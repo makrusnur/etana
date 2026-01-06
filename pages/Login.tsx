@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Button, Input } from '../components/UI';
+import { Button } from '../components/UI';
 import { Lock, User, ShieldCheck, Database, Globe } from 'lucide-react';
 
 export const Login: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {

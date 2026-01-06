@@ -3,9 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { exportToExcel, generateWordDocument } from '../services/export';
 import { db } from '../services/db';
 import { Card, Button, Select } from '../components/UI';
-import { Printer, X, Eye, Database, Info, Copy, ClipboardCheck, UserCheck, FileSpreadsheet, MapPin, FileText, Layout, Ruler, Navigation, History, Hourglass } from 'lucide-react';
+import { Printer, X, Eye, Database, Info, Copy, ClipboardCheck, UserCheck, FileSpreadsheet, MapPin, FileText,  Ruler, Navigation } from 'lucide-react';
 import { formatDateIndo, spellDateIndo } from '../utils';
-import { FileRecord, Identity, LandData, Relation } from '../types';
+import { FileRecord } from '../types';
 
 export const TemplatesPage: React.FC = () => {
   const [selectedFileId, setSelectedFileId] = useState('');
