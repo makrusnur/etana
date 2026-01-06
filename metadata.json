@@ -1,0 +1,7 @@
+{
+  "name": "ETHANA 2",
+  "description": "Sistem Administrasi Notaris dengan Database Lokal, OCR KTP, dan Otomatisasi Dokumen.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
