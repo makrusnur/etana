@@ -1,15 +1,10 @@
 
 import React, { useState } from 'react';
 import { Button } from '../components/UI';
-import { Lock, User, ShieldCheck, Database, Globe } from 'lucide-react';
+import { Lock, ShieldCheck, Database, Globe } from 'lucide-react';
 
 export const Login: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
   const [pin, setPin] = useState('');
-
-  const handleGuestLogin = () => {
-    localStorage.setItem('ethana_auth', 'guest');
-    onLogin();
-  };
 
   const handleAdminLogin = () => {
     if (pin === '1234') { // PIN Demo
@@ -34,8 +29,8 @@ export const Login: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
             <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center shadow-lg shadow-blue-500/20 mb-4 rotate-3 hover:rotate-0 transition-transform duration-500">
                <ShieldCheck size={40} className="text-white" />
             </div>
-            <h1 className="text-3xl font-black text-white tracking-tighter">ETHANA <span className="text-blue-400">2</span></h1>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-2">Notary Administration System</p>
+            <h1 className="text-3xl font-black text-white tracking-tighter">ETANA </h1>
+            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-2">system administrasi notaris</p>
           </div>
 
           <div className="space-y-4">
@@ -53,19 +48,6 @@ export const Login: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
             <Button onClick={handleAdminLogin} className="w-full h-14 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-blue-500/10">
               Masuk Database
             </Button>
-
-            <div className="flex items-center gap-4 py-2">
-              <div className="h-[1px] flex-1 bg-white/10"></div>
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Atau</span>
-              <div className="h-[1px] flex-1 bg-white/10"></div>
-            </div>
-
-            <button 
-              onClick={handleGuestLogin}
-              className="w-full py-4 text-slate-400 hover:text-white text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-white/5 rounded-2xl transition-all border border-transparent hover:border-white/10"
-            >
-              <User size={14} /> Masuk Tanpa Daftar (Guest Mode)
-            </button>
           </div>
 
           <div className="mt-10 flex justify-center gap-6">

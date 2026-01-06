@@ -511,7 +511,7 @@ useEffect(() => {
       
       <div className="flex items-center justify-between text-[10px] font-black text-slate-400 uppercase px-2 tracking-[0.2em]">
         <div>Total Objek: {filteredData.length} Baris</div>
-        <div>Ethana 2.0 Engine • PPAT System</div>
+        <div>Etana 1.0 Engine • PPAT System</div>
       </div>
     </div>
   );

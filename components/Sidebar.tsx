@@ -18,7 +18,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
   return (
     <aside className="w-64 bg-white border-r border-slate-200 h-screen fixed left-0 top-0 overflow-y-auto z-10 flex flex-col">
       <div className="p-6 border-b border-slate-100">
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">ETHANA <span className="text-blue-600">2</span></h1>
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">ETANA</h1>
         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Sistem Administrasi Notaris</p>
       </div>
       
