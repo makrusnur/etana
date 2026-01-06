@@ -4,7 +4,7 @@ import { db } from '../services/db';
 import { processOCR } from '../services/ocr';
 import { Identity } from '../types';
 import { Button, Input, Select, Card, DateInput } from '../components/UI';
-import { Camera, Edit2, Trash2, Plus, Search, Loader2, MonitorOff, CheckCircle2 } from 'lucide-react';
+import { Camera, Edit2, Trash2, Plus, Search, Loader2, CheckCircle2 } from 'lucide-react';
 import { generateId, spellDateIndo, formatDateIndo } from '../utils';
 
 export const Identities: React.FC = () => {
@@ -99,7 +99,8 @@ export const Identities: React.FC = () => {
         setForm((prev) => ({ 
           ...prev, 
           ...result,
-          nama: result.nama?.toUpperCase(),
+          // Perbaikan di sini: Ambil result.nama, jika tidak ada gunakan string kosong, lalu jadikan huruf besar
+          nama: (result.nama || "").toUpperCase(),
           is_seumur_hidup: result.ktp_berlaku === 'SEUMUR HIDUP' 
         }));
       } catch (err: any) {

@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { FileRecord, Relation, Identity, LandData, RelationRole } from '../types';
-import { Button, Input, Card, DateInput, Select } from '../components/UI';
-import { Plus, Trash2, Search, FileText, Edit2, UserPlus, Info, MapPin, Calendar, Hash, FileCheck, Save, X, Coins, Clock } from 'lucide-react';
+import { Button, Input, Card, DateInput, } from '../components/UI';
+import { Plus, Trash2, Search, FileText, Edit2,  Calendar,  X, Coins,} from 'lucide-react';
 import { generateId, formatDateIndo, getDayNameIndo, terbilang } from '../utils';
 
 export const FilesPage: React.FC = () => {
