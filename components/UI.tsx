@@ -75,10 +75,10 @@ export const DateInput: React.FC<{ label?: string, value?: string, onChange: (va
   };
 
   const months = [
-    { v: '1', l: 'JAN' }, { v: '2', l: 'FEB' }, { v: '3', l: 'MAR' },
-    { v: '4', l: 'APR' }, { v: '5', l: 'MEI' }, { v: '6', l: 'JUN' },
-    { v: '7', l: 'JUL' }, { v: '8', l: 'AGU' }, { v: '9', l: 'SEP' },
-    { v: '10', l: 'OKT' }, { v: '11', l: 'NOV' }, { v: '12', l: 'DES' }
+    { v: '1', l: 'Januari' }, { v: '2', l: 'Februari' }, { v: '3', l: 'Maret' },
+    { v: '4', l: 'April' }, { v: '5', l: 'Mei' }, { v: '6', l: 'Juni' },
+    { v: '7', l: 'Juli' }, { v: '8', l: 'Agustus' }, { v: '9', l: 'September' },
+    { v: '10', l: 'Oktober' }, { v: '11', l: 'November' }, { v: '12', l: 'Desember' }
   ];
 
   return (

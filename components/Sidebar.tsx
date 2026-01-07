@@ -59,7 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
         <div className={`p-8 border-b border-slate-100/50 flex items-center justify-between ${isCollapsed ? 'flex-col gap-4' : ''}`}>
           {!isCollapsed && (
             <div>
-              <h1 className="text-2xl font-black text-slate-900 tracking-tighter">ETANA</h1>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tighter">ETA<span className="text-blue-600">NA</span></h1>
               <p className="text-[9px] text-blue-500 font-black uppercase tracking-[0.3em] mt-1">Notary System</p>
             </div>
           )}
