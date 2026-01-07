@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { exportToExcel, generateWordDocument } from '../services/export';
 import { db } from '../services/db';
 import { Card, Button, Select } from '../components/UI';
-import { Printer, X, Eye, Database, Info, Copy, ClipboardCheck, UserCheck, FileSpreadsheet, MapPin, FileText,  Ruler, Navigation } from 'lucide-react';
+import { Printer, X, Eye, Database, Info, Copy, ClipboardCheck, UserCheck, FileSpreadsheet, MapPin, FileText,  Ruler, Navigation ,Crosshair } from 'lucide-react';
 import { formatDateIndo, spellDateIndo } from '../utils';
 import { FileRecord } from '../types';
 
@@ -17,8 +17,12 @@ export const TemplatesPage: React.FC = () => {
 
   useEffect(() => {
     const loadInitial = async () => {
-      const allFiles = await db.files.getAll();
-      setFiles(allFiles || []);
+      try {
+        const allFiles = await db.files.getAll();
+        setFiles(allFiles || []);
+      } catch (err) {
+        console.error("Gagal memuat daftar berkas:", err);
+      }
     };
     loadInitial();
   }, []);
@@ -153,6 +157,14 @@ export const TemplatesPage: React.FC = () => {
       T_Total_T: landObj?.batas_timur_seluruhnya || "",
       T_Total_S: landObj?.batas_selatan_seluruhnya || "",
       T_Total_B: landObj?.batas_barat_seluruhnya || "",
+      
+      T_Koor1: landObj?.koordinat_1 || "",
+      T_Koor2: landObj?.koordinat_2 || "",
+      T_Koor3: landObj?.koordinat_3 || "",
+      T_Koor4: landObj?.koordinat_4 || "",
+      T_Koor5: landObj?.koordinat_5 || "",
+      T_Koor6: landObj?.koordinat_6 || "",
+    
     };
 
     // Mapping BAK Dinamis
@@ -191,6 +203,9 @@ export const TemplatesPage: React.FC = () => {
       result[`${prefix}_Prov`] = p?.provinsi || "";
       result[`${prefix}_KTP_Berlaku`] = p?.ktp_berlaku_indo || "";
       result[`${prefix}_KTP_Ejaan`] = p?.ejaan_berlaku || "";
+      result[`${prefix}_Ibu`] = p?.nama_ibuk_kandung || "";
+      result[`${prefix}_Bapak`] = p?.nama_bapak_kandung || "";
+      result[`${prefix}_Pendidikan`] = p?.pendidikan_terakhir || "";
     };
 
     // Pihak 1 (Maks 3)
@@ -299,6 +314,14 @@ export const TemplatesPage: React.FC = () => {
                             <TagRow tag="{T_Luas_M}" val={previewData.T_Luas_M} onCopy={copyToClipboard} copied={copiedTag} />
                             <TagRow tag="{T_Luas_E}" val={previewData.T_Luas_E} onCopy={copyToClipboard} copied={copiedTag} />
                             <TagRow tag="{T_Batas_U}" val={previewData.T_Batas_U} onCopy={copyToClipboard} copied={copiedTag} />
+                        </TagCategory>
+                        <TagCategory title="TITIK KOORDINAT" icon={<Crosshair size={16}/>} color="pink">
+                            <TagRow tag="{T_Koor1}" val={previewData.T_Koor1} onCopy={copyToClipboard} copied={copiedTag} />
+                            <TagRow tag="{T_Koor2}" val={previewData.T_Koor2} onCopy={copyToClipboard} copied={copiedTag} />
+                            <TagRow tag="{T_Koor3}" val={previewData.T_Koor3} onCopy={copyToClipboard} copied={copiedTag} />
+                            <TagRow tag="{T_Koor4}" val={previewData.T_Koor4} onCopy={copyToClipboard} copied={copiedTag} />
+                            <TagRow tag="{T_Koor5}" val={previewData.T_Koor5} onCopy={copyToClipboard} copied={copiedTag} />
+                            <TagRow tag="{T_Koor6}" val={previewData.T_Koor6} onCopy={copyToClipboard} copied={copiedTag} />
                         </TagCategory>
                         <TagCategory title="NARASI BAK / KETERANGAN" icon={<FileText size={16}/>} color="slate">
                             <TagRow tag="{T_Bak1}" val={previewData.T_Bak1} onCopy={copyToClipboard} copied={copiedTag} />

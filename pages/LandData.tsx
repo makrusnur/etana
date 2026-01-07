@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { LandData, LandType, LandHistory } from '../types';
 import { Button, Input,  Card, DateInput } from '../components/UI';
-import { Edit2, Trash2, Plus, Search, MapPin,  FileStack, Info, AlignLeft, Layers, Maximize } from 'lucide-react';
+import { Edit2, Trash2, Plus, Search, MapPin,  FileStack, Info, AlignLeft, Layers, Maximize ,Crosshair } from 'lucide-react';
 import { generateId, terbilang, spellDateIndo } from '../utils';
 
 export const LandDataPage: React.FC = () => {
@@ -37,6 +37,8 @@ export const LandDataPage: React.FC = () => {
     luas_dimohon: 0, ejaan_luas_dimohon: '', batas_utara_dimohon: '', batas_timur_dimohon: '', batas_selatan_dimohon: '', batas_barat_dimohon: '',
     luas_seluruhnya: 0, ejaan_luas_seluruhnya: '', batas_utara_seluruhnya: '', batas_timur_seluruhnya: '', batas_selatan_seluruhnya: '', batas_barat_seluruhnya: '',
     
+    koordinat_1: '', koordinat_2: '', koordinat_3: '', koordinat_4: '', koordinat_5: '', koordinat_6: '',
+
     bak_list: [''], 
     riwayat_tanah: [], 
     created_at: ''
@@ -388,7 +390,24 @@ useEffect(() => {
                 </div>
             </Card>
 
-            <Card title="5. Narasi BAK (Kesaksian)">
+            <Card title="5. Titik Koordinat Geo-Lokasi">
+               <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Crosshair size={18} className="text-blue-500" />
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Input 6 Titik Koordinat</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-0">
+                    <Input label="Titik 1" value={form.koordinat_1} onChange={e => setForm({...form, koordinat_1: e.target.value})} placeholder="-7.xxxx, 112.xxxx" />
+                    <Input label="Titik 2" value={form.koordinat_2} onChange={e => setForm({...form, koordinat_2: e.target.value})} placeholder="-7.xxxx, 112.xxxx" />
+                    <Input label="Titik 3" value={form.koordinat_3} onChange={e => setForm({...form, koordinat_3: e.target.value})} placeholder="-7.xxxx, 112.xxxx" />
+                    <Input label="Titik 4" value={form.koordinat_4} onChange={e => setForm({...form, koordinat_4: e.target.value})} placeholder="-7.xxxx, 112.xxxx" />
+                    <Input label="Titik 5" value={form.koordinat_5} onChange={e => setForm({...form, koordinat_5: e.target.value})} placeholder="-7.xxxx, 112.xxxx" />
+                    <Input label="Titik 6" value={form.koordinat_6} onChange={e => setForm({...form, koordinat_6: e.target.value})} placeholder="-7.xxxx, 112.xxxx" />
+                  </div>
+               </div>
+            </Card>
+
+            <Card title="6. Narasi BAK (Kesaksian)">
               <div className="space-y-5">
                 {(form.bak_list || []).map((txt, idx) => (
                     <div key={idx} className="relative group bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">

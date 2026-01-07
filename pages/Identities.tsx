@@ -211,8 +211,8 @@ export const Identities: React.FC = () => {
                         <option value="Janda">Janda</option>
                     </Select>
                     <Input label="NIK" value={form.nik} maxLength={16} onChange={e => setForm({...form, nik: e.target.value.replace(/\D/g,'')})} />
-                    <Input label="Nama Lengkap" className="text-blue-600" value={form.nama} onChange={e => setForm({...form, nama: e.target.value.toUpperCase()})} />
-                    <Input label="Tempat Lahir" value={form.tempat_lahir} onChange={e => setForm({...form, tempat_lahir: e.target.value.toUpperCase()})} />
+                    <Input label="Nama Lengkap" className="text-blue-600" value={form.nama} onChange={e => setForm({...form, nama: e.target.value})} />
+                    <Input label="Tempat Lahir" value={form.tempat_lahir} onChange={e => setForm({...form, tempat_lahir: e.target.value})} />
                     
                     <div className="col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-6 rounded-[2rem] border border-slate-100 shadow-inner my-4">
                         <div className="md:col-span-2">
@@ -231,13 +231,14 @@ export const Identities: React.FC = () => {
                             list="pekerjaan-options"
                             className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold shadow-sm focus:outline-none focus:border-blue-500 transition-all uppercase"
                             value={form.pekerjaan}
-                            onChange={e => setForm({...form, pekerjaan: e.target.value.toUpperCase()})}
+                            onChange={e => setForm({...form, pekerjaan: e.target.value})}
                         />
                         <datalist id="pekerjaan-options">
                             <option value="PNS" /><option value="TNI" /><option value="POLRI" />
-                            <option value="KARYAWAN SWASTA" /><option value="WIRASWASTA" />
-                            <option value="BURUH HARIAN LEPAS" /><option value="PETANI/PEKEBUN" />
-                            <option value="MENGURUS RUMAH TANGGA" /><option value="PELAJAR/MAHASISWA" />
+                            <option value="Karyawan Swasta" /><option value="Wiraswasta" />
+                            <option value="Buruh Harian Lepas" /><option value="Petani/Pekebun" />
+                            <option value="Mengurus Rumah Tangga" /><option value="Pelajar/Mahasiswa" />
+                            <option value="Belum/Tidak Bekerja" /><option value="Pensiunan" />   
                         </datalist>
                     </div>
 
@@ -253,17 +254,17 @@ export const Identities: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                     <div className="relative">
                         <Heart className="absolute right-4 top-[42px] text-pink-500 opacity-20" size={20} />
-                        <Input label="Nama Ibu Kandung" value={form.nama_ibuk_kandung} onChange={e => setForm({...form, nama_ibuk_kandung: e.target.value.toUpperCase()})} />
+                        <Input label="Nama Ibu Kandung" value={form.nama_ibuk_kandung} onChange={e => setForm({...form, nama_ibuk_kandung: e.target.value})} />
                     </div>
-                    <Input label="Nama Bapak Kandung" value={form.nama_bapak_kandung} onChange={e => setForm({...form, nama_bapak_kandung: e.target.value.toUpperCase()})} />
+                    <Input label="Nama Bapak Kandung" value={form.nama_bapak_kandung} onChange={e => setForm({...form, nama_bapak_kandung: e.target.value})} />
                     <div className="md:col-span-2 relative">
                         <GraduationCap className="absolute right-4 top-[42px] text-blue-500 opacity-20" size={20} />
                         <Select label="Pendidikan Terakhir" value={form.pendidikan_terakhir} onChange={(e) => setForm({...form, pendidikan_terakhir: e.target.value})}>
                             <option value="">-- Pilih Pendidikan --</option>
-                            <option value="TIDAK/BELUM SEKOLAH">TIDAK/BELUM SEKOLAH</option>
-                            <option value="SD / SEDERAJAT">SD / SEDERAJAT</option>
-                            <option value="SMP / SEDERAJAT">SMP / SEDERAJAT</option>
-                            <option value="SMA / SEDERAJAT">SMA / SEDERAJAT</option>
+                            <option value="TIDAK/BELUM SEKOLAH">Tidak/Belum Sekolah</option>
+                            <option value="SD / SEDERAJAT">SD / Sederajat</option>
+                            <option value="SMP / SEDERAJAT">SMP / Sederajat</option>
+                            <option value="SMA / SEDERAJAT">SMA / Sederajat</option>
                             <option value="DIPLOMA I/II/III">DIPLOMA I/II/III</option>
                             <option value="SARJANA (S1)">SARJANA (S1)</option>
                             <option value="MAGISTER (S2)">MAGISTER (S2)</option>
@@ -275,15 +276,15 @@ export const Identities: React.FC = () => {
 
             <Card title="ALAMAT & DOMISILI">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                    <Input label="Alamat" className="md:col-span-2" value={form.alamat} onChange={e => setForm({...form, alamat: e.target.value.toUpperCase()})} />
+                    <Input label="Alamat" className="md:col-span-2" value={form.alamat} onChange={e => setForm({...form, alamat: e.target.value})} />
                     <div className="grid grid-cols-2 gap-4">
                         <Input label="RT" value={form.rt} onChange={e => setForm({...form, rt: e.target.value})} />
                         <Input label="RW" value={form.rw} onChange={e => setForm({...form, rw: e.target.value})} />
                     </div>
-                    <Input label="Desa/Kel" value={form.desa} onChange={e => setForm({...form, desa: e.target.value.toUpperCase()})} />
-                    <Input label="Kecamatan" value={form.kecamatan} onChange={e => setForm({...form, kecamatan: e.target.value.toUpperCase()})} />
-                    <Input label="Kota/Kab" value={form.kota_kabupaten} onChange={e => setForm({...form, kota_kabupaten: e.target.value.toUpperCase()})} />
-                    <Input label="Provinsi" value={form.provinsi} onChange={e => setForm({...form, provinsi: e.target.value.toUpperCase()})} />
+                    <Input label="Desa/Kel" value={form.desa} onChange={e => setForm({...form, desa: e.target.value})} />
+                    <Input label="Kecamatan" value={form.kecamatan} onChange={e => setForm({...form, kecamatan: e.target.value})} />
+                    <Input label="Kota/Kab" value={form.kota_kabupaten} onChange={e => setForm({...form, kota_kabupaten: e.target.value})} />
+                    <Input label="Provinsi" value={form.provinsi} onChange={e => setForm({...form, provinsi: e.target.value})} />
                 </div>
             </Card>
 

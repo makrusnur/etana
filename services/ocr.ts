@@ -5,6 +5,9 @@ import { spellDateIndo } from "../utils";
 
 export const processOCR = async (imageFile: File): Promise<Partial<Identity>> => {
   // GANTI BARIS INI:
+  const toTitleCase = (str: string) => {
+  return str.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+  };
   const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
 
   if (!apiKey) {
@@ -69,8 +72,16 @@ export const processOCR = async (imageFile: File): Promise<Partial<Identity>> =>
     
     return {
       ...result,
-      nama: (result.nama || "").toUpperCase(),
-      pekerjaan: (result.pekerjaan || "").toUpperCase(),
+      nama: toTitleCase(result.nama || ""),
+      tempat_lahir: toTitleCase(result.tempat_lahir || ""),
+      alamat: toTitleCase(result.alamat || ""),
+      desa: toTitleCase(result.desa || ""),
+      kecamatan: toTitleCase(result.kecamatan || ""),
+      kota_kabupaten: toTitleCase(result.kota_kabupaten || ""),
+      provinsi: toTitleCase(result.provinsi || ""),
+      pekerjaan: toTitleCase(result.pekerjaan || ""),
+      agama: toTitleCase(result.agama || ""),
+      
       ejaan_tanggal_lahir: result.tanggal_lahir ? spellDateIndo(result.tanggal_lahir) : '',
       ejaan_tanggal_ktp_berlaku: result.ktp_berlaku === 'SEUMUR HIDUP' ? 'SEUMUR HIDUP' : (result.ktp_berlaku ? spellDateIndo(result.ktp_berlaku) : ''),
       status: 'active'

@@ -96,6 +96,13 @@ export interface LandData {
   batas_selatan_seluruhnya: string;
   batas_barat_seluruhnya: string;
   
+  koordinat_1?: string;
+  koordinat_2?: string;
+  koordinat_3?: string;
+  koordinat_4?: string;
+  koordinat_5?: string;
+  koordinat_6?: string;
+
   created_at: string;
 }
 
