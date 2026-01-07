@@ -63,7 +63,7 @@ export const Login: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
         </div>
 
         <p className="text-center text-slate-600 text-[10px] mt-8 font-medium uppercase tracking-widest">
-          Build v2.5.0 • Powered by Ethana Tech
+          Build v2.5.0 • Powered by Etana Tech
         </p>
       </div>
     </div>

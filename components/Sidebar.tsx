@@ -22,7 +22,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
     <>
       {/* MOBILE TOP BAR */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-lg border-b border-slate-200 z-50 px-5 flex items-center justify-between">
-        <h1 className="text-xl font-black text-slate-900 tracking-tighter">ETHANA <span className="text-blue-600">2</span></h1>
+        <h1 className="text-xl font-black text-slate-900 tracking-tighter">ETANA</h1>
         <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2 bg-slate-100 rounded-xl">
           {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
@@ -59,7 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
         <div className={`p-8 border-b border-slate-100/50 flex items-center justify-between ${isCollapsed ? 'flex-col gap-4' : ''}`}>
           {!isCollapsed && (
             <div>
-              <h1 className="text-2xl font-black text-slate-900 tracking-tighter">ETHANA <span className="text-blue-600">2</span></h1>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tighter">ETANA <span className="text-blue-600">2</span></h1>
               <p className="text-[9px] text-blue-500 font-black uppercase tracking-[0.3em] mt-1">Notary System</p>
             </div>
           )}
