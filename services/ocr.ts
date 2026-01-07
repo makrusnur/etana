@@ -4,8 +4,13 @@ import { Identity } from "../types";
 import { spellDateIndo } from "../utils";
 
 export const processOCR = async (imageFile: File): Promise<Partial<Identity>> => {
-  // Selalu inisialisasi instance baru untuk memastikan mendapatkan API Key terbaru
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.API_KEY;
+
+  if (!apiKey || apiKey === "") {
+    throw new Error("API Key Gemini belum dipasang. Silakan tambahkan API_KEY di Environment Variables Vercel atau file .env lokal.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   
   const base64Data = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -29,7 +34,7 @@ export const processOCR = async (imageFile: File): Promise<Partial<Identity>> =>
         }
       ],
       config: {
-        thinkingConfig: { thinkingBudget: 1000 }, // Memberikan ruang berpikir untuk akurasi OCR
+        thinkingConfig: { thinkingBudget: 1000 },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -54,9 +59,11 @@ export const processOCR = async (imageFile: File): Promise<Partial<Identity>> =>
       }
     });
 
-    const result = JSON.parse(response.text || "{}");
+    const text = response.text;
+    if (!text) throw new Error("AI tidak mengembalikan data.");
     
-    // Validasi sederhana untuk NIK
+    const result = JSON.parse(text);
+    
     if (result.nik) result.nik = result.nik.replace(/\D/g, '').substring(0, 16);
     
     return {
@@ -69,6 +76,6 @@ export const processOCR = async (imageFile: File): Promise<Partial<Identity>> =>
     };
   } catch (error) {
     console.error("OCR AI Error:", error);
-    throw new Error("Gagal mengekstraksi data KTP. Pastikan gambar jelas, tidak terpotong, dan pencahayaan cukup.");
+    throw new Error("Gagal mengekstraksi data KTP. Pastikan API Key valid dan gambar KTP terlihat jelas.");
   }
 };
