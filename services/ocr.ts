@@ -24,7 +24,7 @@ export const processOCR = async (imageFile: File): Promise<Partial<Identity>> =>
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: {
         parts: [
           { inlineData: { data: base64Data, mimeType: imageFile.type } },
