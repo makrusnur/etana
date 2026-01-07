@@ -11,12 +11,12 @@ const getEnv = (key: string) => {
   }
 };
 
-const supabaseUrl = getEnv('https://placeholder.https://xrtdbatsycdhbbkxcpjs.supabase.co');
+const supabaseUrl = getEnv('https://xrtdbatsycdhbbkxcpjs.supabase.co');
 const supabaseAnonKey = getEnv('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhydGRiYXRzeWNkaGJia3hjcGpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc2ODIxMTYsImV4cCI6MjA4MzI1ODExNn0.H0HW88HYabCqTM3znO0r_2ju0BsLUrcF_ds41wCqZTo');
 
 const isConfigured = supabaseUrl.startsWith('http') && supabaseAnonKey !== '';
 
-const finalUrl = isConfigured ? supabaseUrl : 'https://placeholder.https://xrtdbatsycdhbbkxcpjs.supabase.co';
+const finalUrl = isConfigured ? supabaseUrl : 'https://xrtdbatsycdhbbkxcpjs.supabase.co';
 const finalKey = isConfigured ? supabaseAnonKey : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhydGRiYXRzeWNkaGJia3hjcGpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc2ODIxMTYsImV4cCI6MjA4MzI1ODExNn0.H0HW88HYabCqTM3znO0r_2ju0BsLUrcF_ds41wCqZTo';
 
 export const supabase = createClient(finalUrl, finalKey);

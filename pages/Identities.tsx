@@ -414,7 +414,7 @@ export const Identities: React.FC = () => {
       </Card>
       
       <div className="flex justify-between items-center px-4">
-         <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.4em]">ETHANA v2.5 • GEN-Z READY</span>
+         <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.4em]">ETANA v1.5</span>
          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Data: {filteredData.length}</span>
       </div>
     </div>
