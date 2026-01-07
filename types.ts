@@ -20,6 +20,9 @@ export interface Identity {
   ktp_berlaku: string;
   is_seumur_hidup?: boolean;
   ejaan_tanggal_ktp_berlaku: string;
+  nama_bapak_kandung: string;
+  nama_ibuk_kandung: string;
+  pendidikan_terakhir: string;
   foto_ktp: string;
   created_at: string;
 }

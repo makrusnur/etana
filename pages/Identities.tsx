@@ -35,6 +35,9 @@ export const Identities: React.FC = () => {
     pekerjaan: '', 
     ktp_berlaku: '',
     ejaan_tanggal_ktp_berlaku: '', 
+    nama_bapak_kandung: '',
+    nama_ibuk_kandung: '',
+    pendidikan_terakhir: '',
     foto_ktp: '', 
     created_at: '', 
     is_seumur_hidup: false
@@ -196,8 +199,8 @@ export const Identities: React.FC = () => {
                 <option value="Janda">Janda</option>
               </Select>
               <Input label="NIK" value={form.nik} maxLength={16} onChange={e => setForm({...form, nik: e.target.value.replace(/\D/g,'')})} />
-              <Input label="Nama Lengkap" className="font-bold text-slate-800" value={form.nama} onChange={e => setForm({...form, nama: e.target.value.toUpperCase()})} />
-              <Input label="Tempat Lahir" value={form.tempat_lahir} onChange={e => setForm({...form, tempat_lahir: e.target.value.toUpperCase()})} />
+              <Input label="Nama Lengkap" className="font-bold text-slate-800" value={form.nama} onChange={e => setForm({...form, nama: e.target.value})} />
+              <Input label="Tempat Lahir" value={form.tempat_lahir} onChange={e => setForm({...form, tempat_lahir: e.target.value})} />
               
               <div className="col-span-2 grid grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
                 <div className="col-span-2">
@@ -216,13 +219,13 @@ export const Identities: React.FC = () => {
                   list="pekerjaan-options"
                   className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   value={form.pekerjaan}
-                  onChange={e => setForm({...form, pekerjaan: e.target.value.toUpperCase()})}
+                  onChange={e => setForm({...form, pekerjaan: e.target.value})}
                 />
                 <datalist id="pekerjaan-options">
-                  <option value="PNS" /><option value="TNI" /><option value="POLRI" />
-                  <option value="KARYAWAN SWASTA" /><option value="WIRASWASTA" />
-                  <option value="BURUH HARIAN LEPAS" /><option value="PETANI/PEKEBUN" />
-                  <option value="MENGURUS RUMAH TANGGA" /><option value="PELAJAR/MAHASISWA" />
+                  <option value="PNS" /><option value="TNI" /><option value="Polri" />
+                  <option value="Karyawan Swasta" /><option value="Wiwaswasta" />
+                  <option value="Buruh Harian Lepas" /><option value="Petani/Pekebun" />
+                  <option value="Mengurus Rumah Tangga" /><option value="Pelajar/Mahasiswa" />
                 </datalist>
               </div>
 
@@ -232,15 +235,24 @@ export const Identities: React.FC = () => {
                 <option value="Buddha">Buddha</option><option value="Konghucu">Konghucu</option>
               </Select>
 
-              <Input label="Alamat" className="col-span-2" value={form.alamat} onChange={e => setForm({...form, alamat: e.target.value.toUpperCase()})} />
+              <Input label="Alamat" className="col-span-2" value={form.alamat} onChange={e => setForm({...form, alamat: e.target.value})} />
               <div className="grid grid-cols-2 gap-4">
                 <Input label="RT" value={form.rt} onChange={e => setForm({...form, rt: e.target.value})} />
                 <Input label="RW" value={form.rw} onChange={e => setForm({...form, rw: e.target.value})} />
               </div>
-              <Input label="Desa/Kel" value={form.desa} onChange={e => setForm({...form, desa: e.target.value.toUpperCase()})} />
-              <Input label="Kecamatan" value={form.kecamatan} onChange={e => setForm({...form, kecamatan: e.target.value.toUpperCase()})} />
-              <Input label="Kota/Kab" value={form.kota_kabupaten} onChange={e => setForm({...form, kota_kabupaten: e.target.value.toUpperCase()})} />
-              
+              <Input label="Desa/Kel" value={form.desa} onChange={e => setForm({...form, desa: e.target.value})} />
+              <Input label="Kecamatan" value={form.kecamatan} onChange={e => setForm({...form, kecamatan: e.target.value})} />
+              <Input label="Kota/Kab" value={form.kota_kabupaten} onChange={e => setForm({...form, kota_kabupaten: e.target.value})} />
+              <Input label="Provinsi" value={form.provinsi} onChange={e => setForm({...form, provinsi: e.target.value})} />
+              <Input label="Nama Ibu Kandung" value={form.nama_ibuk_kandung} onChange={e => setForm({...form, nama_ibuk_kandung: e.target.value})} />
+              <Input label="Nama Bapak Kandung" value={form.nama_bapak_kandung} onChange={e => setForm({...form, nama_bapak_kandung: e.target.value})} />
+
+              <Select label="Pendidikan terakhir" value={form.pendidikan_terakhir} onChange={(e) => setForm({...form, pendidikan_terakhir: e.target.value})}>
+                <option value="Sekolah Dasar">Sekolah Dasar</option><option value="SMP">SMP Sederajat</option>
+                <option value="SMA">SMA Sederajat</option><option value="S1/D4">Strata 1</option>
+                <option value="S2">S2 Sederajat</option><option value="S3">S3 Sederajat</option>
+              </Select>  
+ 
               <div className="col-span-2 border-t pt-4 mt-2">
                 <div className="flex justify-between items-center mb-2">
                   <label className="text-[11px] font-black text-slate-700 uppercase">Masa Berlaku KTP</label>
