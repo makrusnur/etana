@@ -9,26 +9,26 @@ export const terbilang = (nilai: number): string => {
   if (angka < 12) {
     temp = " " + huruf[angka];
   } else if (angka < 20) {
-    temp = terbilang(angka - 10) + " belas";
+    temp = terbilang(angka - 10) + " belas ";
   } else if (angka < 100) {
-    temp = terbilang(Math.floor(angka / 10)) + " puluh" + terbilang(angka % 10);
+    temp = terbilang(Math.floor(angka / 10)) + " puluh " + terbilang(angka % 10);
   } else if (angka < 200) {
-    temp = " seratus" + terbilang(angka - 100);
+    temp = " seratus " + terbilang(angka - 100);
   } else if (angka < 1000) {
-    temp = terbilang(Math.floor(angka / 100)) + " ratus" + terbilang(angka % 100);
+    temp = terbilang(Math.floor(angka / 100)) + " ratus " + terbilang(angka % 100);
   } else if (angka < 2000) {
-    temp = " seribu" + terbilang(angka - 1000);
+    temp = " seribu " + terbilang(angka - 1000);
   } else if (angka < 1000000) {
-    temp = terbilang(Math.floor(angka / 1000)) + " ribu" + terbilang(angka % 1000);
+    temp = terbilang(Math.floor(angka / 1000)) + " ribu " + terbilang(angka % 1000);
   } else if (angka < 1000000000) {
-    temp = terbilang(Math.floor(angka / 1000000)) + " juta" + terbilang(angka % 1000000);
+    temp = terbilang(Math.floor(angka / 1000000)) + " juta " + terbilang(angka % 1000000);
   } else if (angka < 1000000000000) {
-    temp = terbilang(Math.floor(angka / 1000000000)) + " miliar" + terbilang(angka % 1000000000);
+    temp = terbilang(Math.floor(angka / 1000000000)) + " miliar " + terbilang(angka % 1000000000);
   } else if (angka < 1000000000000000) {
-    temp = terbilang(Math.floor(angka / 1000000000000)) + " triliun" + terbilang(angka % 1000000000000);
+    temp = terbilang(Math.floor(angka / 1000000000000)) + " triliun " + terbilang(angka % 1000000000000);
   }
   
-  return temp.trim() || "nol";
+  return temp.trim() || " ";
 };
 
 export const getDayNameIndo = (dateStr: string): string => {

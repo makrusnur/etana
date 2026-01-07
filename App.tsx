@@ -26,17 +26,21 @@ const App: React.FC = () => {
 
   return (
     <HashRouter>
-      <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900">
+      <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900">
         <Sidebar onLogout={handleLogout} />
-        <main className="ml-64 flex-1 p-8 overflow-y-auto h-screen">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/identities" element={<Identities />} />
-            <Route path="/lands" element={<LandDataPage />} />
-            <Route path="/files" element={<FilesPage />} />
-            <Route path="/templates" element={<TemplatesPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+        {/* Main content area with dynamic padding based on responsive state */}
+        <main className="w-full lg:pl-[20rem] lg:pr-8 pt-20 lg:pt-8 pb-8 transition-all duration-500 ease-in-out">
+          {/* Inner container to constrain width on ultra-wide screens */}
+          <div className="max-w-7xl mx-auto px-4 lg:px-0">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/identities" element={<Identities />} />
+              <Route path="/lands" element={<LandDataPage />} />
+              <Route path="/files" element={<FilesPage />} />
+              <Route path="/templates" element={<TemplatesPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </div>
         </main>
       </div>
     </HashRouter>
