@@ -4,8 +4,14 @@ import { Identity } from "../types";
 import { spellDateIndo } from "../utils";
 
 export const processOCR = async (imageFile: File): Promise<Partial<Identity>> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
+  // GANTI BARIS INI:
+  const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("API Key Gemini belum dipasang di Environment Variables.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey: apiKey }); 
   const base64Data = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -18,7 +24,7 @@ export const processOCR = async (imageFile: File): Promise<Partial<Identity>> =>
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-1.5-flash',
       contents: {
         parts: [
           { inlineData: { data: base64Data, mimeType: imageFile.type } },
