@@ -1,32 +1,61 @@
 
 import React, { useEffect, useState } from 'react';
 
-export const Button: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'outline', size?: 'sm' | 'md' }> = ({ className = '', variant = 'primary', size = 'md', children, ...props }) => {
-  const base = "rounded-2xl font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2";
-  const v = { 
-    primary: "bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-500/30", 
-    secondary: "bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-200", 
-    outline: "border-2 border-slate-200 text-slate-700 hover:border-blue-600 hover:text-blue-600" 
+// Utility sederhana untuk simulasi 'cn' (classNames)
+const cn = (...classes: (string | boolean | undefined)[]) => classes.filter(Boolean).join(' ');
+
+export const Button: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { 
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive', 
+  size?: 'default' | 'sm' | 'lg' | 'icon'
+}> = ({ className = '', variant = 'primary', size = 'default', children, ...props }) => {
+  const baseStyles = "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-400 disabled:pointer-events-none disabled:opacity-50";
+  
+  const variants = {
+    primary: "bg-slate-900 text-slate-50 shadow hover:bg-slate-900/90",
+    secondary: "bg-slate-100 text-slate-900 shadow-sm hover:bg-slate-100/80",
+    outline: "border border-slate-200 bg-white shadow-sm hover:bg-slate-100 hover:text-slate-900",
+    ghost: "hover:bg-slate-100 hover:text-slate-900",
+    destructive: "bg-red-500 text-slate-50 shadow-sm hover:bg-red-500/90"
   };
-  const s = { sm: "px-4 py-2 text-[10px]", md: "px-6 py-3.5 text-xs" };
-  return <button className={`${base} ${v[variant]} ${s[size]} ${className}`} {...props}>{children}</button>;
+
+  const sizes = {
+    default: "h-9 px-4 py-2",
+    sm: "h-8 rounded-md px-3 text-xs",
+    lg: "h-10 rounded-md px-8",
+    icon: "h-9 w-9"
+  };
+
+  return (
+    <button 
+      className={cn(baseStyles, variants[variant], sizes[size], className)} 
+      {...props}
+    >
+      {children}
+    </button>
+  );
 };
 
 export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label?: string }> = ({ label, className = '', ...props }) => (
-  <div className="mb-4">
-    {label && <label className="block text-[10px] font-black uppercase tracking-widest mb-1.5 text-slate-400 px-1">{label}</label>}
+  <div className="space-y-2 mb-4">
+    {label && <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{label}</label>}
     <input 
-      className={`w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold shadow-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 transition-all placeholder:text-slate-300 disabled:bg-slate-50 disabled:text-slate-400 ${className}`} 
+      className={cn(
+        "flex h-9 w-full rounded-md border border-slate-200 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-400 disabled:cursor-not-allowed disabled:opacity-50",
+        className
+      )} 
       {...props} 
     />
   </div>
 );
 
 export const Select: React.FC<React.SelectHTMLAttributes<HTMLSelectElement> & { label?: string }> = ({ label, className = '', children, ...props }) => (
-  <div className="mb-4">
-    {label && <label className="block text-[10px] font-black uppercase tracking-widest mb-1.5 text-slate-400 px-1">{label}</label>}
+  <div className="space-y-2 mb-4">
+    {label && <label className="text-sm font-medium leading-none">{label}</label>}
     <select 
-      className={`w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold shadow-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 transition-all appearance-none ${className}`} 
+      className={cn(
+        "flex h-9 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-slate-400 disabled:cursor-not-allowed disabled:opacity-50",
+        className
+      )} 
       {...props}
     >
       {children}
@@ -34,14 +63,17 @@ export const Select: React.FC<React.SelectHTMLAttributes<HTMLSelectElement> & { 
   </div>
 );
 
-export const Card: React.FC<{ children: React.ReactNode, title?: string, className?: string }> = ({ children, title, className = '' }) => (
-  <div className={`bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-white overflow-hidden transition-all hover:shadow-2xl hover:shadow-slate-300/50 ${className}`}>
-    {title && (
-      <div className="px-8 py-6 border-b border-slate-50 bg-slate-50/50">
-        <h3 className="text-sm font-black text-slate-900 uppercase tracking-[0.2em]">{title}</h3>
+export const Card: React.FC<{ children: React.ReactNode, title?: string, description?: string, className?: string }> = ({ children, title, description, className = '' }) => (
+  <div className={cn("rounded-lg border border-slate-200 bg-white text-slate-950 shadow-sm", className)}>
+    {(title || description) && (
+      <div className="flex flex-col space-y-1.5 p-6">
+        {title && <h3 className="text-lg font-semibold leading-none tracking-tight">{title}</h3>}
+        {description && <p className="text-sm text-slate-500">{description}</p>}
       </div>
     )}
-    <div className="p-8">{children}</div>
+    <div className={cn("p-6 pt-0", !title && !description && "pt-6")}>
+      {children}
+    </div>
   </div>
 );
 
@@ -82,26 +114,26 @@ export const DateInput: React.FC<{ label?: string, value?: string, onChange: (va
   ];
 
   return (
-    <div className="mb-4">
-      {label && <label className="block text-[10px] font-black uppercase tracking-widest mb-1.5 text-slate-400 px-1">{label}</label>}
+    <div className="space-y-2 mb-4">
+      {label && <label className="text-sm font-medium leading-none">{label}</label>}
       <div className="flex gap-2">
         <input 
-          type="number" placeholder="TGL" min="1" max="31"
-          className="w-16 px-2 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-center focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/5"
+          type="number" placeholder="Tgl" min="1" max="31"
+          className="w-14 h-9 rounded-md border border-slate-200 text-center text-sm focus:outline-none focus:ring-1 focus:ring-slate-400"
           value={d} 
           onChange={e => handleChange(e.target.value, m, y)} 
         />
         <select 
-          className="flex-1 px-4 py-3.5 bg-white border border-slate-200 rounded-2xl text-xs font-black focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/5 appearance-none"
+          className="flex-1 h-9 rounded-md border border-slate-200 px-3 text-sm focus:outline-none focus:ring-1 focus:ring-slate-400 appearance-none bg-white"
           value={m}
           onChange={e => handleChange(d, e.target.value, y)}
         >
-          <option value="">BULAN</option>
+          <option value="">Bulan</option>
           {months.map(mo => <option key={mo.v} value={mo.v}>{mo.l}</option>)}
         </select>
         <input 
-          type="number" placeholder="TAHUN" min="1900" max="2100"
-          className="w-24 px-2 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-center focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/5"
+          type="number" placeholder="Tahun" min="1900" max="2100"
+          className="w-20 h-9 rounded-md border border-slate-200 text-center text-sm focus:outline-none focus:ring-1 focus:ring-slate-400"
           value={y} 
           onChange={e => handleChange(d, m, e.target.value)} 
         />

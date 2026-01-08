@@ -1,6 +1,8 @@
 
 import React, { useState } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+// Fix: Use namespace import for react-router-dom to resolve missing exported member error
+import * as ReactRouterDOM from 'react-router-dom';
+const { HashRouter, Routes, Route, Navigate } = ReactRouterDOM;
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './pages/Dashboard';
 import { Identities } from './pages/Identities';
