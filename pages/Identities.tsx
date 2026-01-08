@@ -291,7 +291,19 @@ export const Identities: React.FC = () => {
                     </Select>
                 </div>
             </Card>
-
+            <Card title="ALAMAT & DOMISILI">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                    <Input label="Alamat" className="md:col-span-2" value={form.alamat} onChange={e => setForm({...form, alamat: e.target.value})} />
+                    <div className="grid grid-cols-2 gap-4">
+                        <Input label="RT" value={form.rt} onChange={e => setForm({...form, rt: e.target.value})} />
+                        <Input label="RW" value={form.rw} onChange={e => setForm({...form, rw: e.target.value})} />
+                    </div>
+                    <Input label="Desa/Kel" value={form.desa} onChange={e => setForm({...form, desa: e.target.value})} />
+                    <Input label="Kecamatan" value={form.kecamatan} onChange={e => setForm({...form, kecamatan: e.target.value})} />
+                    <Input label="Kota/Kab" value={form.kota_kabupaten} onChange={e => setForm({...form, kota_kabupaten: e.target.value})} />
+                    <Input label="Provinsi" value={form.provinsi} onChange={e => setForm({...form, provinsi: e.target.value})} />
+                </div>
+            </Card>
             <Card title="GARIS KETURUNAN & PENDIDIKAN">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                     <div className="relative">
@@ -315,21 +327,6 @@ export const Identities: React.FC = () => {
                     </div>
                 </div>
             </Card>
-
-            <Card title="ALAMAT & DOMISILI">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                    <Input label="Alamat" className="md:col-span-2" value={form.alamat} onChange={e => setForm({...form, alamat: e.target.value})} />
-                    <div className="grid grid-cols-2 gap-4">
-                        <Input label="RT" value={form.rt} onChange={e => setForm({...form, rt: e.target.value})} />
-                        <Input label="RW" value={form.rw} onChange={e => setForm({...form, rw: e.target.value})} />
-                    </div>
-                    <Input label="Desa/Kel" value={form.desa} onChange={e => setForm({...form, desa: e.target.value})} />
-                    <Input label="Kecamatan" value={form.kecamatan} onChange={e => setForm({...form, kecamatan: e.target.value})} />
-                    <Input label="Kota/Kab" value={form.kota_kabupaten} onChange={e => setForm({...form, kota_kabupaten: e.target.value})} />
-                    <Input label="Provinsi" value={form.provinsi} onChange={e => setForm({...form, provinsi: e.target.value})} />
-                </div>
-            </Card>
-
             <Card title="DOKUMEN PENDUKUNG">
                 <div className="flex justify-between items-center mb-6 px-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Masa Berlaku KTP</label>
@@ -366,7 +363,7 @@ export const Identities: React.FC = () => {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Subject <span className="text-blue-600">Database</span></h2>
+          <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Database <span className="text-blue-600">Identitas</span></h2>
           <p className="text-slate-500 font-medium">Pengelolaan subjek hukum dan identitas klien.</p>
         </div>
         <Button onClick={() => { setForm(emptyForm); setEditingId(null); setView('form'); setError(null); }}>

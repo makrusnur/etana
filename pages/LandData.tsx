@@ -387,7 +387,7 @@ export const LandDataPage: React.FC = () => {
                           <Info size={16} className="text-blue-500 mt-0.5 shrink-0" />
                           <div>
                             <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">Terbilang (Nominal Ejaan)</p>
-                            <div className="text-xs font-bold text-blue-700 leading-relaxed uppercase tracking-tight italic">
+                            <div className="text-xs font-bold text-blue-700 leading-relaxed tracking-tight italic">
                               {form.ejaan_harga_transaksi ? `( ${form.ejaan_harga_transaksi} )` : 'nol rupiah'}
                             </div>
                           </div>

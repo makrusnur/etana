@@ -7,7 +7,7 @@ export const Login: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
   const [pin, setPin] = useState('');
 
   const handleAdminLogin = () => {
-    if (pin === '1234') { // PIN Demo
+    if (pin === '260386') { // PIN Demo
       localStorage.setItem('ethana_auth', 'admin');
       onLogin();
     } else {

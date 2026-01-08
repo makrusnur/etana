@@ -295,7 +295,7 @@ export const TemplatesPage: React.FC = () => {
                         <div className="p-3 bg-blue-500/20 rounded-2xl border border-blue-500/30"><Database size={32} className="text-blue-400"/></div>
                         <div>
                             <h3 className="font-black tracking-[0.3em] text-xs uppercase text-blue-400">Tag Dictionary Explorer</h3>
-                            <h2 className="text-xl font-black text-white">Ethana Engine v2.5</h2>
+                            <h2 className="text-xl font-black text-white">Etana Engine v2.5</h2>
                         </div>
                     </div>
                     
@@ -366,7 +366,7 @@ export const TemplatesPage: React.FC = () => {
                 </div>
                 
                 <div className="p-6 bg-slate-50 border-t border-slate-200 px-12 flex justify-between items-center text-[10px] font-black uppercase tracking-[0.5em] text-slate-400">
-                    <div>ETHANA DOCS ENGINE v2.5.0</div>
+                    <div>ETANA DOCS ENGINE v2.5.0</div>
                     <div className="text-blue-500 font-black">ACTIVE SESSION: {selectedFileId}</div>
                 </div>
             </div>
