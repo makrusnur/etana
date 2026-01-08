@@ -1,12 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { processOCR } from '../services/ocr';
 import { Identity } from '../types';
 import { Button, Input, Select, Card, DateInput } from '../components/UI';
 import { Camera, Edit2, Trash2, Plus, Search, Loader2, CheckCircle2, AlertCircle, Users, GraduationCap, Heart } from 'lucide-react';
-import { generateId, spellDateIndo, formatDateIndo } from '../utils';
+import { spellDateIndo, formatDateIndo , toTitleCase} from '../utils';
 
+// Fungsi Helper untuk merubah teks menjadi Title Case (Huruf depan kapital)
 export const Identities: React.FC = () => {
   const [data, setData] = useState<Identity[]>([]);
   const [view, setView] = useState<'list' | 'form'>('list');
@@ -43,6 +43,7 @@ export const Identities: React.FC = () => {
     nama_ibuk_kandung: '',
     pendidikan_terakhir: ''
   };
+  
   const [form, setForm] = useState<Identity>(emptyForm);
 
   useEffect(() => {
@@ -56,32 +57,41 @@ export const Identities: React.FC = () => {
       setError(null);
     } catch (err: any) {
       console.error("Gagal memuat identitas:", err);
-      setError(err?.message || String(err) || "Gagal menghubungkan ke database.");
+      setError(err?.message || "Gagal menghubungkan ke database.");
     }
   };
 
   useEffect(() => {
-    if (form.tanggal_lahir) {
-      const today = new Date();
-      const birthDate = new Date(form.tanggal_lahir);
-      if (!isNaN(birthDate.getTime())) {
-        let age = today.getFullYear() - birthDate.getFullYear();
-        const m = today.getMonth() - birthDate.getMonth();
-        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
-        setUmur(age >= 0 ? age + " Tahun" : "0 Tahun");
-      } else {
-        setUmur("");
-      }
-      setForm((prev) => ({...prev, ejaan_tanggal_lahir: spellDateIndo(form.tanggal_lahir)}));
-    } else {
-      setUmur("");
+  if (form.tanggal_lahir) {
+    const today = new Date();
+    const birthDate = new Date(form.tanggal_lahir);
+    
+    if (!isNaN(birthDate.getTime())) {
+      // 1. Hitung Umur
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+      setUmur(age >= 0 ? age + " Tahun" : "0 Tahun");
+
+      // 2. Update Ejaan dengan Title Case
+      // Kita ambil hasil spellDateIndo, lalu paksa ke toTitleCase
+      const ejaanText = spellDateIndo(form.tanggal_lahir); 
+      
+      setForm((prev) => ({
+        ...prev, 
+        ejaan_tanggal_lahir: toTitleCase(ejaanText) // <--- DIPAKSA DI SINI
+      }));
     }
-  }, [form.tanggal_lahir]);
+  } else {
+    setUmur("");
+    setForm(prev => ({ ...prev, ejaan_tanggal_lahir: "" }));
+  }
+}, [form.tanggal_lahir]);
 
   const handleEdit = async (id: string) => {
     const item = data.find(i => i.id === id);
     if (item) {
-      setForm({ ...item, is_seumur_hidup: item.ktp_berlaku === 'SEUMUR HIDUP' });
+      setForm({ ...item, is_seumur_hidup: item.ktp_berlaku?.toUpperCase() === 'SEUMUR HIDUP' });
       setEditingId(id);
       setView('form');
     }
@@ -98,37 +108,70 @@ export const Identities: React.FC = () => {
     }
   };
 
-  const handleOCR = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setForm((prev) => ({...prev, foto_ktp: URL.createObjectURL(file)}));
-      setIsProcessing(true);
-      
-      try {
-        const result = await processOCR(file);
-        setForm((prev) => ({ 
-          ...prev, 
-          ...result,
-          nama: (result.nama || "").toUpperCase(),
-          is_seumur_hidup: result.ktp_berlaku === 'SEUMUR HIDUP' 
-        }));
-      } catch (err: any) {
-        alert(err?.message || "Gagal memproses gambar. Pastikan API_KEY sudah benar.");
-      } finally {
-        setIsProcessing(false);
-      }
+ const handleOCR = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  if (e.target.files && e.target.files[0]) {
+    const file = e.target.files[0];
+
+    // 1. Validasi awal: Pastikan file tidak terlalu besar (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Ukuran foto terlalu besar. Silakan gunakan foto yang lebih kecil (maksimal 5MB).");
+      return;
     }
-  };
+
+    setForm((prev) => ({ ...prev, foto_ktp: URL.createObjectURL(file) }));
+    setIsProcessing(true);
+    
+    try {
+      const result = await processOCR(file);
+      
+      // 2. Cek apakah result valid
+      if (!result || typeof result !== 'object') {
+        throw new Error("Format data OCR tidak valid.");
+      }
+
+      // 3. Masukkan data ke form dengan proteksi Title Case pada setiap field teks
+      setForm((prev) => ({ 
+        ...prev, 
+        ...result, // Timpa data lama dengan hasil scan
+        // Pastikan field penting langsung rapi (Title Case)
+        nama: toTitleCase(result.nama || prev.nama),
+        tempat_lahir: toTitleCase(result.tempat_lahir || prev.tempat_lahir),
+        pekerjaan: toTitleCase(result.pekerjaan || prev.pekerjaan),
+        alamat: toTitleCase(result.alamat || prev.alamat),
+        desa: toTitleCase(result.desa || prev.desa),
+        kecamatan: toTitleCase(result.kecamatan || prev.kecamatan),
+        kota_kabupaten: toTitleCase(result.kota_kabupaten || prev.kota_kabupaten),
+        provinsi: toTitleCase(result.provinsi || prev.provinsi),
+        // Logika seumur hidup
+        is_seumur_hidup: result.ktp_berlaku?.toUpperCase() === 'SEUMUR HIDUP' 
+      }));
+
+    } catch (err: any) {
+      console.error("Detail Error OCR:", err);
+      // Pesan error lebih ramah pengguna
+      alert("AI gagal membaca data. Pastikan foto KTP jelas, tidak silau, dan tulisan terbaca.");
+    } finally {
+      setIsProcessing(false);
+      // Bersihkan input file agar bisa digunakan lagi jika user mencoba foto ulang
+      e.target.value = '';
+    }
+  }
+};
 
   const handleSave = async () => {
     if (!form.nama || !form.nik) return alert('Nama dan NIK wajib diisi');
     
+    // Format semua data teks penting menjadi Title Case sebelum simpan
     const payload = { 
       ...form, 
-      nama: form.nama.toUpperCase(),
-      nama_bapak_kandung: form.nama_bapak_kandung?.toUpperCase(),
-      nama_ibuk_kandung: form.nama_ibuk_kandung?.toUpperCase(),
-      pekerjaan: form.pekerjaan.toUpperCase(),
+      nama: toTitleCase(form.nama),
+      nama_bapak_kandung: toTitleCase(form.nama_bapak_kandung),
+      nama_ibuk_kandung: toTitleCase(form.nama_ibuk_kandung),
+      pekerjaan: toTitleCase(form.pekerjaan),
+      desa: toTitleCase(form.desa),
+      kecamatan: toTitleCase(form.kecamatan),
+      alamat: toTitleCase(form.alamat),
+      ejaan_tanggal_lahir: toTitleCase(form.ejaan_tanggal_lahir || spellDateIndo(form.tanggal_lahir)),
       created_at: form.created_at || new Date().toISOString() 
     };
 
@@ -136,7 +179,6 @@ export const Identities: React.FC = () => {
       if (editingId) {
         await db.identities.update(editingId, payload);
       } else {
-        payload.id = generateId();
         await db.identities.add(payload);
       }
       setView('list'); 
@@ -152,8 +194,8 @@ export const Identities: React.FC = () => {
     setForm(prev => ({
       ...prev,
       is_seumur_hidup: checked,
-      ktp_berlaku: checked ? 'SEUMUR HIDUP' : '',
-      ejaan_tanggal_ktp_berlaku: checked ? 'SEUMUR HIDUP' : ''
+      ktp_berlaku: checked ? 'Seumur Hidup' : '',
+      ejaan_tanggal_ktp_berlaku: checked ? 'Seumur Hidup' : ''
     }));
   };
 
@@ -217,7 +259,7 @@ export const Identities: React.FC = () => {
                     <div className="col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-6 rounded-[2rem] border border-slate-100 shadow-inner my-4">
                         <div className="md:col-span-2">
                         <DateInput label="Tanggal Lahir" value={form.tanggal_lahir} onChange={val => setForm({...form, tanggal_lahir: val})} />
-                        <div className="text-[9px] text-blue-500 font-black uppercase tracking-widest mt-2">({form.ejaan_tanggal_lahir || '...'})</div>
+                        <div className="text-[10px] text-blue-600 font-bold mt-1.5">({form.ejaan_tanggal_lahir || '...'})</div>
                         </div>
                         <div className="flex flex-col">
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">Umur</label>
@@ -229,7 +271,7 @@ export const Identities: React.FC = () => {
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">Pekerjaan</label>
                         <input 
                             list="pekerjaan-options"
-                            className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold shadow-sm focus:outline-none focus:border-blue-500 transition-all uppercase"
+                            className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold shadow-sm focus:outline-none focus:border-blue-500 transition-all"
                             value={form.pekerjaan}
                             onChange={e => setForm({...form, pekerjaan: e.target.value})}
                         />
@@ -261,14 +303,14 @@ export const Identities: React.FC = () => {
                         <GraduationCap className="absolute right-4 top-[42px] text-blue-500 opacity-20" size={20} />
                         <Select label="Pendidikan Terakhir" value={form.pendidikan_terakhir} onChange={(e) => setForm({...form, pendidikan_terakhir: e.target.value})}>
                             <option value="">-- Pilih Pendidikan --</option>
-                            <option value="TIDAK/BELUM SEKOLAH">Tidak/Belum Sekolah</option>
-                            <option value="SD / SEDERAJAT">SD / Sederajat</option>
-                            <option value="SMP / SEDERAJAT">SMP / Sederajat</option>
-                            <option value="SMA / SEDERAJAT">SMA / Sederajat</option>
-                            <option value="DIPLOMA I/II/III">DIPLOMA I/II/III</option>
-                            <option value="SARJANA (S1)">SARJANA (S1)</option>
-                            <option value="MAGISTER (S2)">MAGISTER (S2)</option>
-                            <option value="DOKTOR (S3)">DOKTOR (S3)</option>
+                            <option value="Tidak/Belum Sekolah">Tidak/Belum Sekolah</option>
+                            <option value="SD / Sederajat">SD / Sederajat</option>
+                            <option value="SMP / Sederajat">SMP / Sederajat</option>
+                            <option value="SMA / Sederajat">SMA / Sederajat</option>
+                            <option value="Diploma I/II/III">Diploma I/II/III</option>
+                            <option value="Sarjana (S1)">Sarjana (S1)</option>
+                            <option value="Magister (S2)">Magister (S2)</option>
+                            <option value="Doktor (S3)">Doktor (S3)</option>
                         </Select>
                     </div>
                 </div>
@@ -373,19 +415,20 @@ export const Identities: React.FC = () => {
                             {item.nama.charAt(0)}
                         </div>
                         <div>
-                            <div className="font-black text-slate-900 uppercase tracking-tight">{item.nama}</div>
+                            {/* Tampilkan Nama dengan Title Case di tabel */}
+                            <div className="font-black text-slate-900 uppercase tracking-tight">{toTitleCase(item.nama)}</div>
                             <div className="text-[10px] text-slate-400 font-mono tracking-tighter mt-0.5">{item.nik}</div>
                         </div>
                     </div>
                   </td>
                   <td className="p-6">
-                    <div className="text-xs font-bold text-slate-600 truncate max-w-[200px]">{item.alamat}</div>
-                    <div className="text-[9px] font-black text-blue-500 uppercase tracking-widest mt-1">DESA {item.desa || '-'} • KEC. {item.kecamatan || '-'}</div>
+                    <div className="text-xs font-bold text-slate-600 truncate max-w-[200px]">{toTitleCase(item.alamat)}</div>
+                    <div className="text-[9px] font-black text-blue-500 uppercase tracking-widest mt-1">DESA {item.desa?.toUpperCase() || '-'} • KEC. {item.kecamatan?.toUpperCase() || '-'}</div>
                   </td>
                   <td className="p-6 text-center">
-                    {item.ktp_berlaku === 'SEUMUR HIDUP' ? (
+                    {item.ktp_berlaku?.toUpperCase() === 'SEUMUR HIDUP' ? (
                       <span className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black border border-emerald-100 uppercase tracking-widest">
-                        <CheckCircle2 size={12}/> Lifetime
+                        <CheckCircle2 size={12}/> Seumur Hidup
                       </span>
                     ) : (
                       <div className="text-slate-500 font-bold text-[11px]">{formatDateIndo(item.ktp_berlaku)}</div>

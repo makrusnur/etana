@@ -119,7 +119,6 @@ export interface FileRecord {
   nomor_berkas: string;
   nomor_register: string;
   hari: string;
-  jenis_berkas: string;
   tanggal: string;
   keterangan: string;
   jenis_perolehan: string;
@@ -127,6 +126,11 @@ export interface FileRecord {
   harga?: number;
   ejaan_harga?: string;
   created_at: string;
+  // khusus waris
+  register_waris_desa?: string;
+  register_waris_kecamatan?: string;
+  tanggal_waris?: string;
+
 }
 
 export type RelationRole = 'PIHAK_1' | 'PIHAK_2' | 'SAKSI' | 'PERSETUJUAN_PIHAK_1';

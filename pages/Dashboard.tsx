@@ -94,7 +94,6 @@ export const Dashboard: React.FC = () => {
                       <FileText size={18} />
                     </div>
                     <div>
-                      <p className="text-sm font-black text-slate-800 uppercase tracking-tight">{file.jenis_berkas}</p>
                       <p className="text-[10px] font-bold text-slate-400">{file.nomor_berkas}</p>
                     </div>
                   </div>

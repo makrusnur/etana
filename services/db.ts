@@ -1,29 +1,19 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { Identity, LandData, FileRecord, Relation } from '../types';
 
-// Safely access process.env
-const getEnv = (key: string) => {
-  try {
-    return process.env[key] || '';
-  } catch {
-    return '';
-  }
-};
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const supabaseUrl = getEnv('https://xrtdbatsycdhbbkxcpjs.supabase.co');
-const supabaseAnonKey = getEnv('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhydGRiYXRzeWNkaGJia3hjcGpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc2ODIxMTYsImV4cCI6MjA4MzI1ODExNn0.H0HW88HYabCqTM3znO0r_2ju0BsLUrcF_ds41wCqZTo');
+const isConfigured = !!supabaseUrl && !!supabaseAnonKey;
 
-const isConfigured = supabaseUrl.startsWith('http') && supabaseAnonKey !== '';
-
-const finalUrl = isConfigured ? supabaseUrl : 'https://xrtdbatsycdhbbkxcpjs.supabase.co';
-const finalKey = isConfigured ? supabaseAnonKey : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhydGRiYXRzeWNkaGJia3hjcGpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc2ODIxMTYsImV4cCI6MjA4MzI1ODExNn0.H0HW88HYabCqTM3znO0r_2ju0BsLUrcF_ds41wCqZTo';
-
-export const supabase = createClient(finalUrl, finalKey);
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder-url.supabase.co', 
+  supabaseAnonKey || 'placeholder'
+);
 
 const handleError = (error: any, context: string) => {
   if (!isConfigured) {
-    throw new Error(`Konfigurasi Supabase belum lengkap. Atur SUPABASE_URL dan SUPABASE_ANON_KEY.`);
+    throw new Error(`Konfigurasi Supabase belum lengkap. Atur VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY di file .env.`);
   }
   const message = error?.message || JSON.stringify(error);
   console.error(`[Supabase Error - ${context}]:`, error);
@@ -43,11 +33,13 @@ export const db = {
       return data as Identity;
     },
     add: async (item: Identity) => {
-      const { error } = await supabase.from('identities').insert([item]);
+      const { id, ...dataToInsert } = item; 
+      const { error } = await supabase.from('identities').insert([dataToInsert]);
       if (error) handleError(error, "Gagal menambah identitas");
     },
     update: async (id: string, updates: Partial<Identity>) => {
-      const { error } = await supabase.from('identities').update(updates).eq('id', id);
+      const { id: _, ...dataToUpdate } = updates;
+      const { error } = await supabase.from('identities').update(dataToUpdate).eq('id', id);
       if (error) handleError(error, "Gagal memperbarui identitas");
     },
     delete: async (id: string) => {
@@ -55,6 +47,7 @@ export const db = {
       if (error) handleError(error, "Gagal menghapus identitas");
     }
   },
+
   lands: {
     getAll: async () => {
       const { data, error } = await supabase.from('lands').select('*').order('created_at', { ascending: false });
@@ -67,11 +60,13 @@ export const db = {
       return data as LandData;
     },
     add: async (item: LandData) => {
-      const { error } = await supabase.from('lands').insert([item]);
+      const { id, ...dataToInsert } = item;
+      const { error } = await supabase.from('lands').insert([dataToInsert]);
       if (error) handleError(error, "Gagal menambah data tanah");
     },
     update: async (id: string, updates: Partial<LandData>) => {
-      const { error } = await supabase.from('lands').update(updates).eq('id', id);
+      const { id: _, ...dataToUpdate } = updates;
+      const { error } = await supabase.from('lands').update(dataToUpdate).eq('id', id);
       if (error) handleError(error, "Gagal memperbarui data tanah");
     },
     delete: async (id: string) => {
@@ -79,6 +74,7 @@ export const db = {
       if (error) handleError(error, "Gagal menghapus data tanah");
     }
   },
+
   files: {
     getAll: async () => {
       const { data, error } = await supabase.from('files').select('*').order('created_at', { ascending: false });
@@ -91,11 +87,13 @@ export const db = {
       return data as FileRecord;
     },
     add: async (item: FileRecord) => {
-      const { error } = await supabase.from('files').insert([item]);
+      const { id, ...dataToInsert } = item;
+      const { error } = await supabase.from('files').insert([dataToInsert]);
       if (error) handleError(error, "Gagal menambah berkas");
     },
     update: async (id: string, updates: Partial<FileRecord>) => {
-      const { error } = await supabase.from('files').update(updates).eq('id', id);
+      const { id: _, ...dataToUpdate } = updates;
+      const { error } = await supabase.from('files').update(dataToUpdate).eq('id', id);
       if (error) handleError(error, "Gagal memperbarui berkas");
     },
     delete: async (id: string) => {
@@ -103,6 +101,7 @@ export const db = {
       if (error) handleError(error, "Gagal menghapus berkas");
     }
   },
+
   relations: {
     getAll: async () => {
       const { data, error } = await supabase.from('relations').select('*');
@@ -115,7 +114,8 @@ export const db = {
       return (data || []) as Relation[];
     },
     add: async (item: Relation) => {
-      const { error } = await supabase.from('relations').insert([item]);
+      const { id, ...dataToInsert } = item;
+      const { error } = await supabase.from('relations').insert([dataToInsert]);
       if (error) handleError(error, "Gagal menambah relasi");
     },
     delete: async (id: string) => {

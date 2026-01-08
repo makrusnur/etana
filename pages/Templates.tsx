@@ -97,7 +97,7 @@ export const TemplatesPage: React.FC = () => {
       No_Berkas: fileData.nomor_berkas,
       No_Register: fileData.nomor_register,
       Hari_Berkas: fileData.hari,
-      Jenis_Surat: fileData.jenis_berkas,
+  
       Tgl_Surat: formatDateIndo(fileData.tanggal),
       Tgl_Ejaan: spellDateIndo(fileData.tanggal),
       Ket_Berkas: fileData.keterangan,
@@ -255,7 +255,7 @@ export const TemplatesPage: React.FC = () => {
             <div className="space-y-4">
                 <Select label="Basis Data Berkas" value={selectedFileId} onChange={e => setSelectedFileId(e.target.value)}>
                     <option value="">-- Hubungkan dengan Berkas --</option>
-                    {files.map(f => <option key={f.id} value={f.id}>{f.nomor_berkas} - {f.jenis_berkas}</option>)}
+                    {files.map(f => <option key={f.id} value={f.id}>{f.nomor_berkas} </option>)}
                 </Select>
                 {previewData && (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 p-5 rounded-2xl border border-slate-200 shadow-inner">

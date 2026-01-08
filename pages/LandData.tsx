@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { LandData, LandType, LandHistory } from '../types';
 import { Button, Input, Card, DateInput } from '../components/UI';
-import { Edit2, Trash2, Plus, Search, MapPin, FileStack,  AlignLeft, Layers, Maximize, Crosshair, Coins, CalendarDays } from 'lucide-react';
+import { Edit2, Trash2, Plus, Search, MapPin, FileStack, Info, AlignLeft, Layers, Maximize, Crosshair, Coins,  Receipt, TrendingUp, Landmark } from 'lucide-react';
 import { generateId, terbilang, spellDateIndo } from '../utils';
 
 export const LandDataPage: React.FC = () => {
@@ -57,12 +57,14 @@ export const LandDataPage: React.FC = () => {
     const totalBangunan = (form.pajak_bangunan_luas || 0) * (form.pajak_bangunan_njop || 0);
     const grandTotal = totalBumi + totalBangunan;
 
-    setForm(prev => ({
-      ...prev,
-      pajak_bumi_total: totalBumi,
-      pajak_bangunan_total: totalBangunan,
-      pajak_grand_total: grandTotal
-    }));
+    if (form.pajak_bumi_total !== totalBumi || form.pajak_bangunan_total !== totalBangunan || form.pajak_grand_total !== grandTotal) {
+      setForm(prev => ({
+        ...prev,
+        pajak_bumi_total: totalBumi,
+        pajak_bangunan_total: totalBangunan,
+        pajak_grand_total: grandTotal
+      }));
+    }
   }, [form.pajak_bumi_luas, form.pajak_bumi_njop, form.pajak_bangunan_luas, form.pajak_bangunan_njop]);
 
   useEffect(() => {
@@ -240,7 +242,7 @@ export const LandDataPage: React.FC = () => {
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-600 text-white rounded-lg shadow-blue-200 shadow-lg"><MapPin size={20}/></div>
               <div>
-                <h2 className="text-lg font-bold text-slate-800">Manajemen Objek Tanah</h2>
+                <h2 className="text-lg font-bold text-slate-800 tracking-tight">Manajemen Objek Tanah</h2>
                 <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Identifikasi & Pengukuran Fisik</p>
               </div>
             </div>
@@ -266,63 +268,131 @@ export const LandDataPage: React.FC = () => {
                 <Input label="Desa/Kelurahan" value={form.desa} onChange={e => setForm({...form, desa: e.target.value})} />
                 <Input label="Kecamatan" value={form.kecamatan} onChange={e => setForm({...form, kecamatan: e.target.value})} />
                 <Input label="Kota / Kabupaten" value={form.kabupaten_kota} readOnly />
-                <Input label="Status Pajak" placeholder="...." value={form.kewajiban_pajak} onChange={e => setForm({...form, kewajiban_pajak: e.target.value})} />
+                <Input label="Kewajiban Pajak" placeholder="...." value={form.kewajiban_pajak} onChange={e => setForm({...form, kewajiban_pajak: e.target.value})} />
               </div>
 
-              {/* Rincian SPPT */}
-              <div className="mt-8 p-6 bg-slate-50 rounded-2xl border border-slate-200">
-                <div className="flex items-center gap-2 mb-4">
-                    <CalendarDays className="text-blue-500" size={18} />
-                    <span className="text-xs font-black uppercase tracking-widest text-slate-600">Rincian SPPT & NJOP</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                    <Input label="SPPT Tahun" value={form.sppt_tahun} onChange={e => setForm({...form, sppt_tahun: e.target.value})} />
-                </div>
-                <div className="overflow-hidden border border-slate-200 rounded-xl bg-white mb-6">
-                    <table className="w-full text-[10px] text-left">
-                        <thead className="bg-slate-100 font-black uppercase text-slate-600">
-                            <tr>
-                                <th className="p-3">Objek Pajak</th>
-                                <th className="p-3">Luas (m²)</th>
-                                <th className="p-3">NJOP (Rp)</th>
-                                <th className="p-3">Total NJOP</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            <tr>
-                                <td className="p-3 font-bold text-slate-700">Bumi</td>
-                                <td className="p-2"><input type="number" className="w-full p-2 border rounded font-bold" value={form.pajak_bumi_luas} onChange={e => setForm({...form, pajak_bumi_luas: parseFloat(e.target.value) || 0})} /></td>
-                                <td className="p-2"><input type="number" className="w-full p-2 border rounded font-bold" value={form.pajak_bumi_njop} onChange={e => setForm({...form, pajak_bumi_njop: parseFloat(e.target.value) || 0})} /></td>
-                                <td className="p-3 font-black text-blue-600">Rp {(form.pajak_bumi_total || 0).toLocaleString('id-ID')}</td>
-                            </tr>
-                            <tr>
-                                <td className="p-3 font-bold text-slate-700">Bangunan</td>
-                                <td className="p-2"><input type="number" className="w-full p-2 border rounded font-bold" value={form.pajak_bangunan_luas} onChange={e => setForm({...form, pajak_bangunan_luas: parseFloat(e.target.value) || 0})} /></td>
-                                <td className="p-2"><input type="number" className="w-full p-2 border rounded font-bold" value={form.pajak_bangunan_njop} onChange={e => setForm({...form, pajak_bangunan_njop: parseFloat(e.target.value) || 0})} /></td>
-                                <td className="p-3 font-black text-blue-600">Rp {(form.pajak_bangunan_total || 0).toLocaleString('id-ID')}</td>
-                            </tr>
-                            <tr className="bg-blue-50">
-                                <td colSpan={3} className="p-3 text-right font-black uppercase text-blue-800">Grand Total NJOP</td>
-                                <td className="p-3 font-black text-blue-900 text-sm">Rp {(form.pajak_grand_total || 0).toLocaleString('id-ID')}</td>
-                            </tr>
-                        </tbody>
-                    </table>
+              {/* Rincian SPPT & NJOP Profesional Layout */}
+              <div className="mt-10 p-1 bg-slate-100/50 rounded-[2.5rem] border border-slate-200">
+                <div className="bg-white rounded-[2.2rem] p-8 shadow-sm">
+                  <div className="flex items-center justify-between mb-8">
+                      <div className="flex items-center gap-3">
+                          <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100 shadow-sm">
+                            <Receipt size={22} />
+                          </div>
+                          <div>
+                            <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-800">SPPT & Nilai NJOP</span>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Penetapan Nilai Objek Pajak</p>
+                          </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="w-32">
+                           <Input label="Tahun Pajak" value={form.sppt_tahun} onChange={e => setForm({...form, sppt_tahun: e.target.value})} />
+                        </div>
+                      </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Ledgers: Bumi */}
+                    <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 flex flex-col group hover:border-blue-200 transition-all">
+                      <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-200/50">
+                        <div className="flex items-center gap-2">
+                           <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                           <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Objek Bumi</span>
+                        </div>
+                        <TrendingUp size={16} className="text-blue-400 opacity-40 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <Input label="Luas (M²)" type="number" value={form.pajak_bumi_luas} onChange={e => setForm({...form, pajak_bumi_luas: parseFloat(e.target.value) || 0})} />
+                          <Input label="NJOP/M² (Rp)" type="number" value={form.pajak_bumi_njop} onChange={e => setForm({...form, pajak_bumi_njop: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="bg-white p-4 rounded-2xl border border-slate-200/50 shadow-inner">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total NJOP Bumi</p>
+                          <div className="text-xl font-black text-slate-900 tracking-tight">Rp {(form.pajak_bumi_total || 0).toLocaleString('id-ID')}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Ledgers: Bangunan */}
+                    <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 flex flex-col group hover:border-emerald-200 transition-all">
+                      <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-200/50">
+                        <div className="flex items-center gap-2">
+                           <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                           <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Objek Bangunan</span>
+                        </div>
+                        <TrendingUp size={16} className="text-emerald-400 opacity-40 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <Input label="Luas (M²)" type="number" value={form.pajak_bangunan_luas} onChange={e => setForm({...form, pajak_bangunan_luas: parseFloat(e.target.value) || 0})} />
+                          <Input label="NJOP/M² (Rp)" type="number" value={form.pajak_bangunan_njop} onChange={e => setForm({...form, pajak_bangunan_njop: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="bg-white p-4 rounded-2xl border border-slate-200/50 shadow-inner">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total NJOP Bangunan</p>
+                          <div className="text-xl font-black text-slate-900 tracking-tight">Rp {(form.pajak_bangunan_total || 0).toLocaleString('id-ID')}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Summary Total NJOP */}
+                  <div className="mt-8 bg-slate-900 rounded-[2rem] p-8 text-white relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 p-10 opacity-5 scale-150 rotate-12 transition-transform group-hover:scale-125 duration-700">
+                        <Landmark size={120} />
+                      </div>
+                      <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-2">Akumulasi Total NJOP</p>
+                          <h4 className="text-4xl font-black tracking-tighter">Rp {(form.pajak_grand_total || 0).toLocaleString('id-ID')}</h4>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">Status Pajak Terdaftar</p>
+                          <div className="px-5 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-emerald-400 inline-block backdrop-blur-md">
+                            Sudah Tervalidasi Sistem
+                          </div>
+                        </div>
+                      </div>
+                  </div>
                 </div>
 
-                {/* Harga Transaksi (Pindahan dari Files) */}
-                <div className="bg-blue-600 p-6 rounded-2xl text-white shadow-xl shadow-blue-500/20">
-                    <div className="flex items-center gap-2 mb-4">
-                        <Coins size={20} />
-                        <span className="text-xs font-black uppercase tracking-widest">Harga Transaksi / Nilai Akta</span>
+                {/* Harga Transaksi / Akta - Premium Layout */}
+                <div className="mt-6 bg-white rounded-[2.2rem] p-8 shadow-sm border border-slate-200/50 relative overflow-hidden group">
+                    <div className="absolute -left-10 -top-10 w-40 h-40 bg-blue-500/5 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700"></div>
+                    <div className="relative z-10">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 shadow-sm">
+                            <Coins size={22} />
+                          </div>
+                          <div>
+                            <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-800">Nilai Transaksi Riil / Harga Akta</span>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Nilai perolehan yang dicatatkan pada akta</p>
+                          </div>
+                        </div>
+                        
+                        <div className="relative">
+                            <div className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-slate-300 text-3xl select-none">Rp</div>
+                            <input 
+                              type="number" 
+                              className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] p-8 pl-20 text-5xl font-black text-slate-900 outline-none focus:bg-white focus:ring-8 focus:ring-blue-500/5 focus:border-blue-500 transition-all placeholder:text-slate-200 shadow-inner" 
+                              placeholder="0"
+                              value={form.harga_transaksi || ''} 
+                              onChange={e => {
+                                const v = parseFloat(e.target.value) || 0;
+                                setForm({...form, harga_transaksi: v, ejaan_harga_transaksi: terbilang(v) + " rupiah"});
+                              }} 
+                            />
+                        </div>
+                        
+                        <div className="mt-6 flex items-start gap-4 p-5 bg-blue-50/30 rounded-2xl border border-blue-100/50">
+                          <Info size={16} className="text-blue-500 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">Terbilang (Nominal Ejaan)</p>
+                            <div className="text-xs font-bold text-blue-700 leading-relaxed uppercase tracking-tight italic">
+                              {form.ejaan_harga_transaksi ? `( ${form.ejaan_harga_transaksi} )` : 'nol rupiah'}
+                            </div>
+                          </div>
+                        </div>
                     </div>
-                    <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-blue-300">Rp</span>
-                        <input type="number" className="w-full bg-white/10 border border-white/20 rounded-xl p-4 pl-12 text-2xl font-black text-white outline-none focus:bg-white/20 focus:ring-2 focus:ring-white/50 transition-all" value={form.harga_transaksi} onChange={e => {
-                            const v = parseFloat(e.target.value) || 0;
-                            setForm({...form, harga_transaksi: v, ejaan_harga_transaksi: terbilang(v) + " rupiah"});
-                        }} />
-                    </div>
-                    <div className="mt-3 text-[10px] font-bold text-blue-100 uppercase tracking-widest italic">{form.ejaan_harga_transaksi || 'nol rupiah'}</div>
                 </div>
               </div>
             </Card>
@@ -428,28 +498,33 @@ export const LandDataPage: React.FC = () => {
                <div className="space-y-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Crosshair size={18} className="text-blue-500" />
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Daftar Titik Koordinat</span>
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Titik Koordinat Bidang Tanah</span>
                   </div>
+                  
                   <div className="space-y-3">
-                    {(form.koordinat_list || []).map((koor, idx) => (
-                      <div key={idx} className="flex gap-2 items-center group">
-                        <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-[10px] font-black text-slate-400 shrink-0">{idx + 1}</div>
+                    {(form.koordinat_list || ['']).map((koor, idx) => (
+                      <div key={idx} className="flex gap-2 items-center group bg-slate-50 p-2 rounded-2xl border border-slate-200">
+                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-[10px] font-black text-slate-400 shrink-0 shadow-sm border border-slate-100">{idx + 1}</div>
                         <input 
-                          className="flex-1 px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none bg-white shadow-inner"
+                          className="flex-1 px-4 py-2 bg-transparent text-xs font-bold focus:outline-none placeholder:text-slate-300 font-mono"
                           placeholder="-7.xxxx, 112.xxxx"
                           value={koor}
                           onChange={e => updateKoordinat(idx, e.target.value)}
                         />
                         {idx > 0 && (
-                          <button onClick={() => removeKoordinat(idx)} className="p-2 text-red-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100">
+                          <button onClick={() => removeKoordinat(idx)} className="p-2 text-red-400 hover:text-red-600 transition-colors">
                             <Trash2 size={16}/>
                           </button>
                         )}
                       </div>
                     ))}
-                    <Button variant="outline" size="sm" onClick={addKoordinat} className="w-full mt-2 border-dashed bg-white">
-                      <Plus size={14} className="mr-2" /> Tambah Titik Koordinat
-                    </Button>
+                    
+                    <button 
+                      onClick={addKoordinat} 
+                      className="w-full py-4 border-2 border-dashed border-slate-200 rounded-[2rem] text-slate-400 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition-all flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest"
+                    >
+                      <Plus size={14} /> Tambah Titik Koordinat
+                    </button>
                   </div>
                </div>
             </Card>

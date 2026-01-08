@@ -53,6 +53,16 @@ export const formatDateIndo = (dateStr: string): string => {
   return `${day} ${month} ${year}`;
 };
 
+export const toTitleCase = (str: string): string => {
+  if (!str) return "";
+  return str
+    .toLowerCase()
+    .split(" ")
+    .filter((s) => s !== "")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
+
 export const spellDateIndo = (dateStr: string): string => {
   if (!dateStr || dateStr === 'SEUMUR HIDUP') return dateStr;
   const date = new Date(dateStr);
@@ -64,7 +74,7 @@ export const spellDateIndo = (dateStr: string): string => {
   const day = terbilang(date.getDate());
   const month = months[date.getMonth()];
   const year = terbilang(date.getFullYear());
-  return `${day} ${month} ${year}`;
+  return toTitleCase(`${day} ${month} ${year}`);
 };
 
 export const generateId = () => {
