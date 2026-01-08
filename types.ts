@@ -96,12 +96,20 @@ export interface LandData {
   batas_selatan_seluruhnya: string;
   batas_barat_seluruhnya: string;
   
-  koordinat_1?: string;
-  koordinat_2?: string;
-  koordinat_3?: string;
-  koordinat_4?: string;
-  koordinat_5?: string;
-  koordinat_6?: string;
+// Field Baru: SPPT Detail & Harga
+  sppt_tahun?: string;
+  pajak_bumi_luas?: number;
+  pajak_bumi_njop?: number;
+  pajak_bumi_total?: number;
+  pajak_bangunan_luas?: number;
+  pajak_bangunan_njop?: number;
+  pajak_bangunan_total?: number;
+  pajak_grand_total?: number;
+  
+  harga_transaksi?: number;
+  ejaan_harga_transaksi?: string;
+
+  koordinat_list?: string[];
 
   created_at: string;
 }

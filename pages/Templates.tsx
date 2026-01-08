@@ -3,9 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { exportToExcel, generateWordDocument } from '../services/export';
 import { db } from '../services/db';
 import { Card, Button, Select } from '../components/UI';
-import { Printer, X, Eye, Database, Info, Copy, ClipboardCheck, UserCheck, FileSpreadsheet, MapPin, FileText,  Ruler, Navigation ,Crosshair } from 'lucide-react';
-import { formatDateIndo, spellDateIndo } from '../utils';
-import { FileRecord } from '../types';
+import { Printer, X, Database,  Copy, ClipboardCheck, UserCheck, FileSpreadsheet, MapPin, FileText, Ruler,  Coins, History,  Search, Users } from 'lucide-react';
+import { formatDateIndo, spellDateIndo, terbilang } from '../utils';
+import { FileRecord, LandData } from '../types';
 
 export const TemplatesPage: React.FC = () => {
   const [selectedFileId, setSelectedFileId] = useState('');
@@ -14,6 +14,7 @@ export const TemplatesPage: React.FC = () => {
   const [copiedTag, setCopiedTag] = useState('');
   const [files, setFiles] = useState<FileRecord[]>([]);
   const [previewData, setPreviewData] = useState<Record<string, any> | null>(null);
+  const [tagSearch, setTagSearch] = useState('');
 
   useEffect(() => {
     const loadInitial = async () => {
@@ -68,7 +69,10 @@ export const TemplatesPage: React.FC = () => {
     const p2: any[] = [];
     const saksi: any[] = [];
     const setuju: any[] = [];
-    let landObj: any = null;
+    
+    // Temukan relasi tanah pertama yang terhubung dengan berkas ini
+    const landRel = relations.find(r => r.data_tanah_id);
+    const landObj: LandData | undefined = landRel ? lands.find(l => l.id === landRel.data_tanah_id) : undefined;
 
     relations.forEach(rel => {
       const person = identities.find(i => i.id === rel.identitas_id);
@@ -86,26 +90,21 @@ export const TemplatesPage: React.FC = () => {
         if (rel.peran === 'SAKSI') saksi.push(enriched);
         if (rel.peran === 'PERSETUJUAN_PIHAK_1') setuju.push(enriched);
       }
-      if (rel.data_tanah_id && !landObj) {
-        landObj = lands.find(l => l.id === rel.data_tanah_id);
-      }
     });
 
     const result: Record<string, any> = {
-      // BERKAS
+      // 1. BERKAS (FileRecord)
       No_Berkas: fileData.nomor_berkas,
-      No_Register: fileData.nomor_register || "",
-      Hari_Berkas: fileData.hari || "",
+      No_Register: fileData.nomor_register,
+      Hari_Berkas: fileData.hari,
       Jenis_Surat: fileData.jenis_berkas,
       Tgl_Surat: formatDateIndo(fileData.tanggal),
       Tgl_Ejaan: spellDateIndo(fileData.tanggal),
-      Ket_Berkas: fileData.keterangan || "",
-      Jenis_Perolehan: fileData.jenis_perolehan || "",
-      Thn_Perolehan: fileData.tahun_perolehan || "",
-      Harga_Angka: fileData.harga ? fileData.harga.toLocaleString('id-ID') : "0",
-      Harga_Ejaan: fileData.ejaan_harga || "nol rupiah",        
+      Ket_Berkas: fileData.keterangan,
+      Jenis_Perolehan: fileData.jenis_perolehan,
+      Thn_Perolehan: fileData.tahun_perolehan,
 
-      // TANAH UMUM
+      // 2. TANAH (LandData)
       T_NOP: landObj?.nop || "",
       T_AtasNama_NOP: landObj?.atas_nama_nop || "",
       T_Kades: landObj?.nama_kepala_desa || "",
@@ -116,18 +115,17 @@ export const TemplatesPage: React.FC = () => {
       T_Desa: landObj?.desa || "",
       T_Kec: landObj?.kecamatan || "",
       T_Kota: landObj?.kabupaten_kota || "",
-      T_Pajak: landObj?.kewajiban_pajak || "",
-      
-      // ALAS HAK - LETTER C
+      T_Pajak_Stat: landObj?.kewajiban_pajak || "",
       T_Jenis_Alas: landObj?.jenis_dasar_surat || "",
-      T_C_AtasNama: landObj?.atas_nama_letter_c || "",
+      
+      // ALAS HAK DETAIL
       T_C_Kohir: landObj?.kohir || "",
       T_C_Persil: landObj?.persil || "",
       T_C_Klas: landObj?.klas || "",
-      T_C_Asal: landObj?.berasal_dari_an || "", 
-      T_C_Tahun: landObj?.tahun_perolehan_alas_hak || "", 
-      
-      // ALAS HAK - SHM ANALOG
+      T_C_AN: landObj?.atas_nama_letter_c || "",
+      T_C_Asal: landObj?.berasal_dari_an || "",
+      T_C_Thn: landObj?.tahun_perolehan_alas_hak || "",
+
       T_SHM_AN: landObj?.atas_nama_shm || "",
       T_SHM_No: landObj?.no_shm || "",
       T_SHM_NIB: landObj?.nib || "",
@@ -137,85 +135,95 @@ export const TemplatesPage: React.FC = () => {
       T_SHM_TglBuku: formatDateIndo(landObj?.tanggal_shm || ""),
       T_SHM_EjaanBuku: landObj?.ejaan_tanggal_shm || "",
 
-      // ALAS HAK - SHM ELEKTRONIK
       T_EL_AN: landObj?.atas_nama_shm_el || "",
       T_EL_Kode: landObj?.kode_sertifikat || "",
       T_EL_Nibel: landObj?.nibel || "",
 
-      // UKUR DIMOHON
-      T_Luas_M: landObj?.luas_dimohon || "",
+      // LUAS & BATAS DIMOHON
+      T_Luas_M: landObj?.luas_dimohon || 0,
       T_Luas_E: landObj?.ejaan_luas_dimohon || "",
       T_Batas_U: landObj?.batas_utara_dimohon || "",
       T_Batas_T: landObj?.batas_timur_dimohon || "",
       T_Batas_S: landObj?.batas_selatan_dimohon || "",
       T_Batas_B: landObj?.batas_barat_dimohon || "",
 
-      // UKUR SELURUHNYA
-      T_Total_M: landObj?.luas_seluruhnya || "",
+      // LUAS & BATAS SELURUHNYA
+      T_Total_M: landObj?.luas_seluruhnya || 0,
       T_Total_E: landObj?.ejaan_luas_seluruhnya || "",
       T_Total_U: landObj?.batas_utara_seluruhnya || "",
       T_Total_T: landObj?.batas_timur_seluruhnya || "",
       T_Total_S: landObj?.batas_selatan_seluruhnya || "",
       T_Total_B: landObj?.batas_barat_seluruhnya || "",
+
+      // SPPT & PAJAK
+      T_Sppt_Thn: landObj?.sppt_tahun || "",
+      T_Bumi_Luas: landObj?.pajak_bumi_luas || 0,
+      T_Bumi_NJOP: landObj?.pajak_bumi_njop || 0,
+      T_Bumi_Total: (landObj?.pajak_bumi_total || 0).toLocaleString('id-ID'),
+      T_Bang_Luas: landObj?.pajak_bangunan_luas || 0,
+      T_Bang_NJOP: landObj?.pajak_bangunan_njop || 0,
+      T_Bang_Total: (landObj?.pajak_bangunan_total || 0).toLocaleString('id-ID'),
+      T_Grand_Total_NJOP: (landObj?.pajak_grand_total || 0).toLocaleString('id-ID'),
+      T_Grand_Ejaan: landObj?.pajak_grand_total ? terbilang(landObj.pajak_grand_total) : "nol",
       
-      T_Koor1: landObj?.koordinat_1 || "",
-      T_Koor2: landObj?.koordinat_2 || "",
-      T_Koor3: landObj?.koordinat_3 || "",
-      T_Koor4: landObj?.koordinat_4 || "",
-      T_Koor5: landObj?.koordinat_5 || "",
-      T_Koor6: landObj?.koordinat_6 || "",
-    
+      T_Harga: (landObj?.harga_transaksi || 0).toLocaleString('id-ID'),
+      T_Harga_E: landObj?.ejaan_harga_transaksi || "nol rupiah",
     };
 
-    // Mapping BAK Dinamis
-    if (landObj?.bak_list) {
-      landObj.bak_list.forEach((val: string, i: number) => {
-        result[`T_Bak${i + 1}`] = val || "";
-      });
+    // KOORDINAT DINAMIS (T_Koor1 s/d T_Koor10)
+    for (let i = 0; i < 10; i++) {
+      result[`T_Koor${i+1}`] = landObj?.koordinat_list?.[i] || "";
     }
 
+    // BAK DINAMIS (T_Bak1 s/d T_Bak10)
+    for (let i = 0; i < 10; i++) {
+      result[`T_Bak${i+1}`] = landObj?.bak_list?.[i] || "";
+    }
+
+    // RIWAYAT TANAH DINAMIS (T_Riw1 s/d T_Riw5)
     for (let i = 0; i < 5; i++) {
-      const entry = landObj?.riwayat_tanah?.[i];
-      result[`T_Riw${i + 1}_Nama`] = entry?.atas_nama || "";
-      result[`T_Riw${i + 1}_C`] = entry?.c_no || "";
-      result[`T_Riw${i + 1}_P`] = entry?.persil_no || "";
-      result[`T_Riw${i + 1}_K`] = entry?.klas || "";
-      result[`T_Riw${i + 1}_L`] = entry?.luas || "";
-      result[`T_Riw${i + 1}_D`] = entry?.dasar_dialihkan || "";
+      const rw = landObj?.riwayat_tanah?.[i];
+      result[`T_Riw${i+1}_Nama`] = rw?.atas_nama || "";
+      result[`T_Riw${i+1}_C`] = rw?.c_no || "";
+      result[`T_Riw${i+1}_P`] = rw?.persil_no || "";
+      result[`T_Riw${i+1}_K`] = rw?.klas || "";
+      result[`T_Riw${i+1}_L`] = rw?.luas || "";
+      result[`T_Riw${i+1}_D`] = rw?.dasar_dialihkan || "";
     }
 
-    const mapP = (prefix: string, p: any) => {
-      result[`${prefix}_Sebutan`] = p?.sebutan || "";
-      result[`${prefix}_Nama`] = p?.nama || "";
-      result[`${prefix}_NIK`] = p?.nik || "";
-      result[`${prefix}_Agama`] = p?.agama || "";
-      result[`${prefix}_Pekerjaan`] = p?.pekerjaan || "";
-      result[`${prefix}_TTL`] = p ? `${p.tempat_lahir}, ${p.tgl_lahir_indo}` : "";
-      result[`${prefix}_Lahir_Tgl`] = p?.tgl_lahir_indo || "";
-      result[`${prefix}_Lahir_Ejaan`] = p?.ejaan_lahir || "";
-      result[`${prefix}_Umur`] = p?.umur ? p.umur + " Tahun" : "";
-      result[`${prefix}_Alamat`] = p?.alamat || "";
-      result[`${prefix}_RT`] = p?.rt || "";
-      result[`${prefix}_RW`] = p?.rw || "";
-      result[`${prefix}_Desa`] = p?.desa || "";
-      result[`${prefix}_Kec`] = p?.kecamatan || "";
-      result[`${prefix}_Kota`] = p?.kota_kabupaten || "";
-      result[`${prefix}_Prov`] = p?.provinsi || "";
-      result[`${prefix}_KTP_Berlaku`] = p?.ktp_berlaku_indo || "";
-      result[`${prefix}_KTP_Ejaan`] = p?.ejaan_berlaku || "";
-      result[`${prefix}_Ibu`] = p?.nama_ibuk_kandung || "";
-      result[`${prefix}_Bapak`] = p?.nama_bapak_kandung || "";
-      result[`${prefix}_Pendidikan`] = p?.pendidikan_terakhir || "";
+    // IDENTITY MAPPING (P1_x, P2_x, Saksi_x, Setuju_x)
+    const mapPerson = (prefix: string, p: any) => {
+      const fields = ["Sebutan", "Nama", "NIK", "Lahir_Tempat", "Lahir_Tgl", "Lahir_Ejaan", "Agama", "Alamat", "RT", "RW", "Desa", "Kec", "Kota", "Prov", "Pekerjaan", "Umur", "Ibu", "Bapak", "Pendidikan", "KTP_Exp"];
+      if (!p) {
+        fields.forEach(f => result[`${prefix}_${f}`] = "");
+        return;
+      }
+      result[`${prefix}_Sebutan`] = p.sebutan || "";
+      result[`${prefix}_Nama`] = p.nama || "";
+      result[`${prefix}_NIK`] = p.nik || "";
+      result[`${prefix}_Lahir_Tempat`] = p.tempat_lahir || "";
+      result[`${prefix}_Lahir_Tgl`] = p.tgl_lahir_indo || "";
+      result[`${prefix}_Lahir_Ejaan`] = p.ejaan_lahir || "";
+      result[`${prefix}_Agama`] = p.agama || "";
+      result[`${prefix}_Alamat`] = p.alamat || "";
+      result[`${prefix}_RT`] = p.rt || "";
+      result[`${prefix}_RW`] = p.rw || "";
+      result[`${prefix}_Desa`] = p.desa || "";
+      result[`${prefix}_Kec`] = p.kecamatan || "";
+      result[`${prefix}_Kota`] = p.kota_kabupaten || "";
+      result[`${prefix}_Prov`] = p.provinsi || "";
+      result[`${prefix}_Pekerjaan`] = p.pekerjaan || "";
+      result[`${prefix}_Umur`] = p.umur || "";
+      result[`${prefix}_Ibu`] = p.nama_ibuk_kandung || "";
+      result[`${prefix}_Bapak`] = p.nama_bapak_kandung || "";
+      result[`${prefix}_Pendidikan`] = p.pendidikan_terakhir || "";
+      result[`${prefix}_KTP_Exp`] = p.ktp_berlaku_indo || "";
     };
 
-    // Pihak 1 (Maks 3)
-    mapP("P1_1", p1[0]); mapP("P1_2", p1[1]); mapP("P1_3", p1[2]);
-    // Pihak 2 (Maks 2)
-    mapP("P2_1", p2[0]); mapP("P2_2", p2[1]);
-    // Saksi (Maks 2)
-    mapP("Saksi1", saksi[0]); mapP("Saksi2", saksi[1]);
-    // Persetujuan (Maks 1)
-    mapP("Setuju1", setuju[0]);
+    mapPerson("P1_1", p1[0]); mapPerson("P1_2", p1[1]); mapPerson("P1_3", p1[2]);
+    mapPerson("P2_1", p2[0]); mapPerson("P2_2", p2[1]);
+    mapPerson("Saksi1", saksi[0]); mapPerson("Saksi2", saksi[1]); mapPerson("Saksi3", saksi[2]); mapPerson("Saksi4", saksi[3]);
+    mapPerson("Setuju1", setuju[0]);
 
     result._countP1 = p1.length;
     result._countP2 = p2.length;
@@ -225,139 +233,141 @@ export const TemplatesPage: React.FC = () => {
     return result;
   };
 
+  const filteredTags = previewData 
+    ? Object.keys(previewData).filter(tag => 
+        tag.toLowerCase().includes(tagSearch.toLowerCase()) || 
+        String(previewData[tag]).toLowerCase().includes(tagSearch.toLowerCase())
+      )
+    : [];
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
       <div className="flex justify-between items-end">
         <div>
-            <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Cetak & Kamus Tag</h2>
-            <p className="text-slate-500 text-sm">Sistem <b>Otomasi Dokumen</b> menggunakan Database Sinkron real-time.</p>
+            <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Otomasi & Kamus Dokumen</h2>
+            <p className="text-slate-500 text-sm">Integrasi <b>Docxtemplater Engine</b> untuk efisiensi pembuatan Akta.</p>
         </div>
-        <div className="flex gap-2">
-            <Button variant="outline" onClick={exportToExcel} size="sm"><FileSpreadsheet size={16} className="mr-2 inline" /> Backup Database (JSON)</Button>
-        </div>
+        <Button variant="outline" onClick={exportToExcel} size="sm"><FileSpreadsheet size={16} className="mr-2 inline" /> Full Backup</Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card title="1. Pilih Berkas Aktif" className="lg:col-span-2 shadow-sm border-slate-200">
+        <Card title="Pilih Berkas Aktif" className="lg:col-span-2 shadow-sm border-slate-200">
             <div className="space-y-4">
-                <Select label="Daftar Berkas Terdaftar" value={selectedFileId} onChange={e => setSelectedFileId(e.target.value)}>
-                    <option value="">-- Pilih Berkas untuk Diproses --</option>
+                <Select label="Basis Data Berkas" value={selectedFileId} onChange={e => setSelectedFileId(e.target.value)}>
+                    <option value="">-- Hubungkan dengan Berkas --</option>
                     {files.map(f => <option key={f.id} value={f.id}>{f.nomor_berkas} - {f.jenis_berkas}</option>)}
                 </Select>
                 {previewData && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-inner">
-                      <SummaryItem label="Pihak 1" val={previewData._countP1} color="emerald" />
-                      <SummaryItem label="Pihak 2" val={previewData._countP2} color="blue" />
-                      <SummaryItem label="Saksi" val={previewData._countS} color="purple" />
-                      <SummaryItem label="Objek" val={previewData._hasLand ? 1 : 0} color="orange" />
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 p-5 rounded-2xl border border-slate-200 shadow-inner">
+                      <SummaryWidget label="Pihak Pertama" val={previewData._countP1} icon={<UserCheck size={14}/>} color="emerald" />
+                      <SummaryWidget label="Pihak Kedua" val={previewData._countP2} icon={<UserCheck size={14}/>} color="blue" />
+                      <SummaryWidget label="Saksi-Saksi" val={previewData._countS} icon={<Users size={14}/>} color="purple" />
+                      <SummaryWidget label="Objek Tanah" val={previewData._hasLand ? 1 : 0} icon={<MapPin size={14}/>} color="orange" />
                     </div>
                 )}
-                {!selectedFileId && <div className="p-10 border-2 border-dashed rounded-xl text-center text-slate-300 text-xs font-bold uppercase tracking-widest">Pilih Berkas untuk melihat statistik data</div>}
             </div>
         </Card>
 
-        <Card title="2. Generate Dokumen" className="shadow-sm border-slate-200">
+        <Card title="Cetak Ke Word" className="shadow-sm border-slate-200">
             <div className="space-y-4 text-center">
-                <div className="p-4 border-2 border-dashed rounded-2xl bg-slate-50 border-slate-300 relative h-36 flex flex-col items-center justify-center group hover:bg-white hover:border-blue-400 transition-all">
+                <div className="p-4 border-2 border-dashed rounded-3xl bg-slate-50 border-slate-200 relative h-36 flex flex-col items-center justify-center group hover:border-blue-400 hover:bg-white transition-all">
                     <input type="file" accept=".docx" onChange={e => setTemplateFile(e.target.files ? e.target.files[0] : null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                     <Printer size={32} className="text-slate-400 mb-2 group-hover:text-blue-500 transition-colors" />
-                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-2 truncate w-full">{templateFile ? templateFile.name : "Klik / Seret Template .docx"}</p>
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 truncate w-full">{templateFile ? templateFile.name : "Lampirkan Template .docx"}</p>
                 </div>
                 <Button 
                   onClick={() => generateWordDocument(templateFile!, previewData)} 
-                  className="w-full h-12 font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 active:scale-95 transition-transform" 
+                  className="w-full font-black uppercase tracking-widest h-14" 
                   disabled={!templateFile || !selectedFileId}
                 >
-                  Proses Dokumen
+                  DOWNLOAD DOKUMEN
                 </Button>
-                <Button variant="outline" className="w-full text-[10px] font-black" onClick={() => setShowDataPreview(true)} disabled={!selectedFileId}><Eye size={14} className="mr-2 inline" /> Buka Panel Kamus Tag</Button>
+                <Button variant="outline" className="w-full text-[10px] font-black" onClick={() => setShowDataPreview(true)} disabled={!selectedFileId}><Database size={14} className="mr-2 inline" /> PANEL KAMUS TAG</Button>
             </div>
         </Card>
       </div>
 
       {showDataPreview && previewData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md overflow-hidden">
-            <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-7xl h-[92vh] flex flex-col border border-white/20 animate-in zoom-in-95 duration-300">
-                <div className="p-6 bg-slate-800 text-white flex justify-between items-center px-10">
-                    <div className="flex items-center gap-6">
-                        <div className="p-3 bg-blue-500/20 rounded-2xl border border-blue-500/30"><Database size={28} className="text-blue-400"/></div>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/95 backdrop-blur-xl animate-in fade-in duration-300">
+            <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-7xl h-[94vh] flex flex-col border border-white/20 animate-in zoom-in-95 duration-300 overflow-hidden">
+                <div className="p-8 bg-slate-800 text-white flex justify-between items-center px-12 border-b border-slate-700">
+                    <div className="flex items-center gap-5">
+                        <div className="p-3 bg-blue-500/20 rounded-2xl border border-blue-500/30"><Database size={32} className="text-blue-400"/></div>
                         <div>
-                            <h3 className="font-black tracking-[0.2em] text-sm uppercase">Kamus Tag Database Real-Time</h3>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Gunakan tag ini untuk diletakkan di dalam file Microsoft Word Anda</p>
+                            <h3 className="font-black tracking-[0.3em] text-xs uppercase text-blue-400">Tag Dictionary Explorer</h3>
+                            <h2 className="text-xl font-black text-white">Ethana Engine v2.5</h2>
                         </div>
                     </div>
-                    <button onClick={() => setShowDataPreview(false)} className="bg-white/10 hover:bg-white/20 p-2 rounded-2xl transition-all"><X size={28} /></button>
+                    
+                    <div className="flex items-center gap-6">
+                        <div className="relative group w-72 hidden md:block">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                            <input 
+                              type="text" 
+                              placeholder="Cari Tag / Isi Data..." 
+                              className="w-full bg-slate-900 border border-slate-700 rounded-2xl py-3 pl-12 pr-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                              value={tagSearch}
+                              onChange={e => setTagSearch(e.target.value)}
+                            />
+                        </div>
+                        <button onClick={() => setShowDataPreview(false)} className="bg-white/5 hover:bg-white/10 p-3 rounded-2xl transition-all"><X size={28} /></button>
+                    </div>
                 </div>
                 
-                <div className="p-8 overflow-y-auto bg-slate-100/50 flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                    {/* KOLOM 1: ADMINISTRASI & TANAH */}
-                    <div className="space-y-8">
-                        <TagCategory title="ADMINISTRASI BERKAS" icon={<FileText size={16}/>} color="emerald">
-                            <TagRow tag="{No_Berkas}" val={previewData.No_Berkas} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{No_Register}" val={previewData.No_Register} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{Hari_Berkas}" val={previewData.Hari_Berkas} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{Tgl_Surat}" val={previewData.Tgl_Surat} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{Jenis_Perolehan}" val={previewData.Jenis_Perolehan} onCopy={copyToClipboard} copied={copiedTag} />
+                <div className="p-10 overflow-y-auto flex-1 bg-slate-50/50 space-y-10 custom-scrollbar">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                        <TagCategory title="ADMIN BERKAS" icon={<FileText size={16}/>} color="emerald">
+                            {filteredTags.filter(t => ["No_Berkas", "No_Register", "Hari_Berkas", "Jenis_Surat", "Tgl_Surat", "Tgl_Ejaan", "Jenis_Perolehan", "Thn_Perolehan"].includes(t)).map(t => (
+                              <TagRow key={t} tag={`{${t}}`} val={previewData[t]} onCopy={copyToClipboard} copied={copiedTag} />
+                            ))}
                         </TagCategory>
-                        
-                        <TagCategory title="OBJEK TANAH (UMUM)" icon={<MapPin size={16}/>} color="blue">
-                            <TagRow tag="{T_NOP}" val={previewData.T_NOP} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{T_AtasNama_NOP}" val={previewData.T_AtasNama_NOP} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{T_Desa}" val={previewData.T_Desa} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{T_Alamat}" val={previewData.T_Alamat} onCopy={copyToClipboard} copied={copiedTag} />
+
+                        <TagCategory title="TANAH & LOKASI" icon={<MapPin size={16}/>} color="blue">
+                            {filteredTags.filter(t => t.startsWith("T_") && !t.includes("NJOP") && !t.includes("Harga") && !t.includes("Koor") && !t.includes("Bak") && !t.includes("Riw")).map(t => (
+                              <TagRow key={t} tag={`{${t}}`} val={previewData[t]} onCopy={copyToClipboard} copied={copiedTag} />
+                            ))}
+                        </TagCategory>
+
+                        <TagCategory title="PAJAK & HARGA" icon={<Coins size={16}/>} color="orange">
+                            {filteredTags.filter(t => t.includes("NJOP") || t.includes("Harga")).map(t => (
+                              <TagRow key={t} tag={`{${t}}`} val={previewData[t]} onCopy={copyToClipboard} copied={copiedTag} />
+                            ))}
+                        </TagCategory>
+
+                        <TagCategory title="BATAS & LUAS" icon={<Ruler size={16}/>} color="pink">
+                            {filteredTags.filter(t => t.startsWith("T_Luas") || t.startsWith("T_Total") || t.startsWith("T_Batas")).map(t => (
+                              <TagRow key={t} tag={`{${t}}`} val={previewData[t]} onCopy={copyToClipboard} copied={copiedTag} />
+                            ))}
                         </TagCategory>
                     </div>
 
-                    {/* KOLOM 2: UKUR & BAK */}
-                    <div className="space-y-8">
-                        <TagCategory title="UKUR DIMOHON" icon={<Ruler size={16}/>} color="orange">
-                            <TagRow tag="{T_Luas_M}" val={previewData.T_Luas_M} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{T_Luas_E}" val={previewData.T_Luas_E} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{T_Batas_U}" val={previewData.T_Batas_U} onCopy={copyToClipboard} copied={copiedTag} />
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                        <TagCategory title="PIHAK PERTAMA" icon={<UserCheck size={16}/>} color="emerald">
+                            {filteredTags.filter(t => t.startsWith("P1_1")).slice(0, 8).map(t => (
+                              <TagRow key={t} tag={`{${t}}`} val={previewData[t]} onCopy={copyToClipboard} copied={copiedTag} />
+                            ))}
                         </TagCategory>
-                        <TagCategory title="TITIK KOORDINAT" icon={<Crosshair size={16}/>} color="pink">
+                        <TagCategory title="PIHAK KEDUA" icon={<UserCheck size={16}/>} color="blue">
+                            {filteredTags.filter(t => t.startsWith("P2_1")).slice(0, 8).map(t => (
+                              <TagRow key={t} tag={`{${t}}`} val={previewData[t]} onCopy={copyToClipboard} copied={copiedTag} />
+                            ))}
+                        </TagCategory>
+                        <TagCategory title="SAKSI & LAINNYA" icon={<Users size={16}/>} color="purple">
+                            {filteredTags.filter(t => t.startsWith("Saksi") || t.startsWith("Setuju")).slice(0, 8).map(t => (
+                              <TagRow key={t} tag={`{${t}}`} val={previewData[t]} onCopy={copyToClipboard} copied={copiedTag} />
+                            ))}
+                        </TagCategory>
+                        <TagCategory title="RIWAYAT & KOORDINAT" icon={<History size={16}/>} color="orange">
                             <TagRow tag="{T_Koor1}" val={previewData.T_Koor1} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{T_Koor2}" val={previewData.T_Koor2} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{T_Koor3}" val={previewData.T_Koor3} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{T_Koor4}" val={previewData.T_Koor4} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{T_Koor5}" val={previewData.T_Koor5} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{T_Koor6}" val={previewData.T_Koor6} onCopy={copyToClipboard} copied={copiedTag} />
-                        </TagCategory>
-                        <TagCategory title="NARASI BAK / KETERANGAN" icon={<FileText size={16}/>} color="slate">
+                            <TagRow tag="{T_Riw1_Nama}" val={previewData.T_Riw1_Nama} onCopy={copyToClipboard} copied={copiedTag} />
                             <TagRow tag="{T_Bak1}" val={previewData.T_Bak1} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{T_Bak2}" val={previewData.T_Bak2} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{Ket_Berkas}" val={previewData.Ket_Berkas} onCopy={copyToClipboard} copied={copiedTag} />
                         </TagCategory>
                     </div>
-
-                    {/* KOLOM 3: PIHAK 1 & 2 */}
-                    <div className="space-y-8">
-                        <TagCategory title="PIHAK 1 (ORANG 1)" icon={<UserCheck size={16}/>} color="emerald">
-                            <TagRow tag="{P1_1_Nama}" val={previewData.P1_1_Nama} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{P1_1_NIK}" val={previewData.P1_1_NIK} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{P1_1_TTL}" val={previewData.P1_1_TTL} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{P1_1_Umur}" val={previewData.P1_1_Umur} onCopy={copyToClipboard} copied={copiedTag} />
-                        </TagCategory>
-                        <TagCategory title="PIHAK 2 (ORANG 1)" icon={<UserCheck size={16}/>} color="blue">
-                            <TagRow tag="{P2_1_Nama}" val={previewData.P2_1_Nama} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{P2_1_NIK}" val={previewData.P2_1_NIK} onCopy={copyToClipboard} copied={copiedTag} />
-                         </TagCategory>
-                    </div>
-
-                    {/* KOLOM 4: SAKSI & TIPS */}
-                    <div className="space-y-8">
-                        <TagCategory title="SAKSI-SAKSI" icon={<Navigation size={16}/>} color="purple">
-                            <TagRow tag="{Saksi1_Nama}" val={previewData.Saksi1_Nama} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{Saksi1_Pekerjaan}" val={previewData.Saksi1_Pekerjaan} onCopy={copyToClipboard} copied={copiedTag} />
-                            <TagRow tag="{Saksi2_Nama}" val={previewData.Saksi2_Nama} onCopy={copyToClipboard} copied={copiedTag} />
-                        </TagCategory>
-                        <div className="p-6 bg-slate-800 rounded-3xl text-white shadow-xl border border-slate-700">
-                            <h4 className="text-[11px] font-black uppercase mb-3 text-blue-400 flex items-center gap-2 tracking-widest"><Info size={16}/> Panduan Cepat</h4>
-                            <p className="text-[10px] leading-relaxed opacity-70 font-medium">
-                                Gunakan kurung kurawal tunggal <code className="text-blue-300 font-bold">{`{No_Berkas}`}</code> di Word. Pastikan ketik manual untuk menghindari kerusakan metadata.
-                            </p>
-                        </div>
-                    </div>
+                </div>
+                
+                <div className="p-6 bg-slate-50 border-t border-slate-200 px-12 flex justify-between items-center text-[10px] font-black uppercase tracking-[0.5em] text-slate-400">
+                    <div>ETHANA DOCS ENGINE v2.5.0</div>
+                    <div className="text-blue-500 font-black">ACTIVE SESSION: {selectedFileId}</div>
                 </div>
             </div>
         </div>
@@ -378,26 +388,29 @@ const TagCategory = ({ title, icon, children, color }: any) => {
     return (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-fit transition-transform hover:scale-[1.02]">
             <div className={`px-5 py-3 border-b flex items-center gap-3 text-[11px] font-black uppercase tracking-widest ${colors[color] || 'bg-slate-50'}`}>{icon} {title}</div>
-            <div className="p-3 space-y-1">{children}</div>
+            <div className="p-4 space-y-1">{children}</div>
         </div>
     );
 };
 
-const TagRow = ({ tag, val, onCopy, copied }: any) => (
-    <div className="group flex flex-col p-2 hover:bg-slate-50 rounded-xl transition-colors border-b border-slate-50 last:border-0">
-        <div className="flex justify-between items-center gap-2">
-            <code className="text-[10px] font-bold text-blue-700 truncate bg-blue-50/50 px-2 py-0.5 rounded-lg border border-blue-100/30 font-mono tracking-tighter">{tag}</code>
-            <button onClick={() => onCopy(tag)} className={`p-1.5 rounded-xl transition-all shrink-0 ${copied === tag ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-500'}`}>
-                {copied === tag ? <ClipboardCheck size={14}/> : <Copy size={14}/>}
-            </button>
+const TagRow = ({ tag, val, onCopy, copied }: any) => {
+    const isNotEmpty = val !== undefined && val !== null && val !== "" && val !== 0;
+    return (
+        <div className="group flex flex-col p-2.5 hover:bg-slate-50 rounded-2xl transition-all border-b border-slate-50 last:border-0 relative">
+            <div className="flex justify-between items-center gap-2">
+                <code className="text-[10px] font-bold text-blue-700 truncate bg-blue-50/50 px-2 py-0.5 rounded-lg border border-blue-100/30 font-mono tracking-tighter cursor-pointer" onClick={() => onCopy(tag)}>{tag}</code>
+                <button onClick={() => onCopy(tag)} className={`p-2 rounded-xl transition-all shrink-0 ${copied === tag ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-500'}`}>
+                    {copied === tag ? <ClipboardCheck size={14}/> : <Copy size={14}/>}
+                </button>
+            </div>
+            {isNotEmpty && <div className="text-[9px] text-slate-400 italic truncate mt-1 px-1 font-medium">{String(val)}</div>}
         </div>
-        <div className="text-[9px] text-slate-400 italic truncate mt-1 px-1 font-medium">{val !== '' && val !== "" ? val : ""}</div>
-    </div>
-);
+    );
+};
 
-const SummaryItem = ({ label, val, color }: any) => (
-    <div className={`p-3 rounded-2xl border text-center bg-${color}-50 border-${color}-100 transition-all`}>
-        <div className={`text-[9px] font-black uppercase text-${color}-600 tracking-widest`}>{label}</div>
-        <div className={`text-xl font-black text-${color}-700`}>{val}</div>
+const SummaryWidget = ({ label, val, icon, color }: any) => (
+    <div className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center bg-${color}-50 border-${color}-100 transition-all`}>
+        <div className={`flex items-center gap-1.5 text-[9px] font-black uppercase text-${color}-600 tracking-widest mb-1`}>{icon} {label}</div>
+        <div className={`text-2xl font-black text-${color}-700 tracking-tighter`}>{val}</div>
     </div>
 );

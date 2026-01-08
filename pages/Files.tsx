@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { FileRecord, Relation, Identity, LandData, RelationRole } from '../types';
 import { Button, Input, Card, DateInput, } from '../components/UI';
-import { Plus, Trash2, Search, FileText, Edit2,  Calendar,  X, Coins,} from 'lucide-react';
-import { generateId, formatDateIndo, getDayNameIndo, terbilang } from '../utils';
+import { Plus, Trash2, Search, FileText, Edit2,  Calendar,  X, } from 'lucide-react';
+import { generateId, formatDateIndo, getDayNameIndo, } from '../utils';
 
 export const FilesPage: React.FC = () => {
   const [files, setFiles] = useState<FileRecord[]>([]);
@@ -332,19 +332,6 @@ export const FilesPage: React.FC = () => {
                  </div>
                  <Input label="Tahun Perolehan" value={formFile.tahun_perolehan} onChange={e => setFormFile({...formFile, tahun_perolehan: e.target.value})} placeholder="Contoh: 2024" />
               </div>
-
-              <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 shadow-inner">
-                <label className="text-[10px] font-black text-blue-600 uppercase flex items-center gap-2 mb-2"><Coins size={14}/> Nilai Transaksi / Harga</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-blue-400">Rp</span>
-                  <input type="number" className="w-full bg-white border border-blue-200 rounded-xl p-3 pl-10 text-xl font-black text-blue-700 outline-none focus:ring-2 focus:ring-blue-500" value={formFile.harga} onChange={e => {
-                    const v = parseFloat(e.target.value) || 0;
-                    setFormFile({...formFile, harga: v, ejaan_harga: terbilang(v) + " rupiah"});
-                  }} />
-                </div>
-                <div className="text-[10px] font-black text-blue-400 mt-2 italic capitalize tracking-tight leading-none">{formFile.ejaan_harga || 'nol rupiah'}</div>
-              </div>
-
               <Input label="Jenis Berkas (Judul Akta)" value={formFile.jenis_berkas} onChange={e => setFormFile({...formFile, jenis_berkas: e.target.value})} placeholder="Contoh: Akta Jual Beli" />
               
               <div className="pt-4 flex gap-3">

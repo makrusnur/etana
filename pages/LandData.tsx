@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { LandData, LandType, LandHistory } from '../types';
-import { Button, Input,  Card, DateInput } from '../components/UI';
-import { Edit2, Trash2, Plus, Search, MapPin,  FileStack, Info, AlignLeft, Layers, Maximize ,Crosshair } from 'lucide-react';
+import { Button, Input, Card, DateInput } from '../components/UI';
+import { Edit2, Trash2, Plus, Search, MapPin, FileStack,  AlignLeft, Layers, Maximize, Crosshair, Coins, CalendarDays } from 'lucide-react';
 import { generateId, terbilang, spellDateIndo } from '../utils';
 
 export const LandDataPage: React.FC = () => {
@@ -37,8 +37,13 @@ export const LandDataPage: React.FC = () => {
     luas_dimohon: 0, ejaan_luas_dimohon: '', batas_utara_dimohon: '', batas_timur_dimohon: '', batas_selatan_dimohon: '', batas_barat_dimohon: '',
     luas_seluruhnya: 0, ejaan_luas_seluruhnya: '', batas_utara_seluruhnya: '', batas_timur_seluruhnya: '', batas_selatan_seluruhnya: '', batas_barat_seluruhnya: '',
     
-    koordinat_1: '', koordinat_2: '', koordinat_3: '', koordinat_4: '', koordinat_5: '', koordinat_6: '',
+    sppt_tahun: new Date().getFullYear().toString(),
+    pajak_bumi_luas: 0, pajak_bumi_njop: 0, pajak_bumi_total: 0,
+    pajak_bangunan_luas: 0, pajak_bangunan_njop: 0, pajak_bangunan_total: 0,
+    pajak_grand_total: 0,
+    harga_transaksi: 0, ejaan_harga_transaksi: '',
 
+    koordinat_list: [''],
     bak_list: [''], 
     riwayat_tanah: [], 
     created_at: ''
@@ -46,20 +51,37 @@ export const LandDataPage: React.FC = () => {
   
   const [form, setForm] = useState<LandData>(emptyForm);
 
+  // Auto Calculations for Tax
+  useEffect(() => {
+    const totalBumi = (form.pajak_bumi_luas || 0) * (form.pajak_bumi_njop || 0);
+    const totalBangunan = (form.pajak_bangunan_luas || 0) * (form.pajak_bangunan_njop || 0);
+    const grandTotal = totalBumi + totalBangunan;
+
+    setForm(prev => ({
+      ...prev,
+      pajak_bumi_total: totalBumi,
+      pajak_bangunan_total: totalBangunan,
+      pajak_grand_total: grandTotal
+    }));
+  }, [form.pajak_bumi_luas, form.pajak_bumi_njop, form.pajak_bangunan_luas, form.pajak_bangunan_njop]);
+
   useEffect(() => {
     loadData();
   }, [view]);
 
   const loadData = async () => {
-    const res = await db.lands.getAll();
-    setData(res || []);
+    try {
+      const res = await db.lands.getAll();
+      setData(res || []);
+    } catch (err) {
+      console.error("Gagal memuat data tanah:", err);
+    }
   };
 
   const updateLuas = (field: 'luas_dimohon' | 'luas_seluruhnya', val: number) => {
     const text = val > 0 ? terbilang(val) + " meter persegi" : "";
     setForm(prev => {
       const newState = { ...prev, [field]: val, [`ejaan_${field}`]: text };
-      // If "Seluruhnya", keep luas_dimohon in sync with luas_seluruhnya
       if (!isPartial && field === 'luas_seluruhnya') {
         newState.luas_dimohon = val;
         newState.ejaan_luas_dimohon = text;
@@ -76,25 +98,33 @@ export const LandDataPage: React.FC = () => {
       created_at: form.created_at || new Date().toISOString() 
     };
 
-    if (editingId) {
-      await db.lands.update(editingId, payload);
-    } else {
-      payload.id = generateId();
-      await db.lands.add(payload);
+    try {
+      if (editingId) {
+        await db.lands.update(editingId, payload);
+      } else {
+        payload.id = generateId();
+        await db.lands.add(payload);
+      }
+      
+      setView('list'); 
+      setEditingId(null); 
+      setForm(emptyForm);
+    } catch (err) {
+      alert("Gagal menyimpan data objek tanah.");
     }
-    
-    setView('list'); 
-    setEditingId(null); 
-    setForm(emptyForm);
   };
 
   const handleEdit = async (id: string) => {
-    const item = await db.lands.get(id);
-    if (item) {
-      setForm({ ...emptyForm, ...item });
-      setIsPartial(item.luas_dimohon !== item.luas_seluruhnya && item.luas_dimohon > 0);
-      setEditingId(id);
-      setView('form');
+    try {
+      const item = await db.lands.get(id);
+      if (item) {
+        setForm({ ...emptyForm, ...item });
+        setIsPartial(item.luas_dimohon !== item.luas_seluruhnya && item.luas_dimohon > 0);
+        setEditingId(id);
+        setView('form');
+      }
+    } catch (err) {
+      alert("Gagal memuat detail data tanah.");
     }
   };
 
@@ -128,28 +158,33 @@ export const LandDataPage: React.FC = () => {
   };
   const removeBAK = (index: number) => setForm(prev => ({ ...prev, bak_list: prev.bak_list?.filter((_, i) => i !== index) }));
 
-  // 🔁 Sinkronisasi otomatis: isi riwayat_tanah[0] dari data Letter C
-useEffect(() => {
-  if (form.jenis_dasar_surat === 'LETTER_C' && (form.persil || form.klas)) {
-    // Pastikan riwayat_tanah punya minimal 1 baris
-    const currentRiwayat = form.riwayat_tanah && form.riwayat_tanah.length > 0 
-      ? [...form.riwayat_tanah] 
-      : [{ atas_nama: '', c_no: '', persil_no: '', klas: '', luas: '', dasar_dialihkan: '' }];
+  const addKoordinat = () => setForm(prev => ({ ...prev, koordinat_list: [...(prev.koordinat_list || []), ''] }));
+  const updateKoordinat = (index: number, val: string) => {
+    const newList = [...(form.koordinat_list || [])];
+    newList[index] = val;
+    setForm(prev => ({ ...prev, koordinat_list: newList }));
+  };
+  const removeKoordinat = (index: number) => setForm(prev => ({ ...prev, koordinat_list: prev.koordinat_list?.filter((_, i) => i !== index) }));
 
-    // Update hanya baris pertama
-    currentRiwayat[0] = {
-      ...currentRiwayat[0],
-      persil_no: form.persil || '',
-      klas: form.klas || '',
-      dasar_dialihkan: 'Letter C'
-    };
+  useEffect(() => {
+    if (form.jenis_dasar_surat === 'LETTER_C' && (form.persil || form.klas)) {
+      const currentRiwayat = form.riwayat_tanah && form.riwayat_tanah.length > 0 
+        ? [...form.riwayat_tanah] 
+        : [{ atas_nama: '', c_no: '', persil_no: '', klas: '', luas: '', dasar_dialihkan: '' }];
 
-    setForm(prev => ({
-      ...prev,
-      riwayat_tanah: currentRiwayat
-    }));
-  }
-}, [form.jenis_dasar_surat, form.persil, form.klas]);
+      currentRiwayat[0] = {
+        ...currentRiwayat[0],
+        persil_no: form.persil || '',
+        klas: form.klas || '',
+        dasar_dialihkan: 'Letter C'
+      };
+
+      setForm(prev => ({
+        ...prev,
+        riwayat_tanah: currentRiwayat
+      }));
+    }
+  }, [form.jenis_dasar_surat, form.persil, form.klas]);
 
   const renderSpecificAlasHak = () => {
     switch (form.jenis_dasar_surat) {
@@ -180,7 +215,6 @@ useEffect(() => {
               <DateInput label="Tanggal SU" value={form.tanggal_su} onChange={val => setForm({...form, tanggal_su: val, ejaan_tanggal_su: spellDateIndo(val)})} />
               <div className="text-[10px] font-bold text-blue-600 italic px-1 lowercase">{form.ejaan_tanggal_su ? `(${form.ejaan_tanggal_su})` : ''}</div>
             </div>
-            
           </div>
         );
       case 'SHM_ELEKTRONIK':
@@ -194,7 +228,6 @@ useEffect(() => {
       default: return null;
     }
   };
-  
 
   const filteredData = data.filter(item => 
     item.atas_nama_nop.toLowerCase().includes(search.toLowerCase()) || item.nop.includes(search)
@@ -203,7 +236,6 @@ useEffect(() => {
   if (view === 'form') {
     return (
       <div className="max-w-6xl mx-auto space-y-6 pb-24">
-        {/* Sticky Header */}
         <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 sticky top-0 z-40 shadow-sm backdrop-blur-md bg-white/90">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-600 text-white rounded-lg shadow-blue-200 shadow-lg"><MapPin size={20}/></div>
@@ -220,7 +252,6 @@ useEffect(() => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            {/* Lokasi */}
             <Card title="1. Informasi Pajak (SPPT) & Lokasi">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                 <Input label="Nomor Objek Pajak (NOP)" value={form.nop} onChange={e => setForm({...form, nop: e.target.value})} />
@@ -237,9 +268,65 @@ useEffect(() => {
                 <Input label="Kota / Kabupaten" value={form.kabupaten_kota} readOnly />
                 <Input label="Status Pajak" placeholder="...." value={form.kewajiban_pajak} onChange={e => setForm({...form, kewajiban_pajak: e.target.value})} />
               </div>
+
+              {/* Rincian SPPT */}
+              <div className="mt-8 p-6 bg-slate-50 rounded-2xl border border-slate-200">
+                <div className="flex items-center gap-2 mb-4">
+                    <CalendarDays className="text-blue-500" size={18} />
+                    <span className="text-xs font-black uppercase tracking-widest text-slate-600">Rincian SPPT & NJOP</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <Input label="SPPT Tahun" value={form.sppt_tahun} onChange={e => setForm({...form, sppt_tahun: e.target.value})} />
+                </div>
+                <div className="overflow-hidden border border-slate-200 rounded-xl bg-white mb-6">
+                    <table className="w-full text-[10px] text-left">
+                        <thead className="bg-slate-100 font-black uppercase text-slate-600">
+                            <tr>
+                                <th className="p-3">Objek Pajak</th>
+                                <th className="p-3">Luas (m²)</th>
+                                <th className="p-3">NJOP (Rp)</th>
+                                <th className="p-3">Total NJOP</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            <tr>
+                                <td className="p-3 font-bold text-slate-700">Bumi</td>
+                                <td className="p-2"><input type="number" className="w-full p-2 border rounded font-bold" value={form.pajak_bumi_luas} onChange={e => setForm({...form, pajak_bumi_luas: parseFloat(e.target.value) || 0})} /></td>
+                                <td className="p-2"><input type="number" className="w-full p-2 border rounded font-bold" value={form.pajak_bumi_njop} onChange={e => setForm({...form, pajak_bumi_njop: parseFloat(e.target.value) || 0})} /></td>
+                                <td className="p-3 font-black text-blue-600">Rp {(form.pajak_bumi_total || 0).toLocaleString('id-ID')}</td>
+                            </tr>
+                            <tr>
+                                <td className="p-3 font-bold text-slate-700">Bangunan</td>
+                                <td className="p-2"><input type="number" className="w-full p-2 border rounded font-bold" value={form.pajak_bangunan_luas} onChange={e => setForm({...form, pajak_bangunan_luas: parseFloat(e.target.value) || 0})} /></td>
+                                <td className="p-2"><input type="number" className="w-full p-2 border rounded font-bold" value={form.pajak_bangunan_njop} onChange={e => setForm({...form, pajak_bangunan_njop: parseFloat(e.target.value) || 0})} /></td>
+                                <td className="p-3 font-black text-blue-600">Rp {(form.pajak_bangunan_total || 0).toLocaleString('id-ID')}</td>
+                            </tr>
+                            <tr className="bg-blue-50">
+                                <td colSpan={3} className="p-3 text-right font-black uppercase text-blue-800">Grand Total NJOP</td>
+                                <td className="p-3 font-black text-blue-900 text-sm">Rp {(form.pajak_grand_total || 0).toLocaleString('id-ID')}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Harga Transaksi (Pindahan dari Files) */}
+                <div className="bg-blue-600 p-6 rounded-2xl text-white shadow-xl shadow-blue-500/20">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Coins size={20} />
+                        <span className="text-xs font-black uppercase tracking-widest">Harga Transaksi / Nilai Akta</span>
+                    </div>
+                    <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-blue-300">Rp</span>
+                        <input type="number" className="w-full bg-white/10 border border-white/20 rounded-xl p-4 pl-12 text-2xl font-black text-white outline-none focus:bg-white/20 focus:ring-2 focus:ring-white/50 transition-all" value={form.harga_transaksi} onChange={e => {
+                            const v = parseFloat(e.target.value) || 0;
+                            setForm({...form, harga_transaksi: v, ejaan_harga_transaksi: terbilang(v) + " rupiah"});
+                        }} />
+                    </div>
+                    <div className="mt-3 text-[10px] font-bold text-blue-100 uppercase tracking-widest italic">{form.ejaan_harga_transaksi || 'nol rupiah'}</div>
+                </div>
+              </div>
             </Card>
 
-            {/* Alas Hak */}
             <Card title="2. Jenis Dasar Hak / Alas Hak">
                 <div className="flex items-center gap-4 mb-4 p-4 bg-blue-50/50 border border-blue-100 rounded-xl">
                     <FileStack className="text-blue-600" size={24} />
@@ -262,7 +349,6 @@ useEffect(() => {
                 {renderSpecificAlasHak()}
             </Card>
 
-            {/* Riwayat */}
             <Card title="3. Riwayat Kepemilikan (Buku C Desa)">
                 <div className="overflow-x-auto border border-slate-300 rounded-xl bg-white shadow-inner">
                     <table className="w-full text-[10px] text-left">
@@ -282,32 +368,8 @@ useEffect(() => {
                                 <tr key={idx} className="hover:bg-blue-50/30">
                                     <td className="p-2"><input className="w-full border border-slate-300 bg-white font-bold p-1.5 focus:ring-2 focus:ring-blue-500 rounded text-xs outline-none" value={row.atas_nama} onChange={e => updateRiwayat(idx, 'atas_nama', e.target.value)} /></td>
                                     <td className="p-2"><input className="w-full border border-slate-300 bg-white p-1.5 focus:ring-2 focus:ring-blue-500 rounded text-xs outline-none" value={row.c_no} onChange={e => updateRiwayat(idx, 'c_no', e.target.value)} /></td>
-                                    {/* Kolom Persil */}
-                                    <td className="p-2">
-                                      <input
-                                        className={`w-full border border-slate-300 p-1.5 rounded text-xs outline-none ${
-                                          row.dasar_dialihkan === 'Letter C'
-                                            ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
-                                            : 'bg-white focus:ring-2 focus:ring-blue-500'
-                                        }`}
-                                        value={row.persil_no}
-                                        onChange={e => updateRiwayat(idx, 'persil_no', e.target.value)}
-                                        readOnly={row.dasar_dialihkan === 'Letter C'}
-                                      />
-                                    </td>
-                                    {/* Kolom Klas */}
-                                    <td className="p-2">
-                                      <input
-                                        className={`w-full border border-slate-300 p-1.5 rounded text-xs outline-none ${
-                                          row.dasar_dialihkan === 'Letter C'
-                                            ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
-                                            : 'bg-white focus:ring-2 focus:ring-blue-500'
-                                        }`}
-                                        value={row.klas}
-                                        onChange={e => updateRiwayat(idx, 'klas', e.target.value)}
-                                        readOnly={row.dasar_dialihkan === 'Letter C'}
-                                      />
-                                    </td>
+                                    <td className="p-2"><input className={`w-full border border-slate-300 p-1.5 rounded text-xs outline-none ${row.dasar_dialihkan === 'Letter C' ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white focus:ring-2 focus:ring-blue-500'}`} value={row.persil_no} onChange={e => updateRiwayat(idx, 'persil_no', e.target.value)} readOnly={row.dasar_dialihkan === 'Letter C'} /></td>
+                                    <td className="p-2"><input className={`w-full border border-slate-300 p-1.5 rounded text-xs outline-none ${row.dasar_dialihkan === 'Letter C' ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white focus:ring-2 focus:ring-blue-500'}`} value={row.klas} onChange={e => updateRiwayat(idx, 'klas', e.target.value)} readOnly={row.dasar_dialihkan === 'Letter C'} /></td>
                                     <td className="p-2"><input className="w-full border border-slate-300 bg-white font-black p-1.5 focus:ring-2 focus:ring-blue-500 rounded text-xs outline-none text-blue-700" value={row.luas} onChange={e => updateRiwayat(idx, 'luas', e.target.value)} /></td>
                                     <td className="p-2"><input className="w-full border border-slate-300 bg-white p-1.5 focus:ring-2 focus:ring-blue-500 rounded text-xs outline-none" value={row.dasar_dialihkan} onChange={e => updateRiwayat(idx, 'dasar_dialihkan', e.target.value)} /></td>
                                     <td className="p-2 text-right">
@@ -317,9 +379,6 @@ useEffect(() => {
                             ))}
                         </tbody>
                     </table>
-                    {(form.riwayat_tanah || []).length === 0 && (
-                      <div className="p-10 text-center text-slate-400 text-xs italic">Belum ada data riwayat tanah.</div>
-                    )}
                 </div>
                 <Button variant="outline" size="sm" onClick={addRiwayat} className="w-full mt-4 border-dashed border-slate-300 hover:bg-slate-50">
                   <Plus size={14} className="mr-2" /> Tambah Baris Riwayat Tanah
@@ -327,37 +386,18 @@ useEffect(() => {
             </Card>
           </div>
 
-          {/* Pengukuran & BAK Sidebar */}
           <div className="space-y-6">
             <Card title="4. Luas & Batas-batas">
                 <div className="space-y-6">
-                    {/* Measurement Mode Selector */}
                     <div className="flex p-1 bg-slate-100 rounded-lg">
-                      <button 
-                        onClick={() => setIsPartial(false)}
-                        className={`flex-1 py-2 text-[10px] font-black uppercase rounded-md transition-all ${!isPartial ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
-                      >
-                        <Layers size={14} className="inline mr-1" /> Seluruhnya
-                      </button>
-                      <button 
-                        onClick={() => setIsPartial(true)}
-                        className={`flex-1 py-2 text-[10px] font-black uppercase rounded-md transition-all ${isPartial ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
-                      >
-                        <Maximize size={14} className="inline mr-1" /> Sebagian
-                      </button>
+                      <button onClick={() => setIsPartial(false)} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-md transition-all ${!isPartial ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}><Layers size={14} className="inline mr-1" /> Seluruhnya</button>
+                      <button onClick={() => setIsPartial(true)} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-md transition-all ${isPartial ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}><Maximize size={14} className="inline mr-1" /> Sebagian</button>
                     </div>
 
-                    {/* Area Input Sections */}
                     <div className="space-y-6">
-                      {/* Luas Seluruhnya Section */}
                       <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100">
                           <label className="block text-[10px] font-black text-emerald-600 uppercase mb-2">Luas Seluruhnya (m²)</label>
-                          <input 
-                              type="number" 
-                              className="w-full px-4 py-3 bg-white border border-emerald-200 rounded-lg text-2xl font-black text-emerald-700 focus:ring-2 focus:ring-emerald-500 outline-none"
-                              value={form.luas_seluruhnya} 
-                              onChange={e => updateLuas('luas_seluruhnya', parseFloat(e.target.value) || 0)} 
-                          />
+                          <input type="number" className="w-full px-4 py-3 bg-white border border-emerald-200 rounded-lg text-2xl font-black text-emerald-700 focus:ring-2 focus:ring-emerald-500 outline-none" value={form.luas_seluruhnya} onChange={e => updateLuas('luas_seluruhnya', parseFloat(e.target.value) || 0)} />
                           <p className="mt-2 text-[10px] font-bold text-emerald-500 italic lowercase tracking-tight">terbilang: {form.ejaan_luas_seluruhnya || 'nol meter persegi'}</p>
                           <div className="grid grid-cols-2 gap-2 mt-4">
                               <Input label="Utara" value={form.batas_utara_seluruhnya} onChange={e => setForm({...form, batas_utara_seluruhnya: e.target.value})} />
@@ -367,16 +407,10 @@ useEffect(() => {
                           </div>
                       </div>
 
-                      {/* Luas Dimohon Section (Only if Sebagian) */}
                       {isPartial && (
                         <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 animate-in fade-in slide-in-from-top-2 duration-300">
                             <label className="block text-[10px] font-black text-blue-600 uppercase mb-2">Luas Dimohon (Sebagian m²)</label>
-                            <input 
-                                type="number" 
-                                className="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg text-2xl font-black text-blue-700 focus:ring-2 focus:ring-blue-500 outline-none"
-                                value={form.luas_dimohon} 
-                                onChange={e => updateLuas('luas_dimohon', parseFloat(e.target.value) || 0)} 
-                            />
+                            <input type="number" className="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg text-2xl font-black text-blue-700 focus:ring-2 focus:ring-blue-500 outline-none" value={form.luas_dimohon} onChange={e => updateLuas('luas_dimohon', parseFloat(e.target.value) || 0)} />
                             <p className="mt-2 text-[10px] font-bold text-blue-500 italic lowercase tracking-tight">terbilang: {form.ejaan_luas_dimohon || 'nol meter persegi'}</p>
                             <div className="grid grid-cols-2 gap-2 mt-4">
                                 <Input label="Utara" value={form.batas_utara_dimohon} onChange={e => setForm({...form, batas_utara_dimohon: e.target.value})} />
@@ -394,15 +428,28 @@ useEffect(() => {
                <div className="space-y-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Crosshair size={18} className="text-blue-500" />
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Input 6 Titik Koordinat</span>
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Daftar Titik Koordinat</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-0">
-                    <Input label="Titik 1" value={form.koordinat_1} onChange={e => setForm({...form, koordinat_1: e.target.value})} placeholder="-7.xxxx, 112.xxxx" />
-                    <Input label="Titik 2" value={form.koordinat_2} onChange={e => setForm({...form, koordinat_2: e.target.value})} placeholder="-7.xxxx, 112.xxxx" />
-                    <Input label="Titik 3" value={form.koordinat_3} onChange={e => setForm({...form, koordinat_3: e.target.value})} placeholder="-7.xxxx, 112.xxxx" />
-                    <Input label="Titik 4" value={form.koordinat_4} onChange={e => setForm({...form, koordinat_4: e.target.value})} placeholder="-7.xxxx, 112.xxxx" />
-                    <Input label="Titik 5" value={form.koordinat_5} onChange={e => setForm({...form, koordinat_5: e.target.value})} placeholder="-7.xxxx, 112.xxxx" />
-                    <Input label="Titik 6" value={form.koordinat_6} onChange={e => setForm({...form, koordinat_6: e.target.value})} placeholder="-7.xxxx, 112.xxxx" />
+                  <div className="space-y-3">
+                    {(form.koordinat_list || []).map((koor, idx) => (
+                      <div key={idx} className="flex gap-2 items-center group">
+                        <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-[10px] font-black text-slate-400 shrink-0">{idx + 1}</div>
+                        <input 
+                          className="flex-1 px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none bg-white shadow-inner"
+                          placeholder="-7.xxxx, 112.xxxx"
+                          value={koor}
+                          onChange={e => updateKoordinat(idx, e.target.value)}
+                        />
+                        {idx > 0 && (
+                          <button onClick={() => removeKoordinat(idx)} className="p-2 text-red-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100">
+                            <Trash2 size={16}/>
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <Button variant="outline" size="sm" onClick={addKoordinat} className="w-full mt-2 border-dashed bg-white">
+                      <Plus size={14} className="mr-2" /> Tambah Titik Koordinat
+                    </Button>
                   </div>
                </div>
             </Card>
@@ -412,26 +459,13 @@ useEffect(() => {
                 {(form.bak_list || []).map((txt, idx) => (
                     <div key={idx} className="relative group bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
                         <div className="flex justify-between items-center mb-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase flex items-center gap-1.5">
-                            <AlignLeft size={14} className="text-blue-500"/> Narasi BAK Ke-{idx + 1}
-                          </label>
-                          {idx > 0 && (
-                            <button onClick={() => removeBAK(idx)} className="text-red-400 hover:text-red-600 transition-colors">
-                              <Trash2 size={16}/>
-                            </button>
-                          )}
+                          <label className="text-[10px] font-black text-slate-500 uppercase flex items-center gap-1.5"><AlignLeft size={14} className="text-blue-500"/> Narasi BAK Ke-{idx + 1}</label>
+                          {idx > 0 && <button onClick={() => removeBAK(idx)} className="text-red-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>}
                         </div>
-                        <textarea 
-                          className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[160px] bg-white shadow-inner resize-y"
-                          placeholder="Masukkan rincian keterangan saksi secara lengkap dan jelas..."
-                          value={txt}
-                          onChange={e => updateBAK(idx, e.target.value)}
-                        />
+                        <textarea className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[160px] bg-white shadow-inner resize-y" placeholder="Masukkan rincian keterangan saksi secara lengkap dan jelas..." value={txt} onChange={e => updateBAK(idx, e.target.value)} />
                     </div>
                 ))}
-                <Button variant="outline" size="sm" onClick={addBAK} className="w-full border-dashed bg-white">
-                  <Plus size={14} className="mr-2" /> Tambah Kolom BAK
-                </Button>
+                <Button variant="outline" size="sm" onClick={addBAK} className="w-full border-dashed bg-white"><Plus size={14} className="mr-2" /> Tambah Kolom BAK</Button>
               </div>
             </Card>
           </div>
@@ -454,13 +488,7 @@ useEffect(() => {
 
       <div className="relative group">
         <Search className="absolute left-3.5 top-3 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={20} />
-        <input 
-          type="text" 
-          placeholder="Cari berdasarkan NOP atau Nama Pemilik (SPPT)..." 
-          className="w-full pl-12 pr-4 py-3.5 border border-slate-200 rounded-2xl text-sm outline-none shadow-sm focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all" 
-          value={search} 
-          onChange={(e) => setSearch(e.target.value)} 
-        />
+        <input type="text" placeholder="Cari berdasarkan NOP atau Nama Pemilik (SPPT)..." className="w-full pl-12 pr-4 py-3.5 border border-slate-200 rounded-2xl text-sm outline-none shadow-sm focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
       <Card className="p-0 overflow-hidden shadow-sm border-slate-200">
@@ -471,7 +499,7 @@ useEffect(() => {
                     <th className="p-4">Jenis Alas Hak</th>
                     <th className="p-4">Nama Pemilik / NOP</th>
                     <th className="p-4">Alamat & Lokasi</th>
-                    <th className="p-4">Luas</th>
+                    <th className="p-4 text-right">Harga Transaksi</th>
                     <th className="p-4 text-right">Aksi</th>
                 </tr>
             </thead>
@@ -479,13 +507,7 @@ useEffect(() => {
               {filteredData.map(item => (
                 <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
                   <td className="p-4">
-                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black border ${
-                      item.jenis_dasar_surat === 'LETTER_C' 
-                        ? 'bg-amber-50 text-amber-700 border-amber-200' 
-                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    }`}>
-                      {item.jenis_dasar_surat.replace('_', ' ')}
-                    </span>
+                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black border ${item.jenis_dasar_surat === 'LETTER_C' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>{item.jenis_dasar_surat.replace('_', ' ')}</span>
                   </td>
                   <td className="p-4">
                     <div className="font-black text-slate-800 uppercase">{item.atas_nama_nop}</div>
@@ -495,43 +517,21 @@ useEffect(() => {
                     <div className="text-xs font-bold text-slate-600 truncate max-w-[200px]">{item.alamat}</div>
                     <div className="text-[9px] font-black text-blue-500 uppercase mt-0.5 tracking-wider">DESA {item.desa || '-'}</div>
                   </td>
-                  <td className="p-4">
-                    <div className="font-black text-slate-800">{item.luas_seluruhnya} m²</div>
-                    {item.luas_dimohon !== item.luas_seluruhnya && (
-                      <div className="text-[9px] text-blue-600 font-black uppercase">Dimohon: {item.luas_dimohon} m²</div>
-                    )}
+                  <td className="p-4 text-right">
+                    <div className="font-black text-blue-600">Rp {(item.harga_transaksi || 0).toLocaleString('id-ID')}</div>
                   </td>
                   <td className="p-4 text-right">
                     <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => handleEdit(item.id)} className="p-2.5 text-blue-600 hover:bg-blue-100 rounded-xl transition-all">
-                        <Edit2 size={16}/>
-                      </button>
-                      <button onClick={() => handleDelete(item.id)} className="p-2.5 text-red-500 hover:bg-red-50 rounded-xl transition-all">
-                        <Trash2 size={16}/>
-                      </button>
+                      <button onClick={() => handleEdit(item.id)} className="p-2.5 text-blue-600 hover:bg-blue-100 rounded-xl transition-all"><Edit2 size={16}/></button>
+                      <button onClick={() => handleDelete(item.id)} className="p-2.5 text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={16}/></button>
                     </div>
                   </td>
                 </tr>
               ))}
-              {filteredData.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="p-20 text-center">
-                    <div className="flex flex-col items-center opacity-20">
-                      <Info size={48} className="mb-4" />
-                      <p className="text-sm font-black uppercase tracking-widest">Belum ada objek tanah terdaftar.</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
       </Card>
-      
-      <div className="flex items-center justify-between text-[10px] font-black text-slate-400 uppercase px-2 tracking-[0.2em]">
-        <div>Total Objek: {filteredData.length} Baris</div>
-        <div>Etana 1.0 Engine • PPAT System</div>
-      </div>
     </div>
   );
 };
