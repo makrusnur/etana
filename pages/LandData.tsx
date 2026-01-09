@@ -556,13 +556,20 @@ export const LandDataPage: React.FC = () => {
                 <button type="button" onClick={() => setShowMapModal(false)} className="p-2 text-slate-400 hover:text-red-500"><X size={24} /></button>
               </div>
               <div className="p-4">
-                <div className="h-[400px] w-full rounded-2xl overflow-hidden border border-slate-200">
-                  <LandMap 
-                    latitude={form.latitude} 
-                    longitude={form.longitude} 
-                    onChange={(newLat, newLng) => setForm({ ...form, latitude: newLat, longitude: newLng })} 
-                  />
-                </div>
+                <div className="h-[600px] w-full rounded-2xl overflow-hidden border-2 border-slate-300 shadow-inner mt-4">
+                    <LandMap 
+                      latitude={form.latitude} 
+                      longitude={form.longitude} 
+                      /* 2. Menambahkan tipe data : number pada parameter agar tidak error */
+                      onChange={(newLat: number, newLng: number) => 
+                        setForm((prev: any) => ({ 
+                          ...prev, 
+                          latitude: newLat, 
+                          longitude: newLng 
+                        }))
+                      } 
+                    />
+                  </div>
                 <div className="mt-4 p-4 bg-indigo-50 rounded-2xl flex justify-between items-center">
                   <code className="text-xs font-bold text-indigo-700">
                     {form.latitude ? `${form.latitude.toFixed(6)}, ${form.longitude?.toFixed(6)}` : 'Klik pada peta...'}
