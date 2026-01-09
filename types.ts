@@ -111,6 +111,8 @@ export interface LandData {
 
   koordinat_list?: string[];
 
+  latitude: number;
+  longitude: number;
   created_at: string;
 }
 
