@@ -30,7 +30,7 @@ export const Identities: React.FC = () => {
     tanggal_lahir: '', 
     ejaan_tanggal_lahir: '', 
     agama: 'Islam', 
-    status_perkawinan: 'Belum Menikah',
+    status_perkawinan: 'Belum Kawin',
     golongan_darah: '',
     alamat: '', 
     rt: '', 
@@ -53,6 +53,7 @@ export const Identities: React.FC = () => {
     nama_ibuk_kandung: '',
     pendidikan_terakhir: '',
     nib_badan: '',
+    npwp_badan: '',
     telepon: '',
     npwp: '',
     email: ''
@@ -308,7 +309,7 @@ export const Identities: React.FC = () => {
                     </div>
 
                     <Select label="Status Perkawinan" value={form.status_perkawinan} onChange={(e) => setForm({...form, status_perkawinan: e.target.value})}>
-                        <option value="Belum Menikah">Belum Menikah</option>
+                        <option value="Belum Kawin">Belum Kawin</option>
                         <option value="Kawin">Kawin</option>
                         <option value="Cerai Hidup">Cerai Hidup</option>
                         <option value="Cerai Mati">Cerai Mati</option>
@@ -344,15 +345,6 @@ export const Identities: React.FC = () => {
                 </div>
             </Card>
 
-            <Card title="KONTAK & LEGALITAS">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                    <Input label="Nomor Telepon / WA" value={form.telepon} onChange={e => setForm({...form, telepon: e.target.value})} />
-                    <Input label="Alamat Email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
-                    <Input label="NPWP (Pribadi/Badan)" value={form.npwp} onChange={e => setForm({...form, npwp: e.target.value})} />
-                    <Input label="NIB (Badan Usaha)" placeholder="Jika ada" value={form.nib_badan} onChange={e => setForm({...form, nib_badan: e.target.value})} />
-                </div>
-            </Card>
-
             <Card title="ALAMAT & DOMISILI">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                     <Input label="Alamat" className="md:col-span-2" value={form.alamat} onChange={e => setForm({...form, alamat: e.target.value})} />
@@ -367,6 +359,32 @@ export const Identities: React.FC = () => {
                         <Input label="Provinsi" value={form.provinsi} onChange={e => setForm({...form, provinsi: e.target.value})} />
                         <Input label="Kode Pos" value={form.kode_pos} maxLength={5} onChange={e => setForm({...form, kode_pos: e.target.value.replace(/\D/g,'')})} />
                     </div>
+                </div>
+            </Card>
+            
+            <Card title="DOKUMEN PENDUKUNG">
+                <div className="flex justify-between items-center mb-6 px-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Masa Berlaku KTP</label>
+                    <label className="flex items-center gap-2 text-[10px] font-black text-blue-600 uppercase tracking-widest cursor-pointer group">
+                        <input type="checkbox" className="w-4 h-4 rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500/20" checked={form.is_seumur_hidup} onChange={e => toggleSeumurHidup(e.target.checked)} /> Set Seumur Hidup
+                    </label>
+                </div>
+                {!form.is_seumur_hidup ? (
+                    <DateInput value={form.ktp_berlaku} onChange={val => setForm({...form, ktp_berlaku: val})} />
+                ) : (
+                    <div className="h-14 px-6 flex items-center bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-2xl text-xs font-black uppercase tracking-widest shadow-inner">
+                        <CheckCircle2 size={16} className="mr-3" /> SEUMUR HIDUP
+                    </div>
+                )}
+            </Card>
+
+            <Card title="KONTAK & LEGALITAS">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                    <Input label="Nomor Telepon / WA" value={form.telepon} onChange={e => setForm({...form, telepon: e.target.value})} />
+                    <Input label="Alamat Email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
+                    <Input label="NPWP Pribadi" value={form.npwp} onChange={e => setForm({...form, npwp: e.target.value})} />
+                    <Input label="NPWP Badan Usaha" placeholder="Jika ada" value={form.npwp_badan} onChange={e => setForm({...form, npwp_badan: e.target.value})} />
+                    <Input label="NIB (Badan Usaha)" placeholder="Jika ada" value={form.nib_badan} onChange={e => setForm({...form, nib_badan: e.target.value})} />
                 </div>
             </Card>
 
@@ -439,23 +457,7 @@ export const Identities: React.FC = () => {
                     </div>
                 </div>
             </Card>
-
-            <Card title="DOKUMEN PENDUKUNG">
-                <div className="flex justify-between items-center mb-6 px-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Masa Berlaku KTP</label>
-                    <label className="flex items-center gap-2 text-[10px] font-black text-blue-600 uppercase tracking-widest cursor-pointer group">
-                        <input type="checkbox" className="w-4 h-4 rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500/20" checked={form.is_seumur_hidup} onChange={e => toggleSeumurHidup(e.target.checked)} /> Set Seumur Hidup
-                    </label>
-                </div>
-                {!form.is_seumur_hidup ? (
-                    <DateInput value={form.ktp_berlaku} onChange={val => setForm({...form, ktp_berlaku: val})} />
-                ) : (
-                    <div className="h-14 px-6 flex items-center bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-2xl text-xs font-black uppercase tracking-widest shadow-inner">
-                        <CheckCircle2 size={16} className="mr-3" /> SEUMUR HIDUP
-                    </div>
-                )}
-            </Card>
-            
+  
             <div className="flex justify-end gap-4 py-6">
               <Button variant="outline" className="px-10" onClick={() => setView('list')}>Batal</Button>
               <Button onClick={handleSave} className="px-12 shadow-xl shadow-blue-500/20">Simpan Identitas</Button>

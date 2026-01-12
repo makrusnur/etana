@@ -35,6 +35,7 @@ export interface Identity {
   nib_badan?: string;
   telepon?: string;
   npwp?: string;
+  npwp_badan?: string; 
   email?: string;
 }
 
@@ -158,8 +159,6 @@ export interface FileRecord {
   keterangan: string;
   jenis_perolehan: string;
   tahun_perolehan: string;
-  harga?: number;
-  ejaan_harga?: string;
   created_at: string;
   // khusus waris
   register_waris_desa?: string;

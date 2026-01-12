@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { exportToExcel, generateWordDocument } from '../services/export';
 import { db } from '../services/db';
 import { Card, Button, Select } from '../components/UI';
-import { Printer, X, Database,  Copy, ClipboardCheck, UserCheck, FileSpreadsheet, MapPin, FileText, Ruler,  Coins, History,  Search, Users } from 'lucide-react';
+import { Printer, X, Database, Copy, ClipboardCheck, UserCheck, FileSpreadsheet, MapPin, FileText, Ruler, Coins, History, Search, Users } from 'lucide-react';
 import { formatDateIndo, spellDateIndo, terbilang } from '../utils';
 import { FileRecord, LandData } from '../types';
 
@@ -70,7 +69,6 @@ export const TemplatesPage: React.FC = () => {
     const saksi: any[] = [];
     const setuju: any[] = [];
     
-    // Temukan relasi tanah pertama yang terhubung dengan berkas ini
     const landRel = relations.find(r => r.data_tanah_id);
     const landObj: LandData | undefined = landRel ? lands.find(l => l.id === landRel.data_tanah_id) : undefined;
 
@@ -97,12 +95,14 @@ export const TemplatesPage: React.FC = () => {
       No_Berkas: fileData.nomor_berkas,
       No_Register: fileData.nomor_register,
       Hari_Berkas: fileData.hari,
-  
       Tgl_Surat: formatDateIndo(fileData.tanggal),
       Tgl_Ejaan: spellDateIndo(fileData.tanggal),
       Ket_Berkas: fileData.keterangan,
       Jenis_Perolehan: fileData.jenis_perolehan,
       Thn_Perolehan: fileData.tahun_perolehan,
+      F_Waris_Desa: fileData.register_waris_desa || "",
+      F_Waris_Kec: fileData.register_waris_kecamatan || "",
+      F_Waris_Tgl: fileData.tanggal_waris ? formatDateIndo(fileData.tanggal_waris) : "",
 
       // 2. TANAH (LandData)
       T_NOP: landObj?.nop || "",
@@ -118,7 +118,6 @@ export const TemplatesPage: React.FC = () => {
       T_Pajak_Stat: landObj?.kewajiban_pajak || "",
       T_Jenis_Alas: landObj?.jenis_dasar_surat || "",
       
-      // ALAS HAK DETAIL
       T_C_Kohir: landObj?.kohir || "",
       T_C_Persil: landObj?.persil || "",
       T_C_Klas: landObj?.klas || "",
@@ -139,7 +138,6 @@ export const TemplatesPage: React.FC = () => {
       T_EL_Kode: landObj?.kode_sertifikat || "",
       T_EL_Nibel: landObj?.nibel || "",
 
-      // LUAS & BATAS DIMOHON
       T_Luas_M: landObj?.luas_dimohon || 0,
       T_Luas_E: landObj?.ejaan_luas_dimohon || "",
       T_Batas_U: landObj?.batas_utara_dimohon || "",
@@ -147,7 +145,6 @@ export const TemplatesPage: React.FC = () => {
       T_Batas_S: landObj?.batas_selatan_dimohon || "",
       T_Batas_B: landObj?.batas_barat_dimohon || "",
 
-      // LUAS & BATAS SELURUHNYA
       T_Total_M: landObj?.luas_seluruhnya || 0,
       T_Total_E: landObj?.ejaan_luas_seluruhnya || "",
       T_Total_U: landObj?.batas_utara_seluruhnya || "",
@@ -155,13 +152,13 @@ export const TemplatesPage: React.FC = () => {
       T_Total_S: landObj?.batas_selatan_seluruhnya || "",
       T_Total_B: landObj?.batas_barat_seluruhnya || "",
 
-      // SPPT & PAJAK
       T_Sppt_Thn: landObj?.sppt_tahun || "",
       T_Bumi_Luas: landObj?.pajak_bumi_luas || 0,
-      T_Bumi_NJOP: landObj?.pajak_bumi_njop || 0,
+      T_Bumi_NJOP: (landObj?.pajak_bumi_njop || 0).toLocaleString('id-ID'),
       T_Bumi_Total: (landObj?.pajak_bumi_total || 0).toLocaleString('id-ID'),
+      T_Bang_Jml: landObj?.jumlah_bangunan || 0,
       T_Bang_Luas: landObj?.pajak_bangunan_luas || 0,
-      T_Bang_NJOP: landObj?.pajak_bangunan_njop || 0,
+      T_Bang_NJOP: (landObj?.pajak_bangunan_njop || 0).toLocaleString('id-ID'),
       T_Bang_Total: (landObj?.pajak_bangunan_total || 0).toLocaleString('id-ID'),
       T_Grand_Total_NJOP: (landObj?.pajak_grand_total || 0).toLocaleString('id-ID'),
       T_Grand_Ejaan: landObj?.pajak_grand_total ? terbilang(landObj.pajak_grand_total) : "nol",
@@ -170,17 +167,11 @@ export const TemplatesPage: React.FC = () => {
       T_Harga_E: landObj?.ejaan_harga_transaksi || "nol rupiah",
     };
 
-    // KOORDINAT DINAMIS (T_Koor1 s/d T_Koor10)
     for (let i = 0; i < 10; i++) {
       result[`T_Koor${i+1}`] = landObj?.koordinat_list?.[i] || "";
-    }
-
-    // BAK DINAMIS (T_Bak1 s/d T_Bak10)
-    for (let i = 0; i < 10; i++) {
       result[`T_Bak${i+1}`] = landObj?.bak_list?.[i] || "";
     }
 
-    // RIWAYAT TANAH DINAMIS (T_Riw1 s/d T_Riw5)
     for (let i = 0; i < 5; i++) {
       const rw = landObj?.riwayat_tanah?.[i];
       result[`T_Riw${i+1}_Nama`] = rw?.atas_nama || "";
@@ -191,9 +182,8 @@ export const TemplatesPage: React.FC = () => {
       result[`T_Riw${i+1}_D`] = rw?.dasar_dialihkan || "";
     }
 
-    // IDENTITY MAPPING (P1_x, P2_x, Saksi_x, Setuju_x)
     const mapPerson = (prefix: string, p: any) => {
-      const fields = ["Sebutan", "Nama", "NIK", "Lahir_Tempat", "Lahir_Tgl", "Lahir_Ejaan", "Agama", "Alamat", "RT", "RW", "Desa", "Kec", "Kota", "Prov", "Pekerjaan", "Umur", "Ibu", "Bapak", "Pendidikan", "KTP_Exp"];
+      const fields = ["Sebutan", "Nama", "NIK", "Lahir_Tempat", "Lahir_Tgl", "Lahir_Ejaan", "Agama", "Alamat", "RT", "RW", "Desa", "Kec", "Kota", "Prov", "Pekerjaan", "Umur", "Ibu", "Bapak", "Pendidikan", "KTP_Exp", "Kawin", "Darah", "Telp", "NPWP", "Email"];
       if (!p) {
         fields.forEach(f => result[`${prefix}_${f}`] = "");
         return;
@@ -205,6 +195,8 @@ export const TemplatesPage: React.FC = () => {
       result[`${prefix}_Lahir_Tgl`] = p.tgl_lahir_indo || "";
       result[`${prefix}_Lahir_Ejaan`] = p.ejaan_lahir || "";
       result[`${prefix}_Agama`] = p.agama || "";
+      result[`${prefix}_Kawin`] = p.status_perkawinan || "";
+      result[`${prefix}_Darah`] = p.golongan_darah || "";
       result[`${prefix}_Alamat`] = p.alamat || "";
       result[`${prefix}_RT`] = p.rt || "";
       result[`${prefix}_RW`] = p.rw || "";
@@ -218,6 +210,9 @@ export const TemplatesPage: React.FC = () => {
       result[`${prefix}_Bapak`] = p.nama_bapak_kandung || "";
       result[`${prefix}_Pendidikan`] = p.pendidikan_terakhir || "";
       result[`${prefix}_KTP_Exp`] = p.ktp_berlaku_indo || "";
+      result[`${prefix}_Telp`] = p.telepon || "";
+      result[`${prefix}_NPWP`] = p.npwp || "";
+      result[`${prefix}_Email`] = p.email || "";
     };
 
     mapPerson("P1_1", p1[0]); mapPerson("P1_2", p1[1]); mapPerson("P1_3", p1[2]);
@@ -317,19 +312,19 @@ export const TemplatesPage: React.FC = () => {
                 <div className="p-10 overflow-y-auto flex-1 bg-slate-50/50 space-y-10 custom-scrollbar">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                         <TagCategory title="ADMIN BERKAS" icon={<FileText size={16}/>} color="emerald">
-                            {filteredTags.filter(t => ["No_Berkas", "No_Register", "Hari_Berkas", "Jenis_Surat", "Tgl_Surat", "Tgl_Ejaan", "Jenis_Perolehan", "Thn_Perolehan"].includes(t)).map(t => (
+                            {filteredTags.filter(t => ["No_Berkas", "No_Register", "Hari_Berkas", "Tgl_Surat", "Tgl_Ejaan", "Jenis_Perolehan", "Thn_Perolehan", "F_Harga", "F_Waris_Desa"].includes(t)).map(t => (
                               <TagRow key={t} tag={`{${t}}`} val={previewData[t]} onCopy={copyToClipboard} copied={copiedTag} />
                             ))}
                         </TagCategory>
 
                         <TagCategory title="TANAH & LOKASI" icon={<MapPin size={16}/>} color="blue">
-                            {filteredTags.filter(t => t.startsWith("T_") && !t.includes("NJOP") && !t.includes("Harga") && !t.includes("Koor") && !t.includes("Bak") && !t.includes("Riw")).map(t => (
+                            {filteredTags.filter(t => t.startsWith("T_") && !t.includes("NJOP") && !t.includes("Harga") && !t.includes("Koor") && !t.includes("Bak") && !t.includes("Riw") && !t.includes("Luas") && !t.includes("Total") && !t.includes("Batas")).map(t => (
                               <TagRow key={t} tag={`{${t}}`} val={previewData[t]} onCopy={copyToClipboard} copied={copiedTag} />
                             ))}
                         </TagCategory>
 
                         <TagCategory title="PAJAK & HARGA" icon={<Coins size={16}/>} color="orange">
-                            {filteredTags.filter(t => t.includes("NJOP") || t.includes("Harga")).map(t => (
+                            {filteredTags.filter(t => t.includes("NJOP") || t.includes("Harga") || t.includes("Pajak") || t.includes("Bumi") || t.includes("Bang")).map(t => (
                               <TagRow key={t} tag={`{${t}}`} val={previewData[t]} onCopy={copyToClipboard} copied={copiedTag} />
                             ))}
                         </TagCategory>
@@ -343,17 +338,17 @@ export const TemplatesPage: React.FC = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                         <TagCategory title="PIHAK PERTAMA" icon={<UserCheck size={16}/>} color="emerald">
-                            {filteredTags.filter(t => t.startsWith("P1_1")).slice(0, 8).map(t => (
+                            {filteredTags.filter(t => t.startsWith("P1_1")).slice(0, 10).map(t => (
                               <TagRow key={t} tag={`{${t}}`} val={previewData[t]} onCopy={copyToClipboard} copied={copiedTag} />
                             ))}
                         </TagCategory>
                         <TagCategory title="PIHAK KEDUA" icon={<UserCheck size={16}/>} color="blue">
-                            {filteredTags.filter(t => t.startsWith("P2_1")).slice(0, 8).map(t => (
+                            {filteredTags.filter(t => t.startsWith("P2_1")).slice(0, 10).map(t => (
                               <TagRow key={t} tag={`{${t}}`} val={previewData[t]} onCopy={copyToClipboard} copied={copiedTag} />
                             ))}
                         </TagCategory>
                         <TagCategory title="SAKSI & LAINNYA" icon={<Users size={16}/>} color="purple">
-                            {filteredTags.filter(t => t.startsWith("Saksi") || t.startsWith("Setuju")).slice(0, 8).map(t => (
+                            {filteredTags.filter(t => t.startsWith("Saksi") || t.startsWith("Setuju")).slice(0, 10).map(t => (
                               <TagRow key={t} tag={`{${t}}`} val={previewData[t]} onCopy={copyToClipboard} copied={copiedTag} />
                             ))}
                         </TagCategory>
@@ -376,6 +371,7 @@ export const TemplatesPage: React.FC = () => {
   );
 };
 
+// ... Sub-components (TagCategory, TagRow, SummaryWidget) sama seperti kode Bapak// ... Sub-components (TagCategory, TagRow, SummaryWidget) sama seperti kode Bapak
 const TagCategory = ({ title, icon, children, color }: any) => {
     const colors: Record<string, string> = {
         emerald: 'border-emerald-200 text-emerald-700 bg-emerald-50',

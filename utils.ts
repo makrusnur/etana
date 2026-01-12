@@ -67,14 +67,20 @@ export const spellDateIndo = (dateStr: string): string => {
   if (!dateStr || dateStr === 'SEUMUR HIDUP') return dateStr;
   const date = new Date(dateStr);
   if (isNaN(date.getTime())) return dateStr;
+
+  // Nama bulan dengan huruf kapital di awal (Title Case)
   const months = [
-    "januari", "februari", "maret", "april", "mei", "juni", 
-    "juli", "agustus", "september", "oktober", "november", "desember"
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni", 
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
   ];
-  const day = terbilang(date.getDate());
-  const month = months[date.getMonth()];
-  const year = terbilang(date.getFullYear());
-  return toTitleCase(`${day} ${month} ${year}`);
+
+  // Ambil ejaan angka (fungsi terbilang Bapak sudah menghasilkan huruf kecil)
+  const day = terbilang(date.getDate()); // "sebelas"
+  const month = months[date.getMonth()]; // "Januari"
+  const year = terbilang(date.getFullYear()); // "dua ribu"
+
+  // Langsung gabungkan tanpa toTitleCase lagi agar format case masing-masing terjaga
+  return `${day} ${month} ${year}`.trim();
 };
 
 export const generateId = () => {

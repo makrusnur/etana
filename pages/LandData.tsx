@@ -396,7 +396,10 @@ export const LandDataPage: React.FC = () => {
                           <Input label="NJOP/M² (Rp)" type="number" value={form.pajak_bangunan_njop} onChange={e => setForm({ ...form, pajak_bangunan_njop: parseFloat(e.target.value) || 0 })} />
                         </div>
                         
-                        {/* BARU: TOMBOL DETAIL BANGUNAN */}
+                        <div className="bg-white p-4 rounded-2xl border border-slate-200/50 shadow-inner">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total NJOP Bangunan</p>
+                          <div className="text-xl font-black text-slate-900 tracking-tight">Rp {(form.pajak_bangunan_total || 0).toLocaleString('id-ID')}</div>
+                        </div>
                         <Button 
                           variant="outline" 
                           size="sm" 
@@ -408,11 +411,6 @@ export const LandDataPage: React.FC = () => {
                             ? `Kelola ${form.detail_bangunan.length} Detail Bangunan` 
                             : 'Masukkan Detail Bangunan'}
                         </Button>
-
-                        <div className="bg-white p-4 rounded-2xl border border-slate-200/50 shadow-inner">
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total NJOP Bangunan</p>
-                          <div className="text-xl font-black text-slate-900 tracking-tight">Rp {(form.pajak_bangunan_total || 0).toLocaleString('id-ID')}</div>
-                        </div>
                       </div>
                     </div>
                   </div>
