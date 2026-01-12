@@ -630,9 +630,9 @@ export const LandDataPage: React.FC = () => {
               <div className="p-4">
                 <div className="h-[600px] w-full rounded-2xl overflow-hidden border-2 border-slate-300 shadow-inner mt-4">
                     <LandMap 
-                      latitude={form.latitude} 
-                      longitude={form.longitude} 
-                      onChange={(newLat: number, newLng: number) => 
+                      latitude={form.latitude || -7.6448} // Berikan default Pasuruan jika kosong
+                      longitude={form.longitude || 112.9061} 
+                      onChange={(newLat, newLng) => 
                         setForm((prev: any) => ({ 
                           ...prev, 
                           latitude: newLat, 
