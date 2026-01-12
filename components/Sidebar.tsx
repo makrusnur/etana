@@ -1,8 +1,7 @@
-
 import React, { useState } from 'react';
 import * as ReactRouterDOM from 'react-router-dom';
 const { NavLink } = ReactRouterDOM;
-import { Users, FileText, Map, Home, Settings, LogOut, ChevronLeft, ChevronRight, Menu, X } from 'lucide-react';
+import { Users, FileText, Map, Home, Settings, LogOut, ChevronLeft, ChevronRight, Menu, X, Navigation } from 'lucide-react';
 
 interface SidebarProps {
   onLogout: () => void;
@@ -42,7 +41,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
               <MobileNavLink to="/" icon={<Home size={20}/>} label="Dashboard" onClick={() => setIsMobileOpen(false)} />
               <MobileNavLink to="/identities" icon={<Users size={20}/>} label="Identitas Klien" onClick={() => setIsMobileOpen(false)} />
               <MobileNavLink to="/lands" icon={<Map size={20}/>} label="Data Tanah" onClick={() => setIsMobileOpen(false)} />
+              
+              {/* MENU BARU DI MOBILE */}
+              
+              
               <MobileNavLink to="/files" icon={<FileText size={20}/>} label="Manajemen Berkas" onClick={() => setIsMobileOpen(false)} />
+              <MobileNavLink to="/map-monitoring" icon={<Navigation size={20}/>} label="Map Monitoring" onClick={() => setIsMobileOpen(false)} />
               <MobileNavLink to="/templates" icon={<Settings size={20}/>} label="Automation" onClick={() => setIsMobileOpen(false)} />
             </nav>
             <button onClick={onLogout} className="mt-auto py-6 text-slate-500 text-xs font-bold border-t border-white/5 flex items-center gap-3 hover:text-red-400 transition-colors">
@@ -70,9 +74,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
         
         <nav className="flex-1 space-y-1">
           <NavItem to="/" icon={<Home size={18} />} label="Dashboard" collapsed={isCollapsed} navClass={navClass} />
-          <NavItem to="/identities" icon={<Users size={18} />} label="Identitas Klien" collapsed={isCollapsed} navClass={navClass} />
+          <NavItem to="/identities" icon={<Users size={18} />} label="Data Subjek" collapsed={isCollapsed} navClass={navClass} />
           <NavItem to="/lands" icon={<Map size={18} />} label="Data Objek Tanah" collapsed={isCollapsed} navClass={navClass} />
+          
+          {/* MENU BARU DI DESKTOP */}
+          
           <NavItem to="/files" icon={<FileText size={18} />} label="Berkas & Relasi" collapsed={isCollapsed} navClass={navClass} />
+          <NavItem to="/map-monitoring" icon={<Navigation size={18} />} label="Map Monitoring" collapsed={isCollapsed} navClass={navClass} />
+          
           <NavItem to="/templates" icon={<Settings size={18} />} label="Automation Engine" collapsed={isCollapsed} navClass={navClass} />
         </nav>
         
@@ -97,11 +106,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
   );
 };
 
+// ... NavItem dan MobileNavLink tetap sama seperti aslinya ...
 const NavItem = ({ to, icon, label, collapsed, navClass }: any) => (
   <NavLink to={to} className={navClass}>
     {({ isActive }) => (
       <>
-        {/* Active Indicator Line */}
         {isActive && (
             <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]"></div>
         )}

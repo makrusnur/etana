@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
-import { LandData, LandType, LandHistory } from '../types';
-import { Button, Input, Card, DateInput } from '../components/UI';
-import { Edit2, Trash2, Plus, Search, MapPin, FileStack, Info, AlignLeft, Layers, Maximize, Crosshair, Coins,  Receipt, TrendingUp, Landmark, X, CheckCircle } from 'lucide-react';
+import { LandData, LandType, LandHistory, BuildingDetail } from '../types';
+import { Button, Input, Card, DateInput, Select } from '../components/UI';
+import { Edit2, Trash2, Plus, Search, MapPin, FileStack, Info, AlignLeft, Layers, Maximize, Crosshair, Coins,  Receipt, TrendingUp, Landmark, X, CheckCircle, Home } from 'lucide-react';
 import { generateId, terbilang, spellDateIndo } from '../utils';
 import LandMap from '../components/LandMap';
 
@@ -13,6 +13,7 @@ export const LandDataPage: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showMapModal, setShowMapModal] = useState(false);
+  const [showBuildingModal, setShowBuildingModal] = useState(false);
   
   // UI State for Measurement Type
   const [isPartial, setIsPartial] = useState(false);
@@ -28,7 +29,7 @@ export const LandDataPage: React.FC = () => {
     rw: '', 
     desa: '', 
     kecamatan: '', 
-    kabupaten_kota: 'Pasuruan' as "Pasuruan", 
+    kabupaten_kota: 'Pasuruan', 
     kewajiban_pajak: '', 
     jenis_dasar_surat: 'LETTER_C',
     
@@ -41,7 +42,11 @@ export const LandDataPage: React.FC = () => {
     
     sppt_tahun: new Date().getFullYear().toString(),
     pajak_bumi_luas: 0, pajak_bumi_njop: 0, pajak_bumi_total: 0,
+    
+    jumlah_bangunan: 0,
     pajak_bangunan_luas: 0, pajak_bangunan_njop: 0, pajak_bangunan_total: 0,
+    detail_bangunan: [],
+
     pajak_grand_total: 0,
     harga_transaksi: 0, ejaan_harga_transaksi: '',
 
@@ -57,24 +62,23 @@ export const LandDataPage: React.FC = () => {
 
   // Auto Calculations for Tax
   useEffect(() => {
-  const totalBumi = (Number(form.pajak_bumi_luas) || 0) * (Number(form.pajak_bumi_njop) || 0);
-  const totalBangunan = (Number(form.pajak_bangunan_luas) || 0) * (Number(form.pajak_bangunan_njop) || 0);
-  const grandTotal = totalBumi + totalBangunan;
+    const totalBumi = (Number(form.pajak_bumi_luas) || 0) * (Number(form.pajak_bumi_njop) || 0);
+    const totalBangunan = (Number(form.pajak_bangunan_luas) || 0) * (Number(form.pajak_bangunan_njop) || 0);
+    const grandTotal = totalBumi + totalBangunan;
 
-  // Hanya update jika nilainya benar-benar berubah untuk mencegah loop
-  if (
-    form.pajak_bumi_total !== totalBumi || 
-    form.pajak_bangunan_total !== totalBangunan || 
-    form.pajak_grand_total !== grandTotal
-  ) {
-    setForm(prev => ({
-      ...prev,
-      pajak_bumi_total: totalBumi,
-      pajak_bangunan_total: totalBangunan,
-      pajak_grand_total: grandTotal
-    }));
-  }
-}, [form.pajak_bumi_luas, form.pajak_bumi_njop, form.pajak_bangunan_luas, form.pajak_bangunan_njop]);
+    if (
+      form.pajak_bumi_total !== totalBumi || 
+      form.pajak_bangunan_total !== totalBangunan || 
+      form.pajak_grand_total !== grandTotal
+    ) {
+      setForm(prev => ({
+        ...prev,
+        pajak_bumi_total: totalBumi,
+        pajak_bangunan_total: totalBangunan,
+        pajak_grand_total: grandTotal
+      }));
+    }
+  }, [form.pajak_bumi_luas, form.pajak_bumi_njop, form.pajak_bangunan_luas, form.pajak_bangunan_njop]);
 
   useEffect(() => {
     loadData();
@@ -118,11 +122,12 @@ export const LandDataPage: React.FC = () => {
       }
 
       setShowMapModal(false);
+      setShowBuildingModal(false);
       
       setView('list'); 
       setEditingId(null); 
       setForm(emptyForm);
-      alert("✅ Data Berhasil Disimpan!"); // Opsional: agar user yakin data sudah masuk
+      alert("✅ Data Berhasil Disimpan!");
     } catch (err) {
       alert("Gagal menyimpan data objek tanah.");
     }
@@ -149,6 +154,58 @@ export const LandDataPage: React.FC = () => {
     }
   };
 
+  // --- Building Detail Logic ---
+  const addBuilding = () => {
+    const nextNum = (form.detail_bangunan?.length || 0) + 1;
+    const newBuilding: BuildingDetail = {
+      id: generateId(),
+      bangunan_ke: nextNum,
+      jenis_penggunaan: 'Perumahan',
+      luas: 0,
+      jumlah_lantai: 1,
+      tahun_dibangun: '',
+      tahun_direnovasi: '',
+      daya_listrik: '',
+      kondisi: 'Baik',
+      konstruksi: 'Beton',
+      atap: 'Gtg Glazur',
+      dinding: 'Batubata',
+      lantai: 'Keramik',
+      langit_langit: 'Triplek'
+    };
+    setForm(prev => ({ 
+      ...prev, 
+      detail_bangunan: [...(prev.detail_bangunan || []), newBuilding],
+      jumlah_bangunan: (prev.jumlah_bangunan || 0) + 1
+    }));
+  };
+
+  const updateBuilding = (index: number, field: keyof BuildingDetail, val: any) => {
+    const newList = [...(form.detail_bangunan || [])];
+    newList[index] = { ...newList[index], [field]: val };
+    
+    // Auto-update total area in main form if buildings change
+    const totalLuasBuilding = newList.reduce((sum, b) => sum + (Number(b.luas) || 0), 0);
+    
+    setForm(prev => ({ 
+      ...prev, 
+      detail_bangunan: newList,
+      pajak_bangunan_luas: totalLuasBuilding
+    }));
+  };
+
+  const removeBuilding = (index: number) => {
+    const newList = (form.detail_bangunan || []).filter((_, i) => i !== index);
+    const totalLuasBuilding = newList.reduce((sum, b) => sum + (Number(b.luas) || 0), 0);
+    setForm(prev => ({ 
+      ...prev, 
+      detail_bangunan: newList,
+      jumlah_bangunan: newList.length,
+      pajak_bangunan_luas: totalLuasBuilding
+    }));
+  };
+
+  // Riwayat logic
   const addRiwayat = () => {
     const newEntry: LandHistory = { atas_nama: '', c_no: '', persil_no: '', klas: '', luas: '', dasar_dialihkan: '' };
     setForm(prev => ({ ...prev, riwayat_tanah: [...(prev.riwayat_tanah || []), newEntry] }));
@@ -247,6 +304,7 @@ export const LandDataPage: React.FC = () => {
   const filteredData = data.filter(item => 
     item.atas_nama_nop.toLowerCase().includes(search.toLowerCase()) || item.nop.includes(search)
   );
+
   if (view === 'form') {
     return (
       <div className="max-w-6xl mx-auto space-y-6 pb-24">
@@ -337,6 +395,20 @@ export const LandDataPage: React.FC = () => {
                           <Input label="Luas (M²)" type="number" value={form.pajak_bangunan_luas} onChange={e => setForm({ ...form, pajak_bangunan_luas: parseFloat(e.target.value) || 0 })} />
                           <Input label="NJOP/M² (Rp)" type="number" value={form.pajak_bangunan_njop} onChange={e => setForm({ ...form, pajak_bangunan_njop: parseFloat(e.target.value) || 0 })} />
                         </div>
+                        
+                        {/* BARU: TOMBOL DETAIL BANGUNAN */}
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full border-blue-200 text-blue-600 bg-blue-50/50 hover:bg-blue-100 font-black tracking-widest uppercase text-[10px] h-11 rounded-xl"
+                          onClick={() => setShowBuildingModal(true)}
+                        >
+                          <Home size={14} className="mr-2" /> 
+                          {form.detail_bangunan && form.detail_bangunan.length > 0 
+                            ? `Kelola ${form.detail_bangunan.length} Detail Bangunan` 
+                            : 'Masukkan Detail Bangunan'}
+                        </Button>
+
                         <div className="bg-white p-4 rounded-2xl border border-slate-200/50 shadow-inner">
                           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total NJOP Bangunan</p>
                           <div className="text-xl font-black text-slate-900 tracking-tight">Rp {(form.pajak_bangunan_total || 0).toLocaleString('id-ID')}</div>
@@ -546,7 +618,7 @@ export const LandDataPage: React.FC = () => {
           </div>
         </div>
 
-        {/* MODAL PETA - ditaruh di level paling tinggi di dalam return */}
+        {/* MODAL PETA */}
         {showMapModal && (
           <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowMapModal(false)} />
@@ -560,7 +632,6 @@ export const LandDataPage: React.FC = () => {
                     <LandMap 
                       latitude={form.latitude} 
                       longitude={form.longitude} 
-                      /* 2. Menambahkan tipe data : number pada parameter agar tidak error */
                       onChange={(newLat: number, newLng: number) => 
                         setForm((prev: any) => ({ 
                           ...prev, 
@@ -582,6 +653,139 @@ export const LandDataPage: React.FC = () => {
                     <CheckCircle size={16} /> Gunakan Lokasi Ini
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL DETAIL BANGUNAN */}
+        {showBuildingModal && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md animate-in fade-in duration-300">
+            <div className="bg-white w-full max-w-5xl h-[90vh] rounded-[3rem] shadow-2xl flex flex-col relative overflow-hidden animate-in zoom-in-95 duration-300">
+              <div className="p-8 border-b bg-slate-50 flex justify-between items-center px-10">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg"><Home size={24}/></div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Manajemen Detail Bangunan</h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Lengkapi spesifikasi fisik konstruksi</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Button variant="secondary" onClick={() => setShowBuildingModal(false)}>Tutup</Button>
+                  <Button onClick={() => setShowBuildingModal(false)} className="bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20 px-8">Simpan Detail</Button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-10 custom-scrollbar space-y-10">
+                {(form.detail_bangunan || []).length === 0 && (
+                   <div className="py-20 text-center flex flex-col items-center opacity-30">
+                      <Home size={64} className="mb-4" strokeWidth={1}/>
+                      <p className="font-black uppercase tracking-[0.3em] text-sm">Belum Ada Data Bangunan</p>
+                      <Button variant="outline" className="mt-6 border-dashed" onClick={addBuilding}><Plus size={16} className="mr-2"/> Tambah Bangunan Pertama</Button>
+                   </div>
+                )}
+
+                {(form.detail_bangunan || []).map((b, idx) => (
+                  <div key={b.id} className="bg-slate-50 rounded-[2.5rem] border border-slate-200 transition-all shadow-sm overflow-hidden hover:border-blue-300">
+                    {/* FIXED HEADER: Bangunan X & Aksi Hapus diletakkan di luar form grid */}
+                    <div className="flex items-center justify-between px-8 py-4 bg-white border-b border-slate-200">
+                      <div className="flex items-center gap-3">
+                         <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center font-black text-[10px] border border-blue-100 shadow-sm">
+                            {idx + 1}
+                         </div>
+                         <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-800">DATA BANGUNAN KE-{idx + 1}</span>
+                      </div>
+                      <button 
+                        onClick={() => removeBuilding(idx)} 
+                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        title="Hapus Unit Bangunan"
+                      >
+                        <Trash2 size={18}/>
+                      </button>
+                    </div>
+
+                    <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-1">
+                       <Select label="Jenis Penggunaan" value={b.jenis_penggunaan} onChange={e => updateBuilding(idx, 'jenis_penggunaan', e.target.value)}>
+                          <option value="Perumahan">Perumahan</option>
+                          <option value="Pabrik">Pabrik</option>
+                          <option value="Perkantoran Swasta">Perkantoran Swasta</option>
+                          <option value="Toko Apotik/Pasar/Ruko">Toko Apotik/Pasar/Ruko</option>
+                          <option value="Rumah Sakit/Klinik">Rumah Sakit/Klinik</option>
+                       </Select>
+                       <Input label="Luas Bangunan (m²)" type="number" value={b.luas} onChange={e => updateBuilding(idx, 'luas', parseFloat(e.target.value) || 0)} />
+                       <Input label="Jumlah Lantai" type="number" value={b.jumlah_lantai} onChange={e => updateBuilding(idx, 'jumlah_lantai', parseInt(e.target.value) || 1)} />
+                       <Input label="Daya Listrik (Watt)" placeholder="Misal: 1300" value={b.daya_listrik} onChange={e => updateBuilding(idx, 'daya_listrik', e.target.value)} />
+                       
+                       <Input label="Tahun Dibangun" type="number" placeholder="YYYY" value={b.tahun_dibangun} onChange={e => updateBuilding(idx, 'tahun_dibangun', e.target.value)} />
+                       <Input label="Tahun Direnovasi" type="number" placeholder="YYYY (Jika Ada)" value={b.tahun_direnovasi} onChange={e => updateBuilding(idx, 'tahun_direnovasi', e.target.value)} />
+                       
+                       <Select label="Kondisi" value={b.kondisi} onChange={e => updateBuilding(idx, 'kondisi', e.target.value)}>
+                          <option value="Sangat Baik">Sangat Baik</option>
+                          <option value="Baik">Baik</option>
+                          <option value="Sedang">Sedang</option>
+                          <option value="Jelek">Jelek</option>
+                       </Select>
+
+                       <Select label="Konstruksi" value={b.konstruksi} onChange={e => updateBuilding(idx, 'konstruksi', e.target.value)}>
+                          <option value="Beton">Beton</option>
+                          <option value="Baja">Baja</option>
+                          <option value="Batu Bata">Batu Bata</option>
+                          <option value="Kayu">Kayu</option>
+                       </Select>
+
+                       <Select label="Atap" value={b.atap} onChange={e => updateBuilding(idx, 'atap', e.target.value)}>
+                          <option value="Decrabon/Beton/Gtg Glazur">Decrabon/Beton/Gtg Glazur</option>
+                          <option value="Gtg Beton/Alumunium">Gtg Beton/Alumunium</option>
+                          <option value="Gtg Biasa/Sirap">Gtg Biasa/Sirap</option>
+                          <option value="Asbes">Asbes</option>
+                          <option value="Seng">Seng</option>
+                       </Select>
+
+                       <Select label="Dinding" value={b.dinding} onChange={e => updateBuilding(idx, 'dinding', e.target.value)}>
+                          <option value="Batubata/Cenblok">Batubata/Cenblok</option>
+                          <option value="Kaca/Alumunium">Kaca/Alumunium</option>
+                          <option value="Beton">Beton</option>
+                          <option value="Kayu">Kayu</option>
+                          <option value="Seng">Seng</option>
+                          <option value="Tidak Ada">Tidak Ada</option>
+                       </Select>
+
+                       <Select label="Lantai" value={b.lantai} onChange={e => updateBuilding(idx, 'lantai', e.target.value)}>
+                          <option value="Keramik">Keramik</option>
+                          <option value="Marmer">Marmer</option>
+                          <option value="Teraso">Teraso</option>
+                          <option value="Ubin PC/Papan">Ubin PC/Papan</option>
+                          <option value="Semen">Semen</option>
+                       </Select>
+
+                       <Select label="Langit-langit" value={b.langit_langit} onChange={e => updateBuilding(idx, 'langit_langit', e.target.value)}>
+                          <option value="Triplek/Asbes Bambu">Triplek/Asbes Bambu</option>
+                          <option value="Akustik/Jati">Akustik/Jati</option>
+                          <option value="Tidak Ada">Tidak Ada</option>
+                       </Select>
+                    </div>
+                  </div>
+                ))}
+                
+                {(form.detail_bangunan || []).length > 0 && (
+                  <Button variant="outline" className="w-full h-16 border-dashed border-2 bg-white rounded-[2rem] text-blue-600 font-black uppercase tracking-widest text-[10px]" onClick={addBuilding}>
+                    <Plus size={18} className="mr-2"/> Tambah Bangunan Baru
+                  </Button>
+                )}
+              </div>
+              
+              <div className="p-8 bg-slate-900 text-white flex justify-between items-center px-12">
+                 <div className="flex gap-10">
+                    <div>
+                       <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1">Total Unit Bangunan</p>
+                       <h4 className="text-2xl font-black">{(form.detail_bangunan || []).length} Unit</h4>
+                    </div>
+                    <div>
+                       <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1">Akumulasi Luas Keseluruhan</p>
+                       <h4 className="text-2xl font-black text-blue-400">{(form.pajak_bangunan_luas || 0)} m²</h4>
+                    </div>
+                 </div>
+                 <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.3em]">Ethana Building Engine v1.0</p>
               </div>
             </div>
           </div>

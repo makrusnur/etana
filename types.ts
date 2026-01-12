@@ -5,10 +5,13 @@ export interface Identity {
   sebutan: 'Tuan' | 'Nyonya' | 'Nona' | 'Duda' | 'Janda' | '';
   nik: string;
   nama: string;
+  alias?: string;
   tempat_lahir: string;
   tanggal_lahir: string;
   ejaan_tanggal_lahir: string;
   agama: string;
+  status_perkawinan?: string; // Field baru
+  golongan_darah?: string; // Field baru
   alamat: string;
   rt: string;
   rw: string;
@@ -16,6 +19,7 @@ export interface Identity {
   kecamatan: string;
   kota_kabupaten: string;
   provinsi: string;
+  kode_pos?: string;
   pekerjaan: string;
   ktp_berlaku: string;
   is_seumur_hidup?: boolean;
@@ -24,10 +28,34 @@ export interface Identity {
   nama_ibuk_kandung: string;
   pendidikan_terakhir: string;
   foto_ktp: string;
+  foto_verifikasi?: string;
+  ttd_digital?: string; // Field baru: Base64/URL
+  sidik_jari?: string; // Field baru: Base64/URL
   created_at: string;
+  nib_badan?: string;
+  telepon?: string;
+  npwp?: string;
+  email?: string;
 }
 
 export type LandType = 'LETTER_C' | 'SHM_ANALOG' | 'SHM_ELEKTRONIK';
+
+export interface BuildingDetail {
+  id: string;
+  bangunan_ke: number;
+  jenis_penggunaan: string;
+  luas: number;
+  jumlah_lantai: number;
+  tahun_dibangun: string;
+  tahun_direnovasi?: string;
+  daya_listrik: string;
+  kondisi: string;
+  konstruksi: string;
+  atap: string;
+  dinding: string;
+  lantai: string;
+  langit_langit: string;
+}
 
 export interface LandHistory {
   atas_nama: string;
@@ -101,9 +129,14 @@ export interface LandData {
   pajak_bumi_luas?: number;
   pajak_bumi_njop?: number;
   pajak_bumi_total?: number;
+
+  // Bangunan Section
+  jumlah_bangunan?: number;
   pajak_bangunan_luas?: number;
   pajak_bangunan_njop?: number;
   pajak_bangunan_total?: number;
+  detail_bangunan?: BuildingDetail[];
+  
   pajak_grand_total?: number;
   
   harga_transaksi?: number;
