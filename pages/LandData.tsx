@@ -586,7 +586,7 @@ export const LandDataPage: React.FC = () => {
                   </button>
                   <div className="mt-2 pt-2 border-t border-slate-100">
                     <button type="button" onClick={() => setShowMapModal(true)} className="w-full py-3 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100 hover:bg-indigo-100 flex items-center justify-center gap-2 text-[10px] font-black uppercase">
-                      <MapPin size={14} /> {form.latitude ? 'Ubah Titik Lokasi Peta' : 'Pilih Lokasi di Peta (Visual)'}
+                      <MapPin size={14} /> {form.latitude ? 'Tambahkan Titik Lokasi Peta' : 'Pilih Lokasi di Peta (Visual)'}
                     </button>
                     {form.latitude && (
                       <div className="mt-2 px-4 py-2 bg-emerald-50 rounded-xl border border-emerald-100 flex justify-between items-center">
