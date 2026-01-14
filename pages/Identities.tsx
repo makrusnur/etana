@@ -29,6 +29,7 @@ export const Identities: React.FC = () => {
     tempat_lahir: '', 
     tanggal_lahir: '', 
     ejaan_tanggal_lahir: '', 
+    jenis_kelamin: '',
     agama: 'Islam', 
     status_perkawinan: 'Belum Kawin',
     golongan_darah: '',
@@ -90,7 +91,7 @@ export const Identities: React.FC = () => {
         const ejaanText = spellDateIndo(form.tanggal_lahir); 
         setForm((prev) => ({
           ...prev, 
-          ejaan_tanggal_lahir: toTitleCase(ejaanText)
+          ejaan_tanggal_lahir: (ejaanText)
         }));
       }
     } else {
@@ -209,7 +210,6 @@ export const Identities: React.FC = () => {
       ejaan_tanggal_ktp_berlaku: checked ? 'Seumur Hidup' : ''
     }));
   };
-
   const filteredData = data.filter(d => 
     d.nama.toLowerCase().includes(search.toLowerCase()) || 
     d.nik.includes(search)
@@ -300,14 +300,18 @@ export const Identities: React.FC = () => {
                     <div className="col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-6 rounded-[2rem] border border-slate-100 shadow-inner my-4">
                         <div className="md:col-span-2">
                         <DateInput label="Tanggal Lahir" value={form.tanggal_lahir} onChange={val => setForm({...form, tanggal_lahir: val})} />
-                        <div className="text-[10px] text-blue-600 font-bold mt-1.5">({form.ejaan_tanggal_lahir || '...'})</div>
+                        <div className="text-[12px] text-blue-600 font-bold mt-1.5">({form.ejaan_tanggal_lahir || '...'})</div>
                         </div>
                         <div className="flex flex-col">
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">Umur</label>
                         <div className="flex-1 min-h-[50px] flex items-center justify-center bg-white border border-slate-200 text-slate-900 rounded-2xl text-sm font-black shadow-sm">{umur || "-"}</div>
                         </div>
                     </div>
-
+                    <Select label="Jenis Kelamin" value={form.jenis_kelamin} onChange={(e: any) => setForm({...form, jenis_kelamin: e.target.value})}>
+                        <option value="">--Pilih Jenis Kelamin--</option>
+                        <option value="Laki-laki">Laki-laki</option>
+                        <option value="Perempuan">Perempuan</option>
+                    </Select>
                     <Select label="Status Perkawinan" value={form.status_perkawinan} onChange={(e) => setForm({...form, status_perkawinan: e.target.value})}>
                         <option value="Belum Kawin">Belum Kawin</option>
                         <option value="Kawin">Kawin</option>

@@ -1,4 +1,3 @@
-
 export const terbilang = (nilai: number): string => {
   const angka = Math.abs(Math.floor(nilai));
   const huruf = [
@@ -28,31 +27,10 @@ export const terbilang = (nilai: number): string => {
     temp = terbilang(Math.floor(angka / 1000000000000)) + " triliun " + terbilang(angka % 1000000000000);
   }
   
-  return temp.trim() || " ";
+  return temp.trim().toLowerCase();
 };
 
-export const getDayNameIndo = (dateStr: string): string => {
-  if (!dateStr) return "";
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return "";
-  const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-  return days[date.getDay()];
-};
-
-export const formatDateIndo = (dateStr: string): string => {
-  if (!dateStr || dateStr === 'SEUMUR HIDUP') return dateStr;
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return dateStr;
-  const months = [
-    "Januari", "Februari", "Maret", "April", "Mei", "Juni", 
-    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-  ];
-  const day = date.getDate();
-  const month = months[date.getMonth()];
-  const year = date.getFullYear();
-  return `${day} ${month} ${year}`;
-};
-
+// --- FUNGSI INI TETAP ADA UNTUK NAMA & ALAMAT ---
 export const toTitleCase = (str: string): string => {
   if (!str) return "";
   return str
@@ -68,19 +46,48 @@ export const spellDateIndo = (dateStr: string): string => {
   const date = new Date(dateStr);
   if (isNaN(date.getTime())) return dateStr;
 
-  // Nama bulan dengan huruf kapital di awal (Title Case)
+  // Nama bulan Manual dengan Kapital di awal
   const months = [
     "Januari", "Februari", "Maret", "April", "Mei", "Juni", 
     "Juli", "Agustus", "September", "Oktober", "November", "Desember"
   ];
 
-  // Ambil ejaan angka (fungsi terbilang Bapak sudah menghasilkan huruf kecil)
-  const day = terbilang(date.getDate()); // "sebelas"
-  const month = months[date.getMonth()]; // "Januari"
-  const year = terbilang(date.getFullYear()); // "dua ribu"
+  const day = terbilang(date.getDate());   
+  const month = months[date.getMonth()];   
+  const year = terbilang(date.getFullYear()); 
 
-  // Langsung gabungkan tanpa toTitleCase lagi agar format case masing-masing terjaga
+  // Di sini kita gabung manual, TIDAK pakai toTitleCase 
+  // supaya "Januari" tetap Besar dan "sebelas" tetap kecil.
   return `${day} ${month} ${year}`.trim();
+};
+
+export const calculateAge = (dateStr: string): string => {
+  if (!dateStr || dateStr === 'SEUMUR HIDUP') return "";
+  const birthDate = new Date(dateStr);
+  if (isNaN(birthDate.getTime())) return "";
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age.toString();
+};
+
+export const getDayNameIndo = (dateStr: string): string => {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return "";
+  const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+  return days[date.getDay()];
+};
+
+export const formatDateIndo = (dateStr: string): string => {
+  if (!dateStr || dateStr === 'SEUMUR HIDUP') return dateStr;
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+  const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+  return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
 };
 
 export const generateId = () => {

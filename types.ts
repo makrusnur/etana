@@ -1,4 +1,4 @@
-
+// 1. Identitas Klien / Subjek Hak
 export interface Identity {
   id: string;
   status: 'active' | 'archived';
@@ -9,9 +9,10 @@ export interface Identity {
   tempat_lahir: string;
   tanggal_lahir: string;
   ejaan_tanggal_lahir: string;
+  jenis_kelamin: 'Laki-laki' | 'Perempuan' | '';
   agama: string;
-  status_perkawinan?: string; // Field baru
-  golongan_darah?: string; // Field baru
+  status_perkawinan?: string;
+  golongan_darah?: string;
   alamat: string;
   rt: string;
   rw: string;
@@ -29,8 +30,8 @@ export interface Identity {
   pendidikan_terakhir: string;
   foto_ktp: string;
   foto_verifikasi?: string;
-  ttd_digital?: string; // Field baru: Base64/URL
-  sidik_jari?: string; // Field baru: Base64/URL
+  ttd_digital?: string;
+  sidik_jari?: string;
   created_at: string;
   nib_badan?: string;
   telepon?: string;
@@ -39,6 +40,18 @@ export interface Identity {
   email?: string;
 }
 
+// 2. Master Desa Pelaksana PTSL (Pilihan A)
+export interface PtslVillage {
+  id: string;
+  nama_desa: string;
+  kecamatan: string;
+  tahun_anggaran: string;
+  target_kuota?: number;
+  keterangan?: string;
+  created_at: string;
+}
+
+// 3. Data Tanah & Bangunan
 export type LandType = 'LETTER_C' | 'SHM_ANALOG' | 'SHM_ELEKTRONIK';
 
 export interface BuildingDetail {
@@ -80,8 +93,8 @@ export interface LandData {
   kecamatan: string;
   kabupaten_kota: string;
   kewajiban_pajak: string;
+  surat_hak_Sebelumnya: string;
   jenis_dasar_surat: LandType;
-  
   
   kohir?: string;
   persil?: string;
@@ -103,13 +116,10 @@ export interface LandData {
   kode_sertifikat?: string;
   nibel?: string;
 
-
-  // Riwayat & BAK
   riwayat_tanah?: LandHistory[];
   bak_list?: string[];
-  bak?: string; // Legacy support
+  bak?: string; 
 
-  // Measurements - Dimohon
   luas_dimohon: number;
   ejaan_luas_dimohon: string;
   batas_utara_dimohon: string;
@@ -117,7 +127,6 @@ export interface LandData {
   batas_selatan_dimohon: string;
   batas_barat_dimohon: string;
 
-  // Measurements - Seluruhnya
   luas_seluruhnya: number;
   ejaan_luas_seluruhnya: string;
   batas_utara_seluruhnya: string;
@@ -125,13 +134,11 @@ export interface LandData {
   batas_selatan_seluruhnya: string;
   batas_barat_seluruhnya: string;
   
-// Field Baru: SPPT Detail & Harga
   sppt_tahun?: string;
   pajak_bumi_luas?: number;
   pajak_bumi_njop?: number;
   pajak_bumi_total?: number;
 
-  // Bangunan Section
   jumlah_bangunan?: number;
   pajak_bangunan_luas?: number;
   pajak_bangunan_njop?: number;
@@ -139,34 +146,57 @@ export interface LandData {
   detail_bangunan?: BuildingDetail[];
   
   pajak_grand_total?: number;
-  
   harga_transaksi?: number;
   ejaan_harga_transaksi?: string;
 
   koordinat_list?: string[];
-
   latitude: number;
   longitude: number;
   created_at: string;
 }
 
+// 4. Berkas (Induk Relasi)
 export interface FileRecord {
+  // === FIELD ASLI (JANGAN DIHAPUS/DIUBAH) ===
   id: string;
-  nomor_berkas: string;
-  nomor_register: string;
-  hari: string;
+  kategori: 'PPAT_NOTARIS' | 'PTSL';
+  village_id?: string; // Menghubungkan ke PtslVillage (Untuk PTSL)
+  nomor_berkas: string; // NUB
+  nomor_register: string; // NOP 
+  hari: string; 
   tanggal: string;
   keterangan: string;
   jenis_perolehan: string;
   tahun_perolehan: string;
   created_at: string;
-  // khusus waris
   register_waris_desa?: string;
   register_waris_kecamatan?: string;
   tanggal_waris?: string;
 
+  // === TAMBAHAN BARU (UNTUK 12 POIN PTSL) ===
+  kasun?: string;                               // Poin 3
+  jenis_tanah?: string;                         // Poin 4
+  nama_pemohon?: string;                        // Poin 5 (Nama)
+  asal_perolehan?: string;                      // Poin 6
+  tahun_pemohon?: string;                       // Poin 7
+  tahun_penjual?: string;                       // Poin 8
+  sebab_perolehan?: string;                     // Poin 9 (Jual beli, hibah, waris)
+  bukti_perolehan?: string;                     // Poin 10 (Segel, akta, kwitansi)
+  
+  // Poin 11: Batas-batas
+  batas_utara?: string;
+  batas_timur?: string;
+  batas_selatan?: string;
+  batas_barat?: string;
+  
+  // Poin 12: Ceklis Kelengkapan (Boolean)
+  cek_ktp?: boolean;
+  cek_kk?: boolean;
+  cek_sppt?: boolean;
+  cek_bukti?: boolean;
 }
 
+// 5. Relasi (Menghubungkan Orang, Tanah, dan Berkas)
 export type RelationRole = 'PIHAK_1' | 'PIHAK_2' | 'SAKSI' | 'PERSETUJUAN_PIHAK_1';
 
 export interface Relation {

@@ -10,6 +10,7 @@ import { FilesPage } from './pages/Files';
 import { TemplatesPage } from './pages/Templates';
 import { Login } from './pages/Login';
 import { MapMonitoring } from './pages/MapMonitoring';
+import { PtslHalaman } from './pages/PtslMassal';
 
 // Komponen Wrapper untuk mendeteksi perubahan rute
 const AppContent: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
@@ -45,6 +46,7 @@ const AppContent: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             <Route path="/files" element={<FilesPage />} />
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/map-monitoring" element={<MapMonitoring />} />
+            <Route path="/ptsl" element={<PtslHalaman />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

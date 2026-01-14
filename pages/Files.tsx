@@ -27,7 +27,8 @@ export const FilesPage: React.FC = () => {
     tahun_perolehan: '',
     register_waris_desa: '',
     register_waris_kecamatan: '',
-    tanggal_waris: ''
+    tanggal_waris: '',
+    kategori: 'PPAT_NOTARIS'
   };
 
   const [formFile, setFormFile] = useState<Partial<FileRecord>>(initialFileState);
@@ -76,6 +77,7 @@ export const FilesPage: React.FC = () => {
         ...initialFileState,
         ...formFile,
         id: editingId || generateId(),
+        kategori: 'PPAT_NOTARIS',
         nomor_berkas: formFile.nomor_berkas!.toUpperCase(),
         nomor_register: formFile.nomor_register?.toUpperCase() || '',
         hari: formFile.hari || getDayNameIndo(formFile.tanggal || ''),
@@ -134,10 +136,16 @@ export const FilesPage: React.FC = () => {
     if (activeFile) setRelations(await db.relations.getByFileId(activeFile.id));
   };
 
-  const filteredFiles = files.filter(f => 
-    f.nomor_berkas.toLowerCase().includes(fileSearch.toLowerCase()) || 
-    f.jenis_perolehan.toLowerCase().includes(fileSearch.toLowerCase())
-  );
+  // LOKASI: Sekitar baris 139
+  const filteredFiles = files.filter(f => {
+  // 1. Cek apakah kategorinya PPAT_NOTARIS (atau kosong untuk data lama)
+  const isKategoriCocok = f.kategori === 'PPAT_NOTARIS' || !f.kategori;
+  // 2. Cek apakah cocok dengan pencarian
+  const isSearchCocok = f.nomor_berkas.toLowerCase().includes(fileSearch.toLowerCase()) || 
+                       f.jenis_perolehan.toLowerCase().includes(fileSearch.toLowerCase());
+  // PASTIKAN BARIS RETURN INI MENGGUNAKAN KEDUANYA:
+  return isKategoriCocok && isSearchCocok; 
+  });
 
   const isWaris = formFile.jenis_perolehan?.toUpperCase().includes('WARIS');
 

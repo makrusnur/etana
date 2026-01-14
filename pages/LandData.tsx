@@ -31,6 +31,7 @@ export const LandDataPage: React.FC = () => {
     kecamatan: '', 
     kabupaten_kota: 'Pasuruan', 
     kewajiban_pajak: '', 
+    surat_hak_Sebelumnya: '',
     jenis_dasar_surat: 'LETTER_C',
     
     kohir: '', persil: '', klas: '', atas_nama_letter_c: '', berasal_dari_an: '', tahun_perolehan_alas_hak: '',
@@ -341,6 +342,7 @@ export const LandDataPage: React.FC = () => {
                 <Input label="Kecamatan" value={form.kecamatan} onChange={e => setForm({ ...form, kecamatan: e.target.value })} />
                 <Input label="Kota / Kabupaten" value={form.kabupaten_kota} readOnly />
                 <Input label="Kewajiban Pajak" placeholder="...." value={form.kewajiban_pajak} onChange={e => setForm({ ...form, kewajiban_pajak: e.target.value })} />
+                <Input label="Surat/Akta sebelumnya" placeholder="Jika ada" value={form.surat_hak_Sebelumnya} onChange={e => setForm({ ...form, surat_hak_Sebelumnya: e.target.value })} />
               </div>
 
               {/* Rincian SPPT & NJOP */}
