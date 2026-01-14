@@ -27,6 +27,7 @@ export const PtslHalaman = () => {
   const [formFile, setFormFile] = useState<Partial<FileRecord>>({
     nomor_berkas: '',
     nomor_register: '',
+    kategori: 'PTSL',
     kasun: '',
     jenis_tanah: '',
     nama_pemohon: '',
