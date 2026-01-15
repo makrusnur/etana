@@ -31,7 +31,7 @@ export const LandDataPage: React.FC = () => {
     kecamatan: '', 
     kabupaten_kota: 'Pasuruan', 
     kewajiban_pajak: '', 
-    surat_hak_Sebelumnya: '',
+    surat_hak_Sebelumnya: [],
     jenis_dasar_surat: 'LETTER_C',
     
     kohir: '', persil: '', klas: '', atas_nama_letter_c: '', berasal_dari_an: '', tahun_perolehan_alas_hak: '',
@@ -93,6 +93,28 @@ export const LandDataPage: React.FC = () => {
       console.error("Gagal memuat data tanah:", err);
     }
   };
+  const addSuratHak = () => {
+  setForm(prev => ({
+    ...prev,
+    surat_hak_Sebelumnya: [
+      ...(Array.isArray(prev.surat_hak_Sebelumnya) ? prev.surat_hak_Sebelumnya : []),
+      { jenis: '', tanggal: '', nomor: '', nama_ppat: '' }
+    ]
+  }));
+};
+
+const updateSuratHak = (index: number, field: string, value: string) => {
+  const newSurat = [...form.surat_hak_Sebelumnya];
+  newSurat[index] = { ...newSurat[index], [field]: value };
+  setForm({ ...form, surat_hak_Sebelumnya: newSurat });
+};
+
+const removeSuratHak = (index: number) => {
+  setForm({
+    ...form,
+    surat_hak_Sebelumnya: form.surat_hak_Sebelumnya.filter((_, i) => i !== index)
+  });
+};
 
   const updateLuas = (field: 'luas_dimohon' | 'luas_seluruhnya', val: number) => {
     const text = val > 0 ? terbilang(val) + " meter persegi" : "";
@@ -342,8 +364,68 @@ export const LandDataPage: React.FC = () => {
                 <Input label="Kecamatan" value={form.kecamatan} onChange={e => setForm({ ...form, kecamatan: e.target.value })} />
                 <Input label="Kota / Kabupaten" value={form.kabupaten_kota} readOnly />
                 <Input label="Kewajiban Pajak" placeholder="...." value={form.kewajiban_pajak} onChange={e => setForm({ ...form, kewajiban_pajak: e.target.value })} />
-                <Input label="Surat/Akta sebelumnya" placeholder="Jika ada" value={form.surat_hak_Sebelumnya} onChange={e => setForm({ ...form, surat_hak_Sebelumnya: e.target.value })} />
-              </div>
+                </div>
+                <div className="mt-8 space-y-4">
+                  <div className="flex justify-between items-center border-b pb-2">
+                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-tighter">
+                      Riwayat Surat Hak Sebelumnya (Dinamis)
+                    </h3>
+                    <button 
+                      type="button"
+                      onClick={addSuratHak}
+                      className="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white px-4 py-2 rounded-xl text-[10px] font-bold transition-all shadow-sm border border-blue-100"
+                    >
+                      + TAMBAH RIWAYAT SURAT
+                    </button>
+                  </div>
+
+                  <div className="grid gap-4">
+                    {form.surat_hak_Sebelumnya && form.surat_hak_Sebelumnya.map((item, index) => (
+                      <div key={index} className="group relative grid grid-cols-1 md:grid-cols-4 gap-4 p-6 bg-slate-50/50 rounded-[24px] border border-slate-200 transition-all hover:bg-white hover:shadow-md">
+                        <Input 
+                          label="Jenis" 
+                          placeholder="Contoh: Akta" 
+                          value={item.jenis} 
+                          onChange={(e) => updateSuratHak(index, 'jenis', e.target.value)} 
+                        />
+                        <Input 
+                          label="Tanggal" 
+                          type="date" 
+                          value={item.tanggal} 
+                          onChange={(e) => updateSuratHak(index, 'tanggal', e.target.value)} 
+                        />
+                        <Input 
+                          label="Nomor" 
+                          placeholder="No. Surat" 
+                          value={item.nomor} 
+                          onChange={(e) => updateSuratHak(index, 'nomor', e.target.value)} 
+                        />
+                        <div className="relative">
+                          <Input 
+                            label="Nama PPAT/Notaris" 
+                            placeholder="Nama Lengkap" 
+                            value={item.nama_ppat} 
+                            onChange={(e) => updateSuratHak(index, 'nama_ppat', e.target.value)} 
+                          />
+                          {/* Tombol Hapus Baris */}
+                          <button 
+                            type="button"
+                            onClick={() => removeSuratHak(index)}
+                            className="absolute -top-2 -right-2 bg-white text-red-500 shadow-sm border border-red-100 rounded-full p-1.5 hover:bg-red-500 hover:text-white transition-all opacity-0 group-hover:opacity-100"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {form.surat_hak_Sebelumnya.length === 0 && (
+                      <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-[32px] bg-slate-50/30">
+                        <p className="text-xs text-slate-400 font-medium">Klik tombol tambah jika ada riwayat surat sebelumnya</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
               {/* Rincian SPPT & NJOP */}
               <div className="mt-10 p-1 bg-slate-100/50 rounded-[2.5rem] border border-slate-200">

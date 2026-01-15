@@ -93,7 +93,7 @@ export interface LandData {
   kecamatan: string;
   kabupaten_kota: string;
   kewajiban_pajak: string;
-  surat_hak_Sebelumnya: string;
+  surat_hak_Sebelumnya: SuratHak[] ;
   jenis_dasar_surat: LandType;
   
   kohir?: string;
@@ -155,6 +155,13 @@ export interface LandData {
   created_at: string;
 }
 
+export interface SuratHak {
+  jenis: string;
+  tanggal: string;
+  nomor: string;
+  nama_ppat: string;
+}
+
 // 4. Berkas (Induk Relasi)
 export interface FileRecord {
   // === FIELD ASLI (JANGAN DIHAPUS/DIUBAH) ===
@@ -162,7 +169,7 @@ export interface FileRecord {
   kategori: 'PPAT_NOTARIS' | 'PTSL';
   village_id?: string; // Menghubungkan ke PtslVillage (Untuk PTSL)
   nomor_berkas: string; // NUB
-  nomor_register: string; // NOP 
+  nomor_register: string; 
   hari: string; 
   tanggal: string;
   keterangan: string;
@@ -172,11 +179,13 @@ export interface FileRecord {
   register_waris_desa?: string;
   register_waris_kecamatan?: string;
   tanggal_waris?: string;
+  ejaan_tanggal_waris: string;
 
   // === TAMBAHAN BARU (UNTUK 12 POIN PTSL) ===
   kasun?: string;                               // Poin 3
   jenis_tanah?: string;                         // Poin 4
   nama_pemohon?: string;                        // Poin 5 (Nama)
+  nop: string;
   asal_perolehan?: string;                      // Poin 6
   tahun_pemohon?: string;                       // Poin 7
   tahun_penjual?: string;                       // Poin 8

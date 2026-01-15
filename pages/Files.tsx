@@ -3,7 +3,7 @@ import { db } from '../services/db';
 import { FileRecord, Relation, Identity, LandData, RelationRole } from '../types';
 import { Button, Input, Card, DateInput } from '../components/UI';
 import { Plus, Trash2, Search, FileText, Edit2,  Calendar, Save, X, Clock, ShieldAlert } from 'lucide-react';
-import { generateId, formatDateIndo, getDayNameIndo, toTitleCase } from '../utils';
+import { generateId, formatDateIndo, getDayNameIndo, toTitleCase, spellDateIndo } from '../utils';
 
 export const FilesPage: React.FC = () => {
   const [files, setFiles] = useState<FileRecord[]>([]);
@@ -28,6 +28,7 @@ export const FilesPage: React.FC = () => {
     register_waris_desa: '',
     register_waris_kecamatan: '',
     tanggal_waris: '',
+    ejaan_tanggal_waris: '',
     kategori: 'PPAT_NOTARIS'
   };
 
@@ -369,9 +370,40 @@ export const FilesPage: React.FC = () => {
                    <div className="grid grid-cols-2 gap-4">
                       <Input label="Reg. Waris Desa" placeholder="Nomor Reg. Desa..." value={formFile.register_waris_desa} onChange={e => setFormFile({...formFile, register_waris_desa: e.target.value})} />
                       <Input label="Reg. Waris Kecamatan" placeholder="Nomor Reg. Kec..." value={formFile.register_waris_kecamatan} onChange={e => setFormFile({...formFile, register_waris_kecamatan: e.target.value})} />
-                      <div className="col-span-2">
-                         <DateInput label="Tertanggal Waris" value={formFile.tanggal_waris} onChange={val => setFormFile({...formFile, tanggal_waris: val})} />
-                      </div>
+                      <div className="col-span-2 space-y-4">
+                          {/* 1. Input Tanggal Utama */}
+                          <DateInput 
+                            label="Tertanggal Waris" 
+                            value={formFile.tanggal_waris} 
+                            onChange={val => {
+                              setFormFile({
+                                ...formFile, 
+                                tanggal_waris: val,
+                                // OTOMATIS: Panggil fungsi spellDateIndo dari utils
+                                ejaan_tanggal_waris: val ? spellDateIndo(val) : '' 
+                              });
+                            }} 
+                          />
+
+                          {/* 2. Tampilan Ejaan Otomatis */}
+                          <div className="bg-slate-50/80 p-4 rounded-2xl border border-dashed border-slate-200">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">
+                              Terbilang Tanggal (Otomatis)
+                            </label>
+                            <textarea
+                              className="w-full bg-transparent border-none text-xs font-bold text-slate-600 outline-none resize-none italic leading-relaxed"
+                              rows={2}
+                              placeholder="Ejaan akan muncul di sini setelah tanggal dipilih..."
+                              value={formFile.ejaan_tanggal_waris || ''}
+                              onChange={e => setFormFile({...formFile, ejaan_tanggal_waris: e.target.value})}
+                            />
+                            <div className="flex justify-end">
+                              <span className="text-[9px] text-emerald-500 font-bold uppercase tracking-tighter">
+                                ✨ Terkoneksi Otomatis
+                              </span>
+                            </div>
+                          </div>
+                        </div>
                    </div>
                 </div>
               )}

@@ -196,7 +196,7 @@ export const PtslHalaman = () => {
                   </div>
                 </div>
                 <h4 className="font-black text-slate-800 uppercase text-lg leading-tight mb-1">{f.nama_pemohon || 'Tanpa Nama'}</h4>
-                <p className="text-[10px] font-bold text-slate-400 mb-4 tracking-tighter">NOP: {f.nomor_register || '-'}</p>
+                <p className="text-[10px] font-bold text-slate-400 mb-4 tracking-tighter">Nomor Register: {f.nomor_register || '-'}</p>
                 
                 <div className="grid grid-cols-2 gap-2 border-t pt-4 text-[9px] font-bold uppercase">
                    <div className="text-slate-500">Kasun: <span className="text-slate-800">{f.kasun || '-'}</span></div>
@@ -221,79 +221,121 @@ export const PtslHalaman = () => {
       {/* MODAL INPUT/EDIT BERKAS (12 POIN LENGKAP) */}
       {modalFile.show && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto relative shadow-2xl p-8 rounded-[40px]" title={modalFile.mode === 'add' ? "Input Berkas PTSL Baru" : "Update Data Berkas"}>
-            <button onClick={() => setModalFile({show: false, mode: 'add'})} className="absolute top-8 right-8 p-2 text-slate-400 hover:text-red-500 transition-colors"><X size={24}/></button>
+          <Card className="w-full max-w-5xl max-h-[95vh] overflow-y-auto relative shadow-2xl p-8 rounded-[40px] border-none" title={modalFile.mode === 'add' ? "Input Berkas PTSL Baru" : "Update Data Berkas"}>
+            <button 
+              onClick={() => setModalFile({show: false, mode: 'add'})} 
+              className="absolute top-8 right-8 p-2 text-slate-400 hover:text-red-500 transition-colors bg-slate-50 rounded-full"
+            >
+              <X size={24}/>
+            </button>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6">
-              {/* KOLOM KIRI: IDENTITAS TANAH */}
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <Input label="1. NUB" placeholder="000" value={formFile.nomor_berkas || ''} onChange={e => setFormFile({...formFile, nomor_berkas: e.target.value})} />
-                  <Input label="2. NOP" placeholder="00.00..." value={formFile.nomor_register || ''} onChange={e => setFormFile({...formFile, nomor_register: e.target.value})} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mt-8">
+              
+              {/* KOLOM KIRI: DATA UTAMA & PEROLEHAN */}
+              <div className="space-y-6">
+                <div className="bg-slate-50/50 p-6 rounded-[32px] border border-slate-100 space-y-4">
+                  <p className="text-[10px] font-black uppercase text-blue-600 mb-2 tracking-widest">A. Identitas Berkas & NOP</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input label="1. NUB" placeholder="000" value={formFile.nomor_berkas || ''} onChange={e => setFormFile({...formFile, nomor_berkas: e.target.value})} />
+                    <Input label="2. No Register" placeholder="00/00..." value={formFile.nomor_register || ''} onChange={e => setFormFile({...formFile, nomor_register: e.target.value})} />
+                  </div>
+                  <Input label="3. KASUN / DUSUN" placeholder="Masukkan Nama Dusun" value={formFile.kasun || ''} onChange={e => setFormFile({...formFile, kasun: e.target.value})} />
+                  <Input label="4. NAMA PEMOHON" placeholder="Nama Sesuai KTP" value={formFile.nama_pemohon || ''} onChange={e => setFormFile({...formFile, nama_pemohon: e.target.value})} />
+                  <Input label="5. NOP" placeholder="35.14.." value={formFile.nop || ''} onChange={e => setFormFile({...formFile, nop: e.target.value})} />
                 </div>
-                <Input label="3. KASUN / DUSUN" placeholder="Masukkan Nama Dusun" value={formFile.kasun || ''} onChange={e => setFormFile({...formFile, kasun: e.target.value})} />
-                <Input label="4. JENIS TANAH" placeholder="Darat / Sawah / Yasan" value={formFile.jenis_tanah || ''} onChange={e => setFormFile({...formFile, jenis_tanah: e.target.value})} />
-                <Input label="5. NAMA PEMOHON" placeholder="Nama Sesuai KTP" value={formFile.nama_pemohon || ''} onChange={e => setFormFile({...formFile, nama_pemohon: e.target.value})} />
-                <Input label="6. ASAL PEROLEHAN DARI" placeholder="Nama Pemilik Sebelumnya" value={formFile.asal_perolehan || ''} onChange={e => setFormFile({...formFile, asal_perolehan: e.target.value})} />
-                <div className="grid grid-cols-2 gap-4">
-                  <Input label="7. THN PEROLEHAN PEMOHON" type="number" placeholder="2024" value={formFile.tahun_pemohon || ''} onChange={e => setFormFile({...formFile, tahun_pemohon: e.target.value})} />
-                  <Input label="8. THN PEROLEHAN PEMBERI" type="number" placeholder="2010" value={formFile.tahun_penjual || ''} onChange={e => setFormFile({...formFile, tahun_penjual: e.target.value})} />
+
+                <div className="bg-white p-6 rounded-[32px] border border-slate-200 space-y-4 shadow-sm">
+                  <p className="text-[10px] font-black uppercase text-orange-600 mb-2 tracking-widest">B. Riwayat Perolehan</p>
+                  <Input label="6. ASAL PEROLEHAN" placeholder="Nama Pemilik Sebelumnya" value={formFile.asal_perolehan || ''} onChange={e => setFormFile({...formFile, asal_perolehan: e.target.value})} />
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input label="7. THN PEMOHON" type="number" placeholder="2024" value={formFile.tahun_pemohon || ''} onChange={e => setFormFile({...formFile, tahun_pemohon: e.target.value})} />
+                    <Input label="8. THN PEMBERI" type="number" placeholder="2010" value={formFile.tahun_penjual || ''} onChange={e => setFormFile({...formFile, tahun_penjual: e.target.value})} />
+                  </div>
+                  
+                  {/* 9. JENIS TANAH (Dipindah ke kiri agar urutan 1-9 satu jalur) */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">9. JENIS TANAH</label>
+                    <select 
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all appearance-none cursor-pointer"
+                      value={formFile.jenis_tanah || ''} 
+                      onChange={e => setFormFile({...formFile, jenis_tanah: e.target.value})}
+                    >
+                      <option value="">-- Pilih Jenis Tanah --</option>
+                      <option value="Pertanian">PERTANIAN</option>
+                      <option value="Non Pertanian">NON PERTANIAN</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
               {/* KOLOM KANAN: LEGALITAS & BATAS */}
-              <div className="space-y-4">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1">9. SEBAB PEROLEHAN</label>
-                  <select className="w-full p-3 border rounded-2xl bg-slate-50 text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500 border-slate-200" value={formFile.sebab_perolehan || ''} onChange={e => setFormFile({...formFile, sebab_perolehan: e.target.value})}>
-                    <option value="">-- Pilih Sebab --</option>
-                    <option value="Jual Beli">JUAL BELI</option>
-                    <option value="Hibah">HIBAH</option>
-                    <option value="Waris">WARIS</option>
-                    <option value="Tukar Menukar">TUKAR MENUKAR</option>
-                    <option value="Pembagian Hak Bersama">PHB</option>
-                  </select>
+              <div className="space-y-6">
+                <div className="bg-slate-50/50 p-6 rounded-[32px] border border-slate-100 space-y-4">
+                  <p className="text-[10px] font-black uppercase text-emerald-600 mb-2 tracking-widest">C. Dasar Hukum & Bukti</p>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">10. SEBAB PEROLEHAN</label>
+                    <select 
+                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all appearance-none cursor-pointer" 
+                      value={formFile.sebab_perolehan || ''} 
+                      onChange={e => setFormFile({...formFile, sebab_perolehan: e.target.value})}
+                    >
+                      <option value="">-- Pilih Sebab --</option>
+                      <option value="Jual Beli">JUAL BELI</option>
+                      <option value="Hibah">HIBAH</option>
+                      <option value="Waris">WARIS</option>
+                      <option value="Tukar Menukar">TUKAR MENUKAR</option>
+                      <option value="Pembagian Hak Bersama">PHB (PEMBAGIAN HAK BERSAMA)</option>
+                    </select>
+                  </div>
+                  <Input label="11. BUKTI (SEGEL/AKTA/KWITANSI)" placeholder="No. Akta / Tgl Segel" value={formFile.bukti_perolehan || ''} onChange={e => setFormFile({...formFile, bukti_perolehan: e.target.value})} />
                 </div>
-
-                <Input label="10. BUKTI (SEGEL/AKTA/KWITANSI)" placeholder="No. Akta / Tgl Segel" value={formFile.bukti_perolehan || ''} onChange={e => setFormFile({...formFile, bukti_perolehan: e.target.value})} />
                 
-                <div className="p-5 bg-slate-50 rounded-[32px] border border-slate-200">
-                  <p className="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-widest text-center">11. BATAS-BATAS BIDANG</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Input placeholder="Utara" value={formFile.batas_utara || ''} onChange={e => setFormFile({...formFile, batas_utara: e.target.value})} />
-                    <Input placeholder="Timur" value={formFile.batas_timur || ''} onChange={e => setFormFile({...formFile, batas_timur: e.target.value})} />
-                    <Input placeholder="Selatan" value={formFile.batas_selatan || ''} onChange={e => setFormFile({...formFile, batas_selatan: e.target.value})} />
-                    <Input placeholder="Barat" value={formFile.batas_barat || ''} onChange={e => setFormFile({...formFile, batas_barat: e.target.value})} />
+                <div className="p-6 bg-white rounded-[32px] border border-slate-200 shadow-sm">
+                  <p className="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-widest text-center">12. BATAS-BATAS BIDANG</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input label="UTARA" placeholder="Nama/Jalan" value={formFile.batas_utara || ''} onChange={e => setFormFile({...formFile, batas_utara: e.target.value})} />
+                    <Input label="TIMUR" placeholder="Nama/Jalan" value={formFile.batas_timur || ''} onChange={e => setFormFile({...formFile, batas_timur: e.target.value})} />
+                    <Input label="SELATAN" placeholder="Nama/Jalan" value={formFile.batas_selatan || ''} onChange={e => setFormFile({...formFile, batas_selatan: e.target.value})} />
+                    <Input label="BARAT" placeholder="Nama/Jalan" value={formFile.batas_barat || ''} onChange={e => setFormFile({...formFile, batas_barat: e.target.value})} />
                   </div>
                 </div>
 
-                <div className="p-5 bg-emerald-50 rounded-[32px] border border-emerald-100">
-                  <p className="text-[10px] font-black uppercase text-emerald-600 mb-4 tracking-widest text-center">12. KELENGKAPAN BERKAS (CEKLIS)</p>
-                  <div className="grid grid-cols-2 gap-y-3 px-2">
-                    <label className="flex items-center gap-3 text-xs font-bold text-slate-700 cursor-pointer group">
-                      <input type="checkbox" checked={formFile.cek_ktp || false} onChange={e => setFormFile({...formFile, cek_ktp: e.target.checked})} className="w-5 h-5 rounded-lg border-emerald-300 text-emerald-600 focus:ring-emerald-500" /> 
-                      <span className="group-hover:text-emerald-600">FOTOCOPI KTP</span>
-                    </label>
-                    <label className="flex items-center gap-3 text-xs font-bold text-slate-700 cursor-pointer group">
-                      <input type="checkbox" checked={formFile.cek_kk || false} onChange={e => setFormFile({...formFile, cek_kk: e.target.checked})} className="w-5 h-5 rounded-lg border-emerald-300 text-emerald-600 focus:ring-emerald-500" /> 
-                      <span className="group-hover:text-emerald-600">FOTOCOPI KK</span>
-                    </label>
-                    <label className="flex items-center gap-3 text-xs font-bold text-slate-700 cursor-pointer group">
-                      <input type="checkbox" checked={formFile.cek_sppt || false} onChange={e => setFormFile({...formFile, cek_sppt: e.target.checked})} className="w-5 h-5 rounded-lg border-emerald-300 text-emerald-600 focus:ring-emerald-500" /> 
-                      <span className="group-hover:text-emerald-600">SPPT PBB</span>
-                    </label>
-                    <label className="flex items-center gap-3 text-xs font-bold text-slate-700 cursor-pointer group">
-                      <input type="checkbox" checked={formFile.cek_bukti || false} onChange={e => setFormFile({...formFile, cek_bukti: e.target.checked})} className="w-5 h-5 rounded-lg border-emerald-300 text-emerald-600 focus:ring-emerald-500" /> 
-                      <span className="group-hover:text-emerald-600">BUKTI ALAS HAK</span>
-                    </label>
+                <div className="p-6 bg-emerald-50/50 rounded-[32px] border border-emerald-100">
+                  <p className="text-[10px] font-black uppercase text-emerald-600 mb-4 tracking-widest text-center">13. KELENGKAPAN BERKAS (CEKLIS)</p>
+                  <div className="grid grid-cols-2 gap-4 px-2">
+                    {[
+                      { id: 'cek_ktp', label: 'FOTOCOPI KTP' },
+                      { id: 'cek_kk', label: 'FOTOCOPI KK' },
+                      { id: 'cek_sppt', label: 'SPPT PBB' },
+                      { id: 'cek_bukti', label: 'BUKTI ALAS HAK' }
+                    ].map((item) => (
+                      <label key={item.id} className="flex items-center gap-3 text-xs font-bold text-slate-700 cursor-pointer group bg-white p-3 rounded-xl border border-emerald-100/50 hover:border-emerald-300 transition-all">
+                        <input 
+                          type="checkbox" 
+                          checked={(formFile as any)[item.id] || false} 
+                          onChange={e => setFormFile({...formFile, [item.id]: e.target.checked})} 
+                          className="w-5 h-5 rounded-md border-emerald-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer" 
+                        /> 
+                        <span className="group-hover:text-emerald-600">{item.label}</span>
+                      </label>
+                    ))}
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 mt-10">
-              <Button variant="secondary" onClick={() => setModalFile({show: false, mode: 'add'})} className="px-8 font-black uppercase text-xs">Batal</Button>
-              <Button onClick={handleSaveFile} className="bg-emerald-600 px-12 font-black uppercase text-xs shadow-lg shadow-emerald-200">
+            <div className="flex justify-end gap-4 mt-12 pt-6 border-t border-slate-100">
+              <Button 
+                variant="secondary" 
+                onClick={() => setModalFile({show: false, mode: 'add'})} 
+                className="px-10 py-6 rounded-2xl font-black uppercase text-xs tracking-widest"
+              >
+                Batal
+              </Button>
+              <Button 
+                onClick={handleSaveFile} 
+                className="bg-emerald-600 hover:bg-emerald-700 px-16 py-6 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-emerald-200 transition-all transform hover:-translate-y-1"
+              >
                 {modalFile.mode === 'add' ? 'Simpan Berkas' : 'Update Berkas'}
               </Button>
             </div>
