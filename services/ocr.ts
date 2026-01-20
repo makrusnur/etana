@@ -44,6 +44,7 @@ export const processOCR = async (imageFile: File): Promise<Partial<Identity>> =>
             nama: { type: Type.STRING },
             tempat_lahir: { type: Type.STRING },
             tanggal_lahir: { type: Type.STRING },
+            jenis_kelamin: { type: Type.STRING }, // Field Baru
             alamat: { type: Type.STRING },
             rt: { type: Type.STRING },
             rw: { type: Type.STRING },
@@ -52,6 +53,8 @@ export const processOCR = async (imageFile: File): Promise<Partial<Identity>> =>
             kota_kabupaten: { type: Type.STRING },
             provinsi: { type: Type.STRING },
             pekerjaan: { type: Type.STRING },
+            kewarganegaraan: { type: Type.STRING }, // Field Baru
+            status_perkawinan: { type: Type.STRING }, // Field Baru
             ktp_berlaku: { type: Type.STRING },
             agama: { type: Type.STRING }
           },
@@ -81,6 +84,11 @@ export const processOCR = async (imageFile: File): Promise<Partial<Identity>> =>
       provinsi: toTitleCase(result.provinsi || ""),
       pekerjaan: toTitleCase(result.pekerjaan || ""),
       agama: toTitleCase(result.agama || ""),
+      
+      // Penyesuaian Field Baru
+      jenis_kelamin: toTitleCase(result.jenis_kelamin || ""),
+      kewarganegaraan: result.kewarganegaraan?.toUpperCase() || "WNI",
+      status_perkawinan: toTitleCase(result.status_perkawinan || ""),
       
       ejaan_tanggal_lahir: result.tanggal_lahir ? spellDateIndo(result.tanggal_lahir) : '',
       ejaan_tanggal_ktp_berlaku: result.ktp_berlaku === 'SEUMUR HIDUP' ? 'SEUMUR HIDUP' : (result.ktp_berlaku ? spellDateIndo(result.ktp_berlaku) : ''),

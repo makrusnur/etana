@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../services/db';
 import { processOCR } from '../services/ocr';
 import { Identity } from '../types';
@@ -7,7 +6,6 @@ import { Button, Input, Select, Card, DateInput } from '../components/UI';
 import { Camera, Edit2, Trash2, Plus, Search, Loader2, CheckCircle2, AlertCircle, Users, Fingerprint, Mail, Phone, ShieldCheck, Briefcase, UserCheck } from 'lucide-react';
 import { spellDateIndo , toTitleCase} from '../utils';
 import SignatureCanvas from 'react-signature-canvas';
-import { useRef } from 'react';
 
 export const Identities: React.FC = () => {
   const [data, setData] = useState<Identity[]>([]);
@@ -42,6 +40,7 @@ export const Identities: React.FC = () => {
     provinsi: '', 
     kode_pos: '',
     pekerjaan: '', 
+    kewarganegaraan: '',
     ktp_berlaku: '',
     ejaan_tanggal_ktp_berlaku: '', 
     foto_ktp: '', 
@@ -121,38 +120,49 @@ export const Identities: React.FC = () => {
   };
 
   const handleOCR = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      if (file.size > 5 * 1024 * 1024) {
-        alert("Ukuran foto terlalu besar. Silakan gunakan foto yang lebih kecil (maksimal 5MB).");
-        return;
-      }
-      setForm((prev) => ({ ...prev, foto_ktp: URL.createObjectURL(file) }));
-      setIsProcessing(true);
-      try {
-        const result = await processOCR(file);
-        if (!result || typeof result !== 'object') throw new Error("Format data OCR tidak valid.");
-        setForm((prev) => ({ 
-          ...prev, 
-          ...result, 
-          nama: toTitleCase(result.nama || prev.nama),
-          tempat_lahir: toTitleCase(result.tempat_lahir || prev.tempat_lahir),
-          pekerjaan: toTitleCase(result.pekerjaan || prev.pekerjaan),
-          alamat: toTitleCase(result.alamat || prev.alamat),
-          desa: toTitleCase(result.desa || prev.desa),
-          kecamatan: toTitleCase(result.kecamatan || prev.kecamatan),
-          kota_kabupaten: toTitleCase(result.kota_kabupaten || prev.kota_kabupaten),
-          provinsi: toTitleCase(result.provinsi || prev.provinsi),
-          is_seumur_hidup: result.ktp_berlaku?.toUpperCase() === 'SEUMUR HIDUP' 
-        }));
-      } catch (err: any) {
-        alert("AI gagal membaca data. Pastikan foto KTP jelas.");
-      } finally {
-        setIsProcessing(false);
-        e.target.value = '';
-      }
+  if (e.target.files && e.target.files[0]) {
+    const file = e.target.files[0];
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Ukuran foto terlalu besar. Silakan gunakan foto yang lebih kecil (maksimal 5MB).");
+      return;
     }
-  };
+
+    setForm((prev) => ({ ...prev, foto_ktp: URL.createObjectURL(file) }));
+    setIsProcessing(true);
+
+    try {
+      const result = await processOCR(file);
+      if (!result || typeof result !== 'object') throw new Error("Format data OCR tidak valid.");
+
+      setForm((prev) => ({ 
+        ...prev, 
+        ...result, 
+        // Field teks standar (Title Case)
+        nama: toTitleCase(result.nama || prev.nama),
+        tempat_lahir: toTitleCase(result.tempat_lahir || prev.tempat_lahir),
+        pekerjaan: toTitleCase(result.pekerjaan || prev.pekerjaan),
+        alamat: toTitleCase(result.alamat || prev.alamat),
+        desa: toTitleCase(result.desa || prev.desa),
+        kecamatan: toTitleCase(result.kecamatan || prev.kecamatan),
+        kota_kabupaten: toTitleCase(result.kota_kabupaten || prev.kota_kabupaten),
+        provinsi: toTitleCase(result.provinsi || prev.provinsi),
+        
+        // --- TAMBAHAN FIELD BARU ---
+        jenis_kelamin: result.jenis_kelamin || prev.jenis_kelamin,
+        status_perkawinan: result.status_perkawinan || prev.status_perkawinan,
+        kewarganegaraan: result.kewarganegaraan || prev.kewarganegaraan,
+        // ---------------------------
+
+        is_seumur_hidup: result.ktp_berlaku?.toUpperCase() === 'SEUMUR HIDUP' 
+      }));
+    } catch (err: any) {
+      alert("AI gagal membaca data. Pastikan foto KTP jelas.");
+    } finally {
+      setIsProcessing(false);
+      e.target.value = '';
+    }
+  }
+};
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'ttd_digital' | 'sidik_jari' | 'foto_verifikasi' | 'foto_ktp') => {
     if (e.target.files && e.target.files[0]) {
@@ -175,7 +185,7 @@ export const Identities: React.FC = () => {
   };
 
   const clearSignature = () => {
-    sigCanvas.current.clear();
+    if (sigCanvas.current) sigCanvas.current.clear();
     setForm(prev => ({ ...prev, ttd_digital: '' }));
   };
 
@@ -210,6 +220,7 @@ export const Identities: React.FC = () => {
       ejaan_tanggal_ktp_berlaku: checked ? 'Seumur Hidup' : ''
     }));
   };
+
   const filteredData = data.filter(d => 
     d.nama.toLowerCase().includes(search.toLowerCase()) || 
     d.nik.includes(search)
@@ -253,7 +264,6 @@ export const Identities: React.FC = () => {
                 </div>
             </Card>
 
-            {/* BARU: SLOT FOTO VERIFIKASI PEMILIK */}
             <Card className="h-fit shadow-xl shadow-slate-200/50" title="VERIFIKASI WAJAH">
                 <div className="text-center space-y-4">
                     <div className="w-full aspect-square bg-slate-50 rounded-[2.5rem] flex items-center justify-center border-2 border-dashed border-slate-200 relative overflow-hidden group hover:border-blue-400 transition-colors cursor-pointer">
@@ -284,7 +294,7 @@ export const Identities: React.FC = () => {
           <div className="col-span-2 space-y-6">
             <Card title="DATA PERSONAL">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                    <Select label="Sebutan Komparisi" value={form.sebutan} onChange={(e: any) => setForm({...form, sebutan: e.target.value})}>
+                    <Select label="Gelar Kehormatan Umum" value={form.sebutan} onChange={(e: any) => setForm({...form, sebutan: e.target.value})}>
                         <option value="">-- Tanpa Sebutan --</option>
                         <option value="Tuan">Tuan</option>
                         <option value="Nyonya">Nyonya</option>
@@ -325,26 +335,27 @@ export const Identities: React.FC = () => {
                         <option value="AB">AB</option><option value="O">O</option>
                     </Select>
 
-                    <div className="mb-4">
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">Pekerjaan</label>
-                        <input 
-                            list="pekerjaan-options"
-                            className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold shadow-sm focus:outline-none focus:border-blue-500 transition-all"
-                            value={form.pekerjaan}
-                            onChange={e => setForm({...form, pekerjaan: e.target.value})}
-                        />
-                        <datalist id="pekerjaan-options">
-                            <option value="PNS" /><option value="TNI" /><option value="POLRI" />
-                            <option value="Karyawan Swasta" /><option value="Wiraswasta" />
-                            <option value="Buruh Harian Lepas" /><option value="Petani/Pekebun" />
-                            <option value="Mengurus Rumah Tangga" /><option value="Pelajar/Mahasiswa" />
-                        </datalist>
-                    </div>
+                    <Input 
+                      label="Pekerjaan"
+                      list="pekerjaan-options"
+                      value={form.pekerjaan}
+                      onChange={e => setForm({...form, pekerjaan: e.target.value})}
+                    />
+                    <datalist id="pekerjaan-options">
+                        <option value="PNS" /><option value="TNI" /><option value="POLRI" />
+                        <option value="Karyawan Swasta" /><option value="Wiraswasta" />
+                        <option value="Buruh Harian Lepas" /><option value="Petani/Pekebun" />
+                        <option value="Mengurus Rumah Tangga" /><option value="Pelajar/Mahasiswa" />
+                    </datalist>
 
                     <Select label="Agama" value={form.agama} onChange={(e) => setForm({...form, agama: e.target.value})}>
                         <option value="Islam">Islam</option><option value="Kristen">Kristen</option>
                         <option value="Katolik">Katolik</option><option value="Hindu">Hindu</option>
                         <option value="Buddha">Buddha</option><option value="Konghucu">Konghucu</option>
+                    </Select>
+                    <Select label="Kewarganegaraan" value={form.kewarganegaraan} onChange={(e) => setForm({...form, kewarganegaraan: e.target.value})}>
+                        <option value="WNI">WNI</option>
+                        <option value="WNA">WNA</option>  
                     </Select>
                 </div>
             </Card>
@@ -405,7 +416,6 @@ export const Identities: React.FC = () => {
                                     <img src={form.ttd_digital} className="max-h-full object-contain mix-blend-multiply opacity-80" />
                                 </div>
                             )}
-                            {/* Fix: use any cast for penColor as it is sometimes missing from type definitions for this library */}
                             <SignatureCanvas 
                                 ref={sigCanvas} 
                                 {...({ penColor: 'black' } as any)}
@@ -453,10 +463,10 @@ export const Identities: React.FC = () => {
                             <option value="SD / Sederajat">SD / Sederajat</option>
                             <option value="SMP / Sederajat">SMP / Sederajat</option>
                             <option value="SMA / Sederajat">SMA / Sederajat</option>
-                            <option value="Diploma (I/II/III/IV)">Dploma (I/II/III/IV)</option>
+                            <option value="Diploma (I/II/III/IV)">Diploma (I/II/III/IV)</option>
                             <option value="Sarjana (S1)">Sarjana (S1)</option>
                             <option value="Magister (S2)">Magister (S2)</option>
-                            <option value="Proffesor (S3)">Sarjana (S3)</option>
+                            <option value="Doktor (S3)">Doktor (S3)</option>
                         </Select>
                     </div>
                 </div>
@@ -529,7 +539,6 @@ export const Identities: React.FC = () => {
                   </td>
                   <td className="p-6 text-center">
                     <div className="flex justify-center gap-3">
-                       {/* Fix for TypeScript error: wrap icons in span to support title attribute */}
                        {item.telepon && <span title={item.telepon}><Phone size={14} className="text-emerald-500" /></span>}
                        {item.email && <span title={item.email}><Mail size={14} className="text-blue-500" /></span>}
                        {item.npwp && <span title="NPWP Tersedia"><ShieldCheck size={14} className="text-amber-500" /></span>}

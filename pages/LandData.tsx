@@ -4,7 +4,7 @@ import { db } from '../services/db';
 import { LandData, LandType, LandHistory, BuildingDetail } from '../types';
 import { Button, Input, Card, DateInput, Select } from '../components/UI';
 import { Edit2, Trash2, Plus, Search, MapPin, FileStack, Info, AlignLeft, Layers, Maximize, Crosshair, Coins,  Receipt, TrendingUp, Landmark, X, CheckCircle, Home } from 'lucide-react';
-import { generateId, terbilang, spellDateIndo } from '../utils';
+import { generateId, terbilang, spellDateIndo, generateUUID} from '../utils';
 import LandMap from '../components/LandMap';
 
 export const LandDataPage: React.FC = () => {
@@ -31,7 +31,7 @@ export const LandDataPage: React.FC = () => {
     kecamatan: '', 
     kabupaten_kota: 'Pasuruan', 
     kewajiban_pajak: '', 
-    surat_hak_Sebelumnya: [],
+    surat_hak_sebelumnya: [],
     jenis_dasar_surat: 'LETTER_C',
     
     kohir: '', persil: '', klas: '', atas_nama_letter_c: '', berasal_dari_an: '', tahun_perolehan_alas_hak: '',
@@ -94,25 +94,26 @@ export const LandDataPage: React.FC = () => {
     }
   };
   const addSuratHak = () => {
-  setForm(prev => ({
-    ...prev,
-    surat_hak_Sebelumnya: [
-      ...(Array.isArray(prev.surat_hak_Sebelumnya) ? prev.surat_hak_Sebelumnya : []),
-      { jenis: '', tanggal: '', nomor: '', nama_ppat: '' }
-    ]
-  }));
-};
+    setForm(prev => ({
+      ...prev,
+      // Gunakan huruf kecil 'sebelumnya' agar sama dengan interface
+      surat_hak_sebelumnya: [
+        ...(Array.isArray(prev.surat_hak_sebelumnya) ? prev.surat_hak_sebelumnya : []),
+        { jenis: '', tanggal: '', nomor: '', nama_ppat: '' }
+      ]
+    }));
+  };
 
 const updateSuratHak = (index: number, field: string, value: string) => {
-  const newSurat = [...form.surat_hak_Sebelumnya];
+  const newSurat = [...form.surat_hak_sebelumnya];
   newSurat[index] = { ...newSurat[index], [field]: value };
-  setForm({ ...form, surat_hak_Sebelumnya: newSurat });
+  setForm({ ...form, surat_hak_sebelumnya: newSurat });
 };
 
 const removeSuratHak = (index: number) => {
   setForm({
     ...form,
-    surat_hak_Sebelumnya: form.surat_hak_Sebelumnya.filter((_, i) => i !== index)
+    surat_hak_sebelumnya: form.surat_hak_sebelumnya.filter((_, i) => i !== index)
   });
 };
 
@@ -131,18 +132,32 @@ const removeSuratHak = (index: number) => {
   const handleSave = async () => {
     if (!form.nop || !form.atas_nama_nop) return alert('NOP dan Atas Nama wajib diisi');
     
+    // PASTIKAN BARIS INI MENGGUNAKAN generateUUID(), BUKAN generateId()
+    const finalId = editingId || generateUUID(); 
+
     const payload = { 
       ...form, 
-      created_at: form.created_at || new Date().toISOString() 
+      id: finalId, // Ini harus jadi format UUID
+      created_at: form.created_at || new Date().toISOString(),
+      // Tambahkan ini untuk memastikan data array tidak kosong/null
+      tanggal_su: form.tanggal_su || undefined,
+      tanggal_shm: form.tanggal_shm || undefined,
+      surat_hak_sebelumnya: form.surat_hak_sebelumnya || [],
+      riwayat_tanah: form.riwayat_tanah || [],
+      detail_bangunan: form.detail_bangunan || [],
+      koordinat_list: form.koordinat_list || [],
+      bak_list: form.bak_list || []
     };
 
     try {
       if (editingId) {
         await db.lands.update(editingId, payload);
       } else {
-        payload.id = generateId();
+        // Log untuk memastikan ID sudah benar sebelum dikirim
+        console.log("Mengirim ID UUID:", payload.id); 
         await db.lands.add(payload);
       }
+      // ... sisanya sama
 
       setShowMapModal(false);
       setShowBuildingModal(false);
@@ -151,8 +166,10 @@ const removeSuratHak = (index: number) => {
       setEditingId(null); 
       setForm(emptyForm);
       alert("✅ Data Berhasil Disimpan!");
-    } catch (err) {
-      alert("Gagal menyimpan data objek tanah.");
+    } catch (err: any) {
+      console.error("Detail Error:", err);
+      // Jika masih error UUID, kita bisa lihat pesannya di console
+      alert(`Gagal menyimpan: ${err.message || 'Cek koneksi/database'}`);
     }
   };
 
@@ -380,7 +397,7 @@ const removeSuratHak = (index: number) => {
                   </div>
 
                   <div className="grid gap-4">
-                    {form.surat_hak_Sebelumnya && form.surat_hak_Sebelumnya.map((item, index) => (
+                    {form.surat_hak_sebelumnya && form.surat_hak_sebelumnya.map((item, index) => (
                       <div key={index} className="group relative grid grid-cols-1 md:grid-cols-4 gap-4 p-6 bg-slate-50/50 rounded-[24px] border border-slate-200 transition-all hover:bg-white hover:shadow-md">
                         <Input 
                           label="Jenis" 
@@ -419,7 +436,7 @@ const removeSuratHak = (index: number) => {
                       </div>
                     ))}
                     
-                    {form.surat_hak_Sebelumnya.length === 0 && (
+                    {form.surat_hak_sebelumnya.length === 0 && (
                       <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-[32px] bg-slate-50/30">
                         <p className="text-xs text-slate-400 font-medium">Klik tombol tambah jika ada riwayat surat sebelumnya</p>
                       </div>

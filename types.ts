@@ -22,6 +22,7 @@ export interface Identity {
   provinsi: string;
   kode_pos?: string;
   pekerjaan: string;
+  kewarganegaraan?: string;
   ktp_berlaku: string;
   is_seumur_hidup?: boolean;
   ejaan_tanggal_ktp_berlaku: string;
@@ -93,7 +94,7 @@ export interface LandData {
   kecamatan: string;
   kabupaten_kota: string;
   kewajiban_pajak: string;
-  surat_hak_Sebelumnya: SuratHak[] ;
+  surat_hak_sebelumnya: SuratHak[] ;
   jenis_dasar_surat: LandType;
   
   kohir?: string;
@@ -180,6 +181,9 @@ export interface FileRecord {
   register_waris_kecamatan?: string;
   tanggal_waris?: string;
   ejaan_tanggal_waris: string;
+
+  latitude?: number;  // Tambahkan ini
+  longitude?: number; // Tambahkan ini
 
   // === TAMBAHAN BARU (UNTUK 12 POIN PTSL) ===
   kasun?: string;                               // Poin 3

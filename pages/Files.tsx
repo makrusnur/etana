@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { FileRecord, Relation, Identity, LandData, RelationRole } from '../types';
 import { Button, Input, Card, DateInput } from '../components/UI';
-import { Plus, Trash2, Search, FileText, Edit2,  Calendar, Save, X, Clock, ShieldAlert } from 'lucide-react';
-import { generateId, formatDateIndo, getDayNameIndo, toTitleCase, spellDateIndo } from '../utils';
+import LandMap from '../components/LandMap'; // Import default sesuai file Bapak
+import { Plus, Trash2, Search, FileText, Edit2, Calendar, Save, X, Clock, ShieldAlert, MapPin } from 'lucide-react';
+import { generateId, formatDateIndo, getDayNameIndo, toTitleCase, spellDateIndo, generateUUID } from '../utils';
 
 export const FilesPage: React.FC = () => {
   const [files, setFiles] = useState<FileRecord[]>([]);
@@ -16,6 +17,14 @@ export const FilesPage: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // STATE UNTUK PETA
+  const [showMapPicker, setShowMapPicker] = useState(false);
+  const [selectedCoords, setSelectedCoords] = useState<{lat: number, lng: number}>({ 
+    lat: -7.6448, 
+    lng: 112.9061 
+  });
+  const [hasSelectedLocation, setHasSelectedLocation] = useState(false);
 
   const initialFileState: Partial<FileRecord> = { 
     tanggal: new Date().toISOString().split('T')[0],
@@ -62,6 +71,16 @@ export const FilesPage: React.FC = () => {
     try {
       const rels = await db.relations.getByFileId(f.id);
       setRelations(rels || []);
+      
+      // Jika berkas punya relasi tanah, set koordinat agar peta sinkron (opsional)
+      const landRel = rels?.find(r => r.data_tanah_id);
+      if (landRel) {
+        const landData = allLands.find(l => l.id === landRel.data_tanah_id);
+        if (landData && landData.latitude) {
+           setSelectedCoords({ lat: landData.latitude, lng: landData.longitude });
+           setHasSelectedLocation(true);
+        }
+      }
     } catch (err) {
       setRelations([]);
     }
@@ -69,38 +88,66 @@ export const FilesPage: React.FC = () => {
   };
 
   const handleSaveFile = async () => {
-    if (!formFile.nomor_berkas?.trim() || !formFile.jenis_perolehan?.trim()) {
-      return alert('Nomor Berkas dan Jenis Perolehan wajib diisi!');
+  if (!formFile.nomor_berkas?.trim() || !formFile.jenis_perolehan?.trim()) {
+    return alert('Nomor Berkas dan Jenis Perolehan wajib diisi!');
+  }
+
+  // Kita tetap butuh koordinat untuk tahu berkas ini ada di lokasi mana,
+  // tapi kita simpan koordinatnya DI DALAM data Berkas saja.
+  if (!hasSelectedLocation) {
+    return alert('Silahkan tentukan lokasi objek tanah pada peta terlebih dahulu!');
+  }
+  
+  try {
+    const fileId = editingId || generateUUID();
+    
+    // Payload hanya untuk tabel FILES
+    const payload: FileRecord = {
+      ...initialFileState,
+      ...formFile,
+      id: fileId,
+      kategori: 'PPAT_NOTARIS',
+      nomor_berkas: formFile.nomor_berkas!.toUpperCase(),
+      nomor_register: formFile.nomor_register?.toUpperCase() || '',
+      
+      // Pastikan koordinat tersimpan di tabel Files jika kolomnya ada
+      // @ts-ignore (jika latitude/longitude belum ada di interface FileRecord)
+      latitude: selectedCoords.lat,
+      // @ts-ignore
+      longitude: selectedCoords.lng,
+
+      // Cegah error DATE ""
+      tanggal: formFile.tanggal || undefined,
+      tanggal_waris: formFile.tanggal_waris || undefined,
+      
+      hari: formFile.hari || getDayNameIndo(formFile.tanggal || ''),
+      jenis_perolehan: formFile.jenis_perolehan!.toUpperCase(),
+      created_at: formFile.created_at || new Date().toISOString()
+    } as FileRecord;
+
+    // 1. Simpan Berkas
+    if (editingId) {
+      await db.files.update(editingId, payload);
+    } else {
+      await db.files.add(payload);
     }
 
-    try {
-      const payload: FileRecord = {
-        ...initialFileState,
-        ...formFile,
-        id: editingId || generateId(),
-        kategori: 'PPAT_NOTARIS',
-        nomor_berkas: formFile.nomor_berkas!.toUpperCase(),
-        nomor_register: formFile.nomor_register?.toUpperCase() || '',
-        hari: formFile.hari || getDayNameIndo(formFile.tanggal || ''),
-        jenis_perolehan: formFile.jenis_perolehan!.toUpperCase(),
-        created_at: formFile.created_at || new Date().toISOString()
-      } as FileRecord;
+    // --- BAGIAN SIMPAN KE DB.LANDS SUDAH SAYA HAPUS TOTAL ---
+    // Agar tidak ada data tanah palsu yang muncul di rincian
 
-      if (editingId) {
-        await db.files.update(editingId, payload);
-      } else {
-        await db.files.add(payload);
-      }
+    setIsCreating(false);
+    setEditingId(null);
+    setFormFile(initialFileState);
+    setHasSelectedLocation(false);
+    await refreshData();
+    setActiveFile(payload);
+    alert("Berkas berhasil disimpan!");
 
-      setIsCreating(false);
-      setEditingId(null);
-      setFormFile(initialFileState);
-      await refreshData();
-      setActiveFile(payload);
-    } catch (err) {
-      alert("Gagal menyimpan data.");
-    }
-  };
+  } catch (err: any) {
+    console.error(err);
+    alert("Gagal menyimpan data: " + (err.message || "Terjadi kesalahan"));
+  }
+};
 
   const handleEditFile = (e: React.MouseEvent, f: FileRecord) => {
     e.stopPropagation();
@@ -137,15 +184,11 @@ export const FilesPage: React.FC = () => {
     if (activeFile) setRelations(await db.relations.getByFileId(activeFile.id));
   };
 
-  // LOKASI: Sekitar baris 139
   const filteredFiles = files.filter(f => {
-  // 1. Cek apakah kategorinya PPAT_NOTARIS (atau kosong untuk data lama)
-  const isKategoriCocok = f.kategori === 'PPAT_NOTARIS' || !f.kategori;
-  // 2. Cek apakah cocok dengan pencarian
-  const isSearchCocok = f.nomor_berkas.toLowerCase().includes(fileSearch.toLowerCase()) || 
-                       f.jenis_perolehan.toLowerCase().includes(fileSearch.toLowerCase());
-  // PASTIKAN BARIS RETURN INI MENGGUNAKAN KEDUANYA:
-  return isKategoriCocok && isSearchCocok; 
+    const isKategoriCocok = f.kategori === 'PPAT_NOTARIS' || !f.kategori;
+    const isSearchCocok = f.nomor_berkas.toLowerCase().includes(fileSearch.toLowerCase()) || 
+                         f.jenis_perolehan.toLowerCase().includes(fileSearch.toLowerCase());
+    return isKategoriCocok && isSearchCocok; 
   });
 
   const isWaris = formFile.jenis_perolehan?.toUpperCase().includes('WARIS');
@@ -157,9 +200,9 @@ export const FilesPage: React.FC = () => {
         <div className="flex justify-between items-center sticky top-0 bg-slate-50 py-2 z-10 border-b border-slate-100 mb-2">
           <div>
             <h2 className="text-xl font-bold text-slate-800">Manajemen Berkas</h2>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">PPAT Administration</p>
+            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">PPAT Administration</p>
           </div>
-          <Button onClick={() => { setIsCreating(true); setEditingId(null); setFormFile(initialFileState); }}>
+          <Button onClick={() => { setIsCreating(true); setEditingId(null); setFormFile(initialFileState); setHasSelectedLocation(false); }}>
             <Plus size={18} />
           </Button>
         </div>
@@ -220,27 +263,8 @@ export const FilesPage: React.FC = () => {
                    <p className="text-slate-500 font-bold tracking-tighter text-sm">Nomor Berkas: {activeFile.nomor_berkas} {activeFile.nomor_register && ` / Reg: ${activeFile.nomor_register}`}</p>
                 </div>
             </div>
-            <div className="col-span-2">
-                  <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 px-1 tracking-widest">
-                    Objek Tanah Terhubung (Opsional)
-                  </label>
-                  <select 
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-white text-sm font-bold appearance-none" 
-                    value={newRel.landId} 
-                    onChange={e => setNewRel({...newRel, landId: e.target.value})}
-                  >
-                    <option value="">-- Tanpa Hubungan Objek Tanah --</option>
-                    
-                    {/* TAMBAHKAN ATAU PASTIKAN BAGIAN INI ADA: */}
-                    {allLands.map(l => (
-                      <option key={l.id} value={l.id}>
-                        {l.nop} - {l.atas_nama_nop}
-                      </option>
-                    ))}
-                    
-                  </select>
-                </div>
-                <div className="bg-blue-600 px-6 py-4 rounded-2xl shadow-lg flex justify-between items-center text-white">
+
+            <div className="bg-blue-600 px-6 py-4 rounded-2xl shadow-lg flex justify-between items-center text-white">
               <div className="flex items-center gap-3">
                 <Calendar size={20} className="opacity-80" />
                 <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Hari & Tanggal Berkas</span>
@@ -273,7 +297,6 @@ export const FilesPage: React.FC = () => {
             )}
 
             <Card title="Penyusunan Struktur Relasi Pihak">
-               {/* Konten Relasi tetap sama */}
                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-6 rounded-[2.5rem] border border-slate-200 mb-8 shadow-inner">
                 <div className="col-span-1">
                   <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 px-1 tracking-widest">Pilih Subjek</label>
@@ -291,9 +314,26 @@ export const FilesPage: React.FC = () => {
                     <option value="PERSETUJUAN_PIHAK_1">PERSETUJUAN</option>
                   </select>
                 </div>
+                
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 px-1 tracking-widest">Objek Tanah Terhubung (Opsional)</label>
+                  <select 
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-white text-sm font-bold appearance-none" 
+                    value={newRel.landId} 
+                    onChange={e => setNewRel({...newRel, landId: e.target.value})}
+                  >
+                    <option value="">-- Tanpa Hubungan Objek Tanah --</option>
+                    {allLands.map(l => (
+                      <option key={l.id} value={l.id}>
+                        {l.nop} - {l.atas_nama_nop}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <Button className="col-span-2 h-12" onClick={handleAddRel}>Hubungkan Pihak</Button>
               </div>
-              {/* List Relasi */}
+
               <div className="space-y-4">
                 {relations.map(r => (
                   <div key={r.id} className="flex justify-between p-3 bg-white border rounded-xl items-center">
@@ -317,18 +357,16 @@ export const FilesPage: React.FC = () => {
 
       {/* OVERLAY FORM PEMBUATAN/EDIT BERKAS */}
       {isCreating && (
-        <div className="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-xl flex items-center justify-center p-6">
-          <Card className="w-full max-w-2xl relative shadow-2xl" title={editingId ? "Edit Berkas" : "Buat Berkas Baru"}>
-            <button onClick={() => setIsCreating(false)} className="absolute top-6 right-8 p-2 text-slate-400 hover:text-red-500"><X size={24} /></button>
-            <div className="space-y-4">
+        <div className="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-xl flex items-center justify-center p-6 overflow-y-auto">
+          <Card className="w-full max-w-2xl relative shadow-2xl my-auto" title={editingId ? "Edit Berkas" : "Buat Berkas Baru"}>
+            <button onClick={() => setIsCreating(false)} className="absolute top-6 right-8 p-2 text-slate-400 hover:text-red-500 transition-colors"><X size={24} /></button>
+            <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-2 custom-scrollbar">
               
-              {/* BARIS 1: NOMOR BERKAS & REGISTER */}
               <div className="grid grid-cols-2 gap-4">
                 <Input label="Nomor Berkas" placeholder="Ex: 123/2024" value={formFile.nomor_berkas} onChange={e => setFormFile({...formFile, nomor_berkas: e.target.value})} />
                 <Input label="Nomor Register" placeholder="Ex: REG-XXX" value={formFile.nomor_register} onChange={e => setFormFile({...formFile, nomor_register: e.target.value})} />
               </div>
 
-              {/* BARIS 2: TANGGAL BERKAS (FULL WIDTH) */}
               <div className="grid grid-cols-3 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
                 <div className="col-span-2">
                   <DateInput label="Tanggal Berkas" value={formFile.tanggal} onChange={val => setFormFile({...formFile, tanggal: val, hari: getDayNameIndo(val)})} />
@@ -341,7 +379,6 @@ export const FilesPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* BARIS 3: JENIS PEROLEHAN & TAHUN PEROLEHAN */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-1">
                   <label className="block text-[10px] font-black uppercase tracking-widest mb-1.5 text-slate-400 px-1">Jenis Perolehan</label>
@@ -360,7 +397,6 @@ export const FilesPage: React.FC = () => {
                 <Input label="Tahun Perolehan" type="number" placeholder="Ex: 2024" value={formFile.tahun_perolehan} onChange={e => setFormFile({...formFile, tahun_perolehan: e.target.value})} />
               </div>
 
-              {/* BARIS 4: KONDISIONAL KHUSUS WARIS (MUNCUL DI BAWAH JENIS PEROLEHAN) */}
               {isWaris && (
                 <div className="p-6 bg-amber-50 rounded-[2rem] border border-amber-100 space-y-4 animate-in slide-in-from-top-4">
                    <div className="flex items-center gap-2 mb-2">
@@ -371,7 +407,6 @@ export const FilesPage: React.FC = () => {
                       <Input label="Reg. Waris Desa" placeholder="Nomor Reg. Desa..." value={formFile.register_waris_desa} onChange={e => setFormFile({...formFile, register_waris_desa: e.target.value})} />
                       <Input label="Reg. Waris Kecamatan" placeholder="Nomor Reg. Kec..." value={formFile.register_waris_kecamatan} onChange={e => setFormFile({...formFile, register_waris_kecamatan: e.target.value})} />
                       <div className="col-span-2 space-y-4">
-                          {/* 1. Input Tanggal Utama */}
                           <DateInput 
                             label="Tertanggal Waris" 
                             value={formFile.tanggal_waris} 
@@ -379,36 +414,55 @@ export const FilesPage: React.FC = () => {
                               setFormFile({
                                 ...formFile, 
                                 tanggal_waris: val,
-                                // OTOMATIS: Panggil fungsi spellDateIndo dari utils
                                 ejaan_tanggal_waris: val ? spellDateIndo(val) : '' 
                               });
                             }} 
                           />
-
-                          {/* 2. Tampilan Ejaan Otomatis */}
                           <div className="bg-slate-50/80 p-4 rounded-2xl border border-dashed border-slate-200">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">
-                              Terbilang Tanggal (Otomatis)
-                            </label>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Terbilang Tanggal (Otomatis)</label>
                             <textarea
                               className="w-full bg-transparent border-none text-xs font-bold text-slate-600 outline-none resize-none italic leading-relaxed"
                               rows={2}
-                              placeholder="Ejaan akan muncul di sini setelah tanggal dipilih..."
+                              placeholder="Ejaan akan muncul di sini..."
                               value={formFile.ejaan_tanggal_waris || ''}
                               onChange={e => setFormFile({...formFile, ejaan_tanggal_waris: e.target.value})}
                             />
-                            <div className="flex justify-end">
-                              <span className="text-[9px] text-emerald-500 font-bold uppercase tracking-tighter">
-                                ✨ Terkoneksi Otomatis
-                              </span>
-                            </div>
                           </div>
-                        </div>
+                      </div>
                    </div>
                 </div>
               )}
               
               <Input label="Keterangan Tambahan" placeholder="Informasi pendukung..." value={formFile.keterangan} onChange={e => setFormFile({...formFile, keterangan: e.target.value})} />
+
+              {/* SEKSI LOKASI OBJEK (INTEGRASI LANDMAP) */}
+              <div className={`p-5 rounded-[2rem] border-2 transition-all duration-500 ${hasSelectedLocation ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-100 animate-pulse'}`}>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-2xl text-white shadow-lg ${hasSelectedLocation ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                      <MapPin size={24} />
+                    </div>
+                    <div>
+                      <span className={`text-[10px] font-black uppercase tracking-widest block ${hasSelectedLocation ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        Lokasi Objek Tanah (Wajib)
+                      </span>
+                      <p className="text-sm font-black text-slate-700">
+                        {hasSelectedLocation 
+                          ? `${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}` 
+                          : 'Titik Koordinat Belum Ditentukan'}
+                      </p>
+                    </div>
+                  </div>
+                  <Button 
+                    type="button" 
+                    variant={hasSelectedLocation ? "secondary" : "primary"}
+                    onClick={() => setShowMapPicker(true)}
+                    className="text-xs px-6"
+                  >
+                    {hasSelectedLocation ? "Ubah Lokasi" : "Buka Peta"}
+                  </Button>
+                </div>
+              </div>
               
               <div className="flex justify-end gap-3 mt-4 pt-6 border-t">
                 <Button variant="secondary" onClick={() => setIsCreating(false)}>Batal</Button>
@@ -416,6 +470,58 @@ export const FilesPage: React.FC = () => {
               </div>
             </div>
           </Card>
+        </div>
+      )}
+
+      {/* MODAL POPUP UNTUK LANDMAP PICKER */}
+      {showMapPicker && (
+        <div className="fixed inset-0 z-[150] bg-slate-900/95 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-5xl rounded-[40px] overflow-hidden shadow-2xl flex flex-col h-[85vh] border border-white/20">
+            <div className="p-8 border-b flex justify-between items-center bg-white">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-blue-100 text-blue-600 rounded-2xl"><MapPin size={24}/></div>
+                <div>
+                  <h3 className="font-black text-slate-800 text-xl uppercase tracking-tight">Tentukan Titik Objek</h3>
+                  <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Klik pada area tanah untuk menetapkan koordinat monitoring</p>
+                </div>
+              </div>
+              <button onClick={() => setShowMapPicker(false)} className="p-3 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-red-500"><X size={28} /></button>
+            </div>
+            
+            <div className="flex-1 bg-slate-100 relative">
+              <LandMap 
+                latitude={selectedCoords.lat}
+                longitude={selectedCoords.lng}
+                onChange={(lat, lng) => {
+                  setSelectedCoords({ lat, lng });
+                  setHasSelectedLocation(true);
+                }}
+              />
+              
+              {/* Floating Info */}
+              <div className="absolute top-6 left-6 z-[1000] bg-white/90 backdrop-blur-md p-5 rounded-3xl shadow-2xl border border-white max-w-xs">
+                 <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2">Koordinat Terdeteksi</p>
+                 <div className="space-y-1">
+                    <p className="text-sm font-mono font-black text-slate-800 flex justify-between"><span>LAT:</span> {selectedCoords.lat.toFixed(8)}</p>
+                    <p className="text-sm font-mono font-black text-slate-800 flex justify-between"><span>LNG:</span> {selectedCoords.lng.toFixed(8)}</p>
+                 </div>
+              </div>
+            </div>
+
+            <div className="p-8 bg-slate-50 border-t flex justify-between items-center">
+              <p className="text-xs font-bold text-slate-400 italic">* Pastikan titik berada tepat di atas objek tanah yang dimaksud.</p>
+              <div className="flex gap-4">
+                <Button variant="secondary" onClick={() => setShowMapPicker(false)} className="px-8">Batal</Button>
+                <Button 
+                  disabled={!hasSelectedLocation}
+                  onClick={() => setShowMapPicker(false)} 
+                  className="px-12 bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200 shadow-xl"
+                >
+                  Konfirmasi Titik Lokasi
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
