@@ -57,175 +57,192 @@ export const TemplatesPage: React.FC = () => {
   };
 
   const prepareData = async (fileId: string): Promise<Record<string, any> | null> => {
-    const fileData = await db.files.get(fileId);
-    if (!fileData) return null;
+    try {
+      const fileData = await db.files.get(fileId);
+      if (!fileData) return null;
 
-    const relations = await db.relations.getByFileId(fileId);
-    const identities = await db.identities.getAll();
-    const lands = await db.lands.getAll();
+      // Ambil data pendukung secara paralel
+      const [relations, identities, lands] = await Promise.all([
+        db.relations.getByFileId(fileId),
+        db.identities.getAll(),
+        db.lands.getAll()
+      ]);
 
-    const p1: any[] = [];
-    const p2: any[] = [];
-    const saksi: any[] = [];
-    const setuju: any[] = [];
-    
-    const landRel = relations.find(r => r.data_tanah_id);
-    const landObj: LandData | undefined = landRel ? lands.find(l => l.id === landRel.data_tanah_id) : undefined;
-
-    relations.forEach(rel => {
-      const person = identities.find(i => i.id === rel.identitas_id);
-      if (person) {
-        const enriched = { 
-          ...person, 
-          umur: calculateAge(person.tanggal_lahir),
-          tgl_lahir_indo: formatDateIndo(person.tanggal_lahir),
-          ktp_berlaku_indo: person.ktp_berlaku === 'SEUMUR HIDUP' ? 'SEUMUR HIDUP' : formatDateIndo(person.ktp_berlaku),
-          ejaan_lahir: spellDateIndo(person.tanggal_lahir),
-          ejaan_berlaku: person.ktp_berlaku === 'SEUMUR HIDUP' ? 'SEUMUR HIDUP' : spellDateIndo(person.ktp_berlaku)
-        };
-        if (rel.peran === 'PIHAK_1') p1.push(enriched);
-        if (rel.peran === 'PIHAK_2') p2.push(enriched);
-        if (rel.peran === 'SAKSI') saksi.push(enriched);
-        if (rel.peran === 'PERSETUJUAN_PIHAK_1') setuju.push(enriched);
-      }
-    });
-
-    const result: Record<string, any> = {
-      // 1. BERKAS (FileRecord)
-      No_Berkas: fileData.nomor_berkas,
-      No_Register: fileData.nomor_register,
-      Hari_Berkas: fileData.hari,
-      Tgl_Surat: formatDateIndo(fileData.tanggal),
-      Tgl_Ejaan: spellDateIndo(fileData.tanggal),
-      Ket_Berkas: fileData.keterangan,
-      Jenis_Perolehan: fileData.jenis_perolehan,
-      Thn_Perolehan: fileData.tahun_perolehan,
-      F_Waris_Desa: fileData.register_waris_desa || "",
-      F_Waris_Kec: fileData.register_waris_kecamatan || "",
-      F_Waris_Tgl: fileData.tanggal_waris ? formatDateIndo(fileData.tanggal_waris) : "",
-
-      // 2. TANAH (LandData)
-      T_NOP: landObj?.nop || "",
-      T_AtasNama_NOP: landObj?.atas_nama_nop || "",
-      T_Kades: landObj?.nama_kepala_desa || "",
-      T_Guna: landObj?.penggunaan_tanah || "",
-      T_Alamat: landObj?.alamat || "",
-      T_RT: landObj?.rt || "",
-      T_RW: landObj?.rw || "",
-      T_Desa: landObj?.desa || "",
-      T_Kec: landObj?.kecamatan || "",
-      T_Kota: landObj?.kabupaten_kota || "",
-      T_Pajak_Stat: landObj?.kewajiban_pajak || "",
-      T_Jenis_Alas: landObj?.jenis_dasar_surat || "",
+      const p1: any[] = [];
+      const p2: any[] = [];
+      const saksi: any[] = [];
+      const setuju: any[] = [];
       
-      T_C_Kohir: landObj?.kohir || "",
-      T_C_Persil: landObj?.persil || "",
-      T_C_Klas: landObj?.klas || "",
-      T_C_AN: landObj?.atas_nama_letter_c || "",
-      T_C_Asal: landObj?.berasal_dari_an || "",
-      T_C_Thn: landObj?.tahun_perolehan_alas_hak || "",
+      // Sinkronisasi ID Tanah (UUID Fix)
+      const landRel = relations.find(r => r.data_tanah_id);
+      const landObj: LandData | undefined = landRel 
+        ? lands.find(l => String(l.id).trim() === String(landRel.data_tanah_id).trim()) 
+        : undefined;
 
-      T_SHM_AN: landObj?.atas_nama_shm || "",
-      T_SHM_No: landObj?.no_shm || "",
-      T_SHM_NIB: landObj?.nib || "",
-      T_SHM_SU: landObj?.no_su || "",
-      T_SHM_TglSU: formatDateIndo(landObj?.tanggal_su || ""),
-      T_SHM_EjaanSU: landObj?.ejaan_tanggal_su || "",
-      T_SHM_TglBuku: formatDateIndo(landObj?.tanggal_shm || ""),
-      T_SHM_EjaanBuku: landObj?.ejaan_tanggal_shm || "",
+      relations.forEach(rel => {
+        // Sinkronisasi ID Orang (UUID Fix)
+        const person = identities.find(i => String(i.id).trim() === String(rel.identitas_id).trim());
+        
+        if (person) {
+          const enriched = { 
+            ...person, 
+            umur: calculateAge(person.tanggal_lahir),
+            tgl_lahir_indo: formatDateIndo(person.tanggal_lahir),
+            ktp_berlaku_indo: person.ktp_berlaku === 'SEUMUR HIDUP' ? 'SEUMUR HIDUP' : formatDateIndo(person.ktp_berlaku),
+            ejaan_lahir: spellDateIndo(person.tanggal_lahir),
+            ejaan_berlaku: person.ktp_berlaku === 'SEUMUR HIDUP' ? 'SEUMUR HIDUP' : spellDateIndo(person.ktp_berlaku)
+          };
+          
+          const cleanRole = (rel.peran || "").toUpperCase().trim();
+          // Normalisasi string peran agar case-insensi
 
-      T_EL_AN: landObj?.atas_nama_shm_el || "",
-      T_EL_Kode: landObj?.kode_sertifikat || "",
-      T_EL_Nibel: landObj?.nibel || "",
+          if (cleanRole === 'PIHAK_1') p1.push(enriched);
+          else if (cleanRole === 'PIHAK_2') p2.push(enriched);
+          else if (cleanRole === 'SAKSI') saksi.push(enriched);
+          else if (cleanRole === 'PERSETUJUAN_PIHAK_1' || cleanRole === 'SETUJU') setuju.push(enriched);
+        }
+      });
 
-      T_Luas_M: landObj?.luas_dimohon || 0,
-      T_Luas_E: landObj?.ejaan_luas_dimohon || "",
-      T_Batas_U: landObj?.batas_utara_dimohon || "",
-      T_Batas_T: landObj?.batas_timur_dimohon || "",
-      T_Batas_S: landObj?.batas_selatan_dimohon || "",
-      T_Batas_B: landObj?.batas_barat_dimohon || "",
+      const result: Record<string, any> = {
+        // 1. BERKAS (FileRecord)
+        No_Berkas: fileData.nomor_berkas,
+        No_Register: fileData.nomor_register,
+        Hari_Berkas: fileData.hari,
+        Tgl_Surat: formatDateIndo(fileData.tanggal),
+        Tgl_Ejaan: spellDateIndo(fileData.tanggal),
+        Ket_Berkas: fileData.keterangan,
+        Jenis_Perolehan: fileData.jenis_perolehan,
+        Thn_Perolehan: fileData.tahun_perolehan,
+        F_Waris_Desa: fileData.register_waris_desa || "",
+        F_Waris_Kec: fileData.register_waris_kecamatan || "",
+        F_Waris_Tgl: fileData.tanggal_waris ? formatDateIndo(fileData.tanggal_waris) : "",
 
-      T_Total_M: landObj?.luas_seluruhnya || 0,
-      T_Total_E: landObj?.ejaan_luas_seluruhnya || "",
-      T_Total_U: landObj?.batas_utara_seluruhnya || "",
-      T_Total_T: landObj?.batas_timur_seluruhnya || "",
-      T_Total_S: landObj?.batas_selatan_seluruhnya || "",
-      T_Total_B: landObj?.batas_barat_seluruhnya || "",
+        // 2. TANAH (LandData)
+        T_NOP: landObj?.nop || "",
+        T_AtasNama_NOP: landObj?.atas_nama_nop || "",
+        T_Kades: landObj?.nama_kepala_desa || "",
+        T_Guna: landObj?.penggunaan_tanah || "",
+        T_Alamat: landObj?.alamat || "",
+        T_RT: landObj?.rt || "",
+        T_RW: landObj?.rw || "",
+        T_Desa: landObj?.desa || "",
+        T_Kec: landObj?.kecamatan || "",
+        T_Kota: landObj?.kabupaten_kota || "",
+        T_Pajak_Stat: landObj?.kewajiban_pajak || "",
+        T_Jenis_Alas: landObj?.jenis_dasar_surat || "",
+        
+        T_C_Kohir: landObj?.kohir || "",
+        T_C_Persil: landObj?.persil || "",
+        T_C_Klas: landObj?.klas || "",
+        T_C_AN: landObj?.atas_nama_letter_c || "",
+        T_C_Asal: landObj?.berasal_dari_an || "",
+        T_C_Thn: landObj?.tahun_perolehan_alas_hak || "",
 
-      T_Sppt_Thn: landObj?.sppt_tahun || "",
-      T_Bumi_Luas: landObj?.pajak_bumi_luas || 0,
-      T_Bumi_NJOP: (landObj?.pajak_bumi_njop || 0).toLocaleString('id-ID'),
-      T_Bumi_Total: (landObj?.pajak_bumi_total || 0).toLocaleString('id-ID'),
-      T_Bang_Jml: landObj?.jumlah_bangunan || 0,
-      T_Bang_Luas: landObj?.pajak_bangunan_luas || 0,
-      T_Bang_NJOP: (landObj?.pajak_bangunan_njop || 0).toLocaleString('id-ID'),
-      T_Bang_Total: (landObj?.pajak_bangunan_total || 0).toLocaleString('id-ID'),
-      T_Grand_Total_NJOP: (landObj?.pajak_grand_total || 0).toLocaleString('id-ID'),
-      T_Grand_Ejaan: landObj?.pajak_grand_total ? terbilang(landObj.pajak_grand_total) : "nol",
-      
-      T_Harga: (landObj?.harga_transaksi || 0).toLocaleString('id-ID'),
-      T_Harga_E: landObj?.ejaan_harga_transaksi || "nol rupiah",
-    };
+        T_SHM_AN: landObj?.atas_nama_shm || "",
+        T_SHM_No: landObj?.no_shm || "",
+        T_SHM_NIB: landObj?.nib || "",
+        T_SHM_SU: landObj?.no_su || "",
+        T_SHM_TglSU: formatDateIndo(landObj?.tanggal_su || ""),
+        T_SHM_EjaanSU: landObj?.ejaan_tanggal_su || "",
+        T_SHM_TglBuku: formatDateIndo(landObj?.tanggal_shm || ""),
+        T_SHM_EjaanBuku: landObj?.ejaan_tanggal_shm || "",
 
-    for (let i = 0; i < 10; i++) {
-      result[`T_Koor${i+1}`] = landObj?.koordinat_list?.[i] || "";
-      result[`T_Bak${i+1}`] = landObj?.bak_list?.[i] || "";
-    }
+        T_EL_AN: landObj?.atas_nama_shm_el || "",
+        T_EL_Kode: landObj?.kode_sertifikat || "",
+        T_EL_Nibel: landObj?.nibel || "",
 
-    for (let i = 0; i < 5; i++) {
-      const rw = landObj?.riwayat_tanah?.[i];
-      result[`T_Riw${i+1}_Nama`] = rw?.atas_nama || "";
-      result[`T_Riw${i+1}_C`] = rw?.c_no || "";
-      result[`T_Riw${i+1}_P`] = rw?.persil_no || "";
-      result[`T_Riw${i+1}_K`] = rw?.klas || "";
-      result[`T_Riw${i+1}_L`] = rw?.luas || "";
-      result[`T_Riw${i+1}_D`] = rw?.dasar_dialihkan || "";
-    }
+        T_Luas_M: landObj?.luas_dimohon || 0,
+        T_Luas_E: landObj?.ejaan_luas_dimohon || "",
+        T_Batas_U: landObj?.batas_utara_dimohon || "",
+        T_Batas_T: landObj?.batas_timur_dimohon || "",
+        T_Batas_S: landObj?.batas_selatan_dimohon || "",
+        T_Batas_B: landObj?.batas_barat_dimohon || "",
 
-    const mapPerson = (prefix: string, p: any) => {
-      const fields = ["Sebutan", "Nama", "NIK", "Lahir_Tempat", "Lahir_Tgl", "Lahir_Ejaan", "Agama", "Alamat", "RT", "RW", "Desa", "Kec", "Kota", "Prov", "Pekerjaan", "Umur", "Ibu", "Bapak", "Pendidikan", "KTP_Exp", "Kawin", "Darah", "Telp", "NPWP", "Email"];
-      if (!p) {
-        fields.forEach(f => result[`${prefix}_${f}`] = "");
-        return;
+        T_Total_M: landObj?.luas_seluruhnya || 0,
+        T_Total_E: landObj?.ejaan_luas_seluruhnya || "",
+        T_Total_U: landObj?.batas_utara_seluruhnya || "",
+        T_Total_T: landObj?.batas_timur_seluruhnya || "",
+        T_Total_S: landObj?.batas_selatan_seluruhnya || "",
+        T_Total_B: landObj?.batas_barat_seluruhnya || "",
+
+        T_Sppt_Thn: landObj?.sppt_tahun || "",
+        T_Bumi_Luas: landObj?.pajak_bumi_luas || 0,
+        T_Bumi_NJOP: (landObj?.pajak_bumi_njop || 0).toLocaleString('id-ID'),
+        T_Bumi_Total: (landObj?.pajak_bumi_total || 0).toLocaleString('id-ID'),
+        T_Bang_Jml: landObj?.jumlah_bangunan || 0,
+        T_Bang_Luas: landObj?.pajak_bangunan_luas || 0,
+        T_Bang_NJOP: (landObj?.pajak_bangunan_njop || 0).toLocaleString('id-ID'),
+        T_Bang_Total: (landObj?.pajak_bangunan_total || 0).toLocaleString('id-ID'),
+        T_Grand_Total_NJOP: (landObj?.pajak_grand_total || 0).toLocaleString('id-ID'),
+        T_Grand_Ejaan: landObj?.pajak_grand_total ? terbilang(landObj.pajak_grand_total) : "nol",
+        
+        T_Harga: (landObj?.harga_transaksi || 0).toLocaleString('id-ID'),
+        T_Harga_E: landObj?.ejaan_harga_transaksi || "nol rupiah",
+      };
+
+      for (let i = 0; i < 10; i++) {
+        result[`T_Koor${i+1}`] = landObj?.koordinat_list?.[i] || "";
+        result[`T_Bak${i+1}`] = landObj?.bak_list?.[i] || "";
       }
-      result[`${prefix}_Sebutan`] = p.sebutan || "";
-      result[`${prefix}_Nama`] = p.nama || "";
-      result[`${prefix}_NIK`] = p.nik || "";
-      result[`${prefix}_Lahir_Tempat`] = p.tempat_lahir || "";
-      result[`${prefix}_Lahir_Tgl`] = p.tgl_lahir_indo || "";
-      result[`${prefix}_Lahir_Ejaan`] = p.ejaan_lahir || "";
-      result[`${prefix}_Agama`] = p.agama || "";
-      result[`${prefix}_Kawin`] = p.status_perkawinan || "";
-      result[`${prefix}_Darah`] = p.golongan_darah || "";
-      result[`${prefix}_Alamat`] = p.alamat || "";
-      result[`${prefix}_RT`] = p.rt || "";
-      result[`${prefix}_RW`] = p.rw || "";
-      result[`${prefix}_Desa`] = p.desa || "";
-      result[`${prefix}_Kec`] = p.kecamatan || "";
-      result[`${prefix}_Kota`] = p.kota_kabupaten || "";
-      result[`${prefix}_Prov`] = p.provinsi || "";
-      result[`${prefix}_Pekerjaan`] = p.pekerjaan || "";
-      result[`${prefix}_Umur`] = p.umur || "";
-      result[`${prefix}_Ibu`] = p.nama_ibuk_kandung || "";
-      result[`${prefix}_Bapak`] = p.nama_bapak_kandung || "";
-      result[`${prefix}_Pendidikan`] = p.pendidikan_terakhir || "";
-      result[`${prefix}_KTP_Exp`] = p.ktp_berlaku_indo || "";
-      result[`${prefix}_Telp`] = p.telepon || "";
-      result[`${prefix}_NPWP`] = p.npwp || "";
-      result[`${prefix}_Email`] = p.email || "";
-    };
 
-    mapPerson("P1_1", p1[0]); mapPerson("P1_2", p1[1]); mapPerson("P1_3", p1[2]);
-    mapPerson("P2_1", p2[0]); mapPerson("P2_2", p2[1]);
-    mapPerson("Saksi1", saksi[0]); mapPerson("Saksi2", saksi[1]); mapPerson("Saksi3", saksi[2]); mapPerson("Saksi4", saksi[3]);
-    mapPerson("Setuju1", setuju[0]);
+      for (let i = 0; i < 5; i++) {
+        const rw = landObj?.riwayat_tanah?.[i];
+        result[`T_Riw${i+1}_Nama`] = rw?.atas_nama || "";
+        result[`T_Riw${i+1}_C`] = rw?.c_no || "";
+        result[`T_Riw${i+1}_P`] = rw?.persil_no || "";
+        result[`T_Riw${i+1}_K`] = rw?.klas || "";
+        result[`T_Riw${i+1}_L`] = rw?.luas || "";
+        result[`T_Riw${i+1}_D`] = rw?.dasar_dialihkan || "";
+      }
 
-    result._countP1 = p1.length;
-    result._countP2 = p2.length;
-    result._countS = saksi.length;
-    result._hasLand = !!landObj;
+      const mapPerson = (prefix: string, p: any) => {
+        const fields = ["Sebutan", "Nama", "NIK", "Lahir_Tempat", "Lahir_Tgl", "Lahir_Ejaan", "Agama", "Alamat", "RT", "RW", "Desa", "Kec", "Kota", "Prov", "Pekerjaan", "Umur", "Ibu", "Bapak", "Pendidikan", "KTP_Exp", "Kawin", "Darah", "Telp", "NPWP", "Email"];
+        if (!p) {
+          fields.forEach(f => result[`${prefix}_${f}`] = "");
+          return;
+        }
+        result[`${prefix}_Sebutan`] = p.sebutan || "";
+        result[`${prefix}_Nama`] = p.nama || "";
+        result[`${prefix}_NIK`] = p.nik || "";
+        result[`${prefix}_Lahir_Tempat`] = p.tempat_lahir || "";
+        result[`${prefix}_Lahir_Tgl`] = p.tgl_lahir_indo || "";
+        result[`${prefix}_Lahir_Ejaan`] = p.ejaan_lahir || "";
+        result[`${prefix}_Agama`] = p.agama || "";
+        result[`${prefix}_Kawin`] = p.status_perkawinan || "";
+        result[`${prefix}_Darah`] = p.golongan_darah || "";
+        result[`${prefix}_Alamat`] = p.alamat || "";
+        result[`${prefix}_RT`] = p.rt || "";
+        result[`${prefix}_RW`] = p.rw || "";
+        result[`${prefix}_Desa`] = p.desa || "";
+        result[`${prefix}_Kec`] = p.kecamatan || "";
+        result[`${prefix}_Kota`] = p.kota_kabupaten || "";
+        result[`${prefix}_Prov`] = p.provinsi || "";
+        result[`${prefix}_Pekerjaan`] = p.pekerjaan || "";
+        result[`${prefix}_Umur`] = p.umur || "";
+        result[`${prefix}_Ibu`] = p.nama_ibuk_kandung || "";
+        result[`${prefix}_Bapak`] = p.nama_bapak_kandung || "";
+        result[`${prefix}_Pendidikan`] = p.pendidikan_terakhir || "";
+        result[`${prefix}_KTP_Exp`] = p.ktp_berlaku_indo || "";
+        result[`${prefix}_Telp`] = p.telepon || "";
+        result[`${prefix}_NPWP`] = p.npwp || "";
+        result[`${prefix}_Email`] = p.email || "";
+      };
 
-    return result;
+      mapPerson("P1_1", p1[0]); mapPerson("P1_2", p1[1]); mapPerson("P1_3", p1[2]);
+      mapPerson("P2_1", p2[0]); mapPerson("P2_2", p2[1]);
+      mapPerson("Saksi1", saksi[0]); mapPerson("Saksi2", saksi[1]); mapPerson("Saksi3", saksi[2]); mapPerson("Saksi4", saksi[3]);
+      mapPerson("Setuju1", setuju[0]);
+
+      result._countP1 = p1.length;
+      result._countP2 = p2.length;
+      result._countS = saksi.length;
+      result._hasLand = !!landObj;
+
+      return result;
+    } catch (err) {
+      console.error("Gagal memproses kamus tag:", err);
+      return null;
+    }
   };
 
   const filteredTags = previewData 
@@ -371,7 +388,6 @@ export const TemplatesPage: React.FC = () => {
   );
 };
 
-// ... Sub-components (TagCategory, TagRow, SummaryWidget) sama seperti kode Bapak// ... Sub-components (TagCategory, TagRow, SummaryWidget) sama seperti kode Bapak
 const TagCategory = ({ title, icon, children, color }: any) => {
     const colors: Record<string, string> = {
         emerald: 'border-emerald-200 text-emerald-700 bg-emerald-50',
@@ -404,9 +420,26 @@ const TagRow = ({ tag, val, onCopy, copied }: any) => {
     );
 };
 
-const SummaryWidget = ({ label, val, icon, color }: any) => (
-    <div className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center bg-${color}-50 border-${color}-100 transition-all`}>
-        <div className={`flex items-center gap-1.5 text-[9px] font-black uppercase text-${color}-600 tracking-widest mb-1`}>{icon} {label}</div>
-        <div className={`text-2xl font-black text-${color}-700 tracking-tighter`}>{val}</div>
+const SummaryWidget = ({ label, val, icon, color }: any) => {
+  // Mapping warna untuk memastikan Tailwind mendeteksi class-nya
+  const colors: Record<string, string> = {
+    emerald: "bg-emerald-50 border-emerald-100 text-emerald-600 text-emerald-700",
+    blue: "bg-blue-50 border-blue-100 text-blue-600 text-blue-700",
+    purple: "bg-purple-50 border-purple-100 text-purple-600 text-purple-700",
+    orange: "bg-orange-50 border-orange-100 text-orange-600 text-orange-700"
+  };
+
+  const selectedColor = colors[color] || colors.blue;
+  const colorParts = selectedColor.split(' '); // [bg, border, textIcon, textVal]
+
+  return (
+    <div className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center ${colorParts[0]} ${colorParts[1]}`}>
+        <div className={`flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest mb-1 ${colorParts[2]}`}>
+          {icon} {label}
+        </div>
+        <div className={`text-2xl font-black tracking-tighter ${colorParts[3]}`}>
+          {val || 0}
+        </div>
     </div>
-);
+  );
+};

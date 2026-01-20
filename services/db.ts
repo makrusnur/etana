@@ -179,8 +179,18 @@ export const db = {
       return (data || []) as Relation[];
     },
     getByFileId: async (fileId: string) => {
-      const { data, error } = await supabase.from('relations').select('*').eq('berkas_id', fileId);
-      if (error) handleError(error, "Gagal memuat relasi berkas");
+      // Kita bersihkan string ID untuk memastikan tidak ada spasi/newline
+      const cleanId = fileId.trim(); 
+      
+      const { data, error } = await supabase
+        .from('relations')
+        .select('*')
+        .eq('berkas_id', cleanId);
+        
+      if (error) {
+        console.error("Gagal memuat relasi berkas untuk ID:", cleanId, error);
+        return [];
+      }
       return (data || []) as Relation[];
     },
     add: async (item: Relation) => {
