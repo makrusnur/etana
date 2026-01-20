@@ -6,6 +6,7 @@ import { Button, Input, Card, DateInput, Select } from '../components/UI';
 import { Edit2, Trash2, Plus, Search, MapPin, FileStack, Info, AlignLeft, Layers, Maximize, Crosshair, Coins,  Receipt, TrendingUp, Landmark, X, CheckCircle, Home } from 'lucide-react';
 import { generateId, terbilang, spellDateIndo, generateUUID} from '../utils';
 import LandMap from '../components/LandMap';
+import { useSearchParams } from 'react-router-dom';
 
 export const LandDataPage: React.FC = () => {
   const [data, setData] = useState<LandData[]>([]);
@@ -14,6 +15,8 @@ export const LandDataPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [showMapModal, setShowMapModal] = useState(false);
   const [showBuildingModal, setShowBuildingModal] = useState(false);
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('edit');
   
   // UI State for Measurement Type
   const [isPartial, setIsPartial] = useState(false);
@@ -61,7 +64,6 @@ export const LandDataPage: React.FC = () => {
   
   const [form, setForm] = useState<LandData>(emptyForm);
 
-  // Auto Calculations for Tax
   useEffect(() => {
     const totalBumi = (Number(form.pajak_bumi_luas) || 0) * (Number(form.pajak_bumi_njop) || 0);
     const totalBangunan = (Number(form.pajak_bangunan_luas) || 0) * (Number(form.pajak_bangunan_njop) || 0);
@@ -92,7 +94,8 @@ export const LandDataPage: React.FC = () => {
     } catch (err) {
       console.error("Gagal memuat data tanah:", err);
     }
-  };
+ }; 
+
   const addSuratHak = () => {
     setForm(prev => ({
       ...prev,
@@ -193,6 +196,14 @@ const removeSuratHak = (index: number) => {
       loadData();
     }
   };
+
+  // Letakkan ini setelah deklarasi fungsi handleEdit agar tidak error
+  useEffect(() => {
+  if (editId) {
+    // Kita panggil fungsi handleEdit milik Bapak yang sudah lengkap logikanya
+    handleEdit(editId);
+    }
+  }, [editId]); // editId didapat dari searchParams.get('edit')
 
   // --- Building Detail Logic ---
   const addBuilding = () => {

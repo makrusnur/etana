@@ -4,7 +4,7 @@ import { FileRecord, Relation, Identity, LandData, RelationRole } from '../types
 import { Button, Input, Card, DateInput } from '../components/UI';
 import LandMap from '../components/LandMap'; // Import default sesuai file Bapak
 import { Plus, Trash2, Search, FileText, Edit2, Calendar, Save, X, Clock, ShieldAlert, MapPin } from 'lucide-react';
-import { generateId, formatDateIndo, getDayNameIndo, toTitleCase, spellDateIndo, generateUUID } from '../utils';
+import {  formatDateIndo, getDayNameIndo, toTitleCase, spellDateIndo, generateUUID } from '../utils';
 
 export const FilesPage: React.FC = () => {
   const [files, setFiles] = useState<FileRecord[]>([]);
@@ -166,18 +166,26 @@ export const FilesPage: React.FC = () => {
   };
 
   const handleAddRel = async () => {
-    if (!activeFile || !newRel.identityId) return;
-    const rel: Relation = {
-      id: generateId(),
-      berkas_id: activeFile.id,
-      identitas_id: newRel.identityId,
-      peran: newRel.role,
-      data_tanah_id: newRel.landId || undefined
-    };
-    await db.relations.add(rel);
-    setRelations(await db.relations.getByFileId(activeFile.id));
-    setNewRel({ ...newRel, identityId: '' });
+  if (!activeFile || !newRel.identityId) return;
+
+  const rel: Relation = {
+    id: generateUUID(), // Pakai fungsi manual ini
+    berkas_id: activeFile.id,
+    identitas_id: newRel.identityId,
+    peran: newRel.role,
+    data_tanah_id: newRel.landId || undefined
   };
+
+  try {
+    await db.relations.add(rel);
+    const updatedRels = await db.relations.getByFileId(activeFile.id);
+    setRelations(updatedRels);
+    setNewRel({ ...newRel, identityId: '' });
+  } catch (err: any) {
+    console.error("Gagal menambah relasi:", err);
+    alert("Database menolak format ID. Harap ubah tipe data kolom di Supabase menjadi TEXT.");
+  }
+};
 
   const deleteRel = async (id: string) => {
     await db.relations.delete(id);

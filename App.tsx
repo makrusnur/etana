@@ -11,6 +11,7 @@ import { TemplatesPage } from './pages/Templates';
 import { Login } from './pages/Login';
 import { MapMonitoring } from './pages/MapMonitoring';
 import { PtslHalaman } from './pages/PtslMassal';
+import { PbbPage } from './pages/Pbb';
 
 // Komponen Wrapper untuk mendeteksi perubahan rute
 const AppContent: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
@@ -47,6 +48,7 @@ const AppContent: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/map-monitoring" element={<MapMonitoring />} />
             <Route path="/ptsl" element={<PtslHalaman />} />
+            <Route path="/pbb" element={<PbbPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

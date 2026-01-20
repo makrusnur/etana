@@ -1,7 +1,21 @@
 import React, { useState } from 'react';
 import * as ReactRouterDOM from 'react-router-dom';
 const { NavLink } = ReactRouterDOM;
-import { Users, FileText, Map, Home, Settings, LogOut, ChevronLeft, ChevronRight, Menu, X, Navigation, Milestone } from 'lucide-react';
+import { 
+  Users, 
+  FileText, 
+  Map, 
+  Home, 
+  Settings, 
+  LogOut, 
+  ChevronLeft, 
+  ChevronRight, 
+  Menu, 
+  X, 
+  Navigation, 
+  Milestone,
+  Landmark // Icon untuk PBB
+} from 'lucide-react';
 
 interface SidebarProps {
   onLogout: () => void;
@@ -42,9 +56,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
               <MobileNavLink to="/identities" icon={<Users size={20}/>} label="Identitas Klien" onClick={() => setIsMobileOpen(false)} />
               <MobileNavLink to="/lands" icon={<Map size={20}/>} label="Data Tanah" onClick={() => setIsMobileOpen(false)} />
               
-              {/* MENU BARU DI MOBILE */}
               <MobileNavLink to="/files" icon={<FileText size={20}/>} label="Manajemen Berkas" onClick={() => setIsMobileOpen(false)} />
               <MobileNavLink to="/ptsl" icon={<Milestone size={20}/>} label="PTSL Massal" onClick={() => setIsMobileOpen(false)} />
+              
+              {/* MENU PBB MOBILE */}
+              <MobileNavLink to="/pbb" icon={<Landmark size={20}/>} label="PBB / SPPT" onClick={() => setIsMobileOpen(false)} />
               
               <MobileNavLink to="/map-monitoring" icon={<Navigation size={20}/>} label="Map Monitoring" onClick={() => setIsMobileOpen(false)} />
               <MobileNavLink to="/templates" icon={<Settings size={20}/>} label="Automation" onClick={() => setIsMobileOpen(false)} />
@@ -79,8 +95,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
           
           <NavItem to="/files" icon={<FileText size={18} />} label="Berkas & Relasi" collapsed={isCollapsed} navClass={navClass} />
           
-          {/* MENU BARU DI DESKTOP: PTSL MASSAL */}
           <NavItem to="/ptsl" icon={<Milestone size={18} />} label="PTSL Massal" collapsed={isCollapsed} navClass={navClass} />
+          
+          {/* MENU PBB DESKTOP */}
+          <NavItem to="/pbb" icon={<Landmark size={18} />} label="PBB / SPPT" collapsed={isCollapsed} navClass={navClass} />
           
           <NavItem to="/map-monitoring" icon={<Navigation size={18} />} label="Map Monitoring" collapsed={isCollapsed} navClass={navClass} />
           
