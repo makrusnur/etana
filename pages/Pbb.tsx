@@ -1,130 +1,180 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Search, MapPin, ChevronRight, Landmark,  
-  ArrowLeft, Printer, Trash2, Edit3, Plus 
+  Search, MapPin, ArrowLeft, Printer, Trash2, 
+  Plus, X, User, Map as MapIcon, ChevronRight, Hash, Edit3, Info
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { db } from '../services/db';
-import { LandData } from '../types';
+import { db, supabase } from '../services/db';
+import { LandData, Identity, PbbRecord } from '../types';
 
 export const PbbPage: React.FC = () => {
-  const navigate = useNavigate();
-  const [allLands, setAllLands] = useState<LandData[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
-  
-  // State untuk melacak desa mana yang sedang dilihat detailnya
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [allLands, setAllLands] = useState<LandData[]>([]);
+  const [identities, setIdentities] = useState<Identity[]>([]);
+  const [pbbRecords, setPbbRecords] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedLocation, setSelectedLocation] = useState<{kec: string, desa: string} | null>(null);
 
-  useEffect(() => { 
-    fetchData(); 
-  }, []);
+  // State khusus Edit
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  const fetchData = async () => {
+  const [formData, setFormData] = useState<PbbRecord>({
+    desa_id: '',
+    identitas_id: '',
+    data_tanah_id: '',
+    tipe_layanan: 'PEREKAMAN DATA',
+    nop_asal: '',
+    status_subjek: 'PEMILIK',
+    jenis_subjek: 'PRIBADI'
+  });
+
+  useEffect(() => { fetchAllData(); }, []);
+
+  const fetchAllData = async () => {
+    setLoading(true);
     try {
-      const data = await db.lands.getAll();
-      setAllLands(data || []);
-    } catch (error) { 
-      console.error("Gagal memuat data:", error); 
-    } finally {
-      setLoading(false);
+      const [l, i, p] = await Promise.all([db.lands.getAll(), db.identities.getAll(), db.pbb.getAll()]);
+      setAllLands(l || []);
+      setIdentities(i || []);
+      setPbbRecords(p || []);
+    } catch (error) { console.error(error); } 
+    finally { setLoading(false); }
+  };
+
+  const handleSave = async () => {
+    if (!formData.identitas_id || !formData.data_tanah_id) {
+      alert("Pilih Wajib Pajak dan Objek Tanah dulu, Pak.");
+      return;
     }
+
+    try {
+      const payload = { ...formData, desa_id: selectedLocation?.desa || '' };
+      
+      if (editingId) {
+        // Logika UPDATE
+        const { error } = await supabase.from('pbb_records').update(payload).eq('id', editingId);
+        if (error) throw error;
+        alert("Data PBB berhasil diperbarui!");
+      } else {
+        // Logika INSERT
+        await db.pbb.add(payload);
+        alert("Data PBB berhasil ditambahkan!");
+      }
+
+      closeModal();
+      fetchAllData();
+    } catch (e) { 
+      console.error(e);
+      alert("Gagal menyimpan data ke database."); 
+    }
+  };
+
+  const startEdit = (record: any) => {
+    setEditingId(record.id);
+    setFormData({
+      desa_id: record.desa_id,
+      identitas_id: record.identitas_id,
+      data_tanah_id: record.data_tanah_id,
+      tipe_layanan: record.tipe_layanan,
+      nop_asal: record.nop_asal,
+      status_subjek: record.status_subjek,
+      jenis_subjek: record.jenis_subjek
+    });
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingId(null);
+    setFormData({
+      desa_id: '', identitas_id: '', data_tanah_id: '',
+      tipe_layanan: 'PEREKAMAN DATA', nop_asal: '',
+      status_subjek: 'PEMILIK', jenis_subjek: 'PRIBADI'
+    });
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm("Apakah Anda yakin ingin menghapus data SPPT ini?")) {
+    if (window.confirm("Hapus data PBB ini? Tindakan ini tidak bisa dibatalkan.")) {
       try {
-        await db.lands.delete(id);
-        fetchData(); // Refresh data setelah hapus
-      } catch (error) {
-        alert("Gagal menghapus data");
-      }
+        await db.pbb.delete(id);
+        fetchAllData();
+      } catch (e) { alert("Gagal menghapus."); }
     }
   };
 
-  const kecamatanList = Array.from(
-    new Set(allLands.map(l => (l.kecamatan || "TANPA KECAMATAN").toUpperCase()))
-  ).sort();
+  const kecamatanList = Array.from(new Set(allLands.map(l => (l.kecamatan || "Tanpa Kecamatan").toUpperCase()))).sort();
 
-  const detailData = selectedLocation 
-    ? allLands.filter(l => 
-        (l.kecamatan || "").toUpperCase() === selectedLocation.kec && 
-        (l.desa || "").toUpperCase() === selectedLocation.desa
-      )
-    : [];
+  if (loading) return <div className="p-10 text-[10px] font-mono tracking-widest text-slate-400 animate-pulse">SYNCING_DATABASE...</div>;
 
-  if (loading) return <div className="p-10 text-center font-bold text-slate-400 animate-pulse uppercase tracking-widest">Memproses Basis Data...</div>;
-
-  // --- TAMPILAN 1: DETAIL DESA (TABEL) ---
+  // --- VIEW: DETAIL DATA PER DESA ---
   if (selectedLocation) {
+    const filteredRecords = pbbRecords.filter(r => (r.desa_id || "").toUpperCase() === selectedLocation.desa.toUpperCase());
+
     return (
-      <div className="p-4 lg:p-8 bg-[#f8fafc] min-h-screen">
-        <div className="flex justify-between items-center mb-6">
-          <button 
-            onClick={() => setSelectedLocation(null)}
-            className="flex items-center gap-2 text-blue-600 font-bold text-sm hover:gap-3 transition-all uppercase"
-          >
-            <ArrowLeft size={18} /> Kembali
-          </button>
-          
-          <button 
-            onClick={() => navigate('/lands')}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-blue-700 transition-all shadow-lg shadow-blue-200"
-          >
-            <Plus size={16} /> TAMBAH SPPT BARU
-          </button>
-        </div>
-
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-6">
-          <div className="flex items-center gap-2 text-slate-400 text-[10px] font-black mb-1 uppercase tracking-[0.2em]">
-            <MapPin size={12} /> {selectedLocation.kec}
+      <div className="min-h-screen bg-white p-6 lg:p-10 font-sans text-slate-900 animate-in fade-in duration-300">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex justify-between items-center mb-8 pb-6 border-b border-slate-100">
+            <div className="flex items-center gap-4">
+              <button onClick={() => setSelectedLocation(null)} className="p-2 hover:bg-slate-100 rounded-md transition-all">
+                <ArrowLeft size={18} className="text-slate-400" />
+              </button>
+              <div>
+                <h1 className="text-xl font-bold tracking-tight uppercase">{selectedLocation.desa}</h1>
+                <p className="text-[10px] text-indigo-500 font-black uppercase tracking-[0.2em]">{selectedLocation.kec}</p>
+              </div>
+            </div>
+            <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 text-white px-5 py-2.5 rounded-md text-[10px] font-black tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2">
+              <Plus size={14}/> TAMBAH RECORD
+            </button>
           </div>
-          <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight">DESA {selectedLocation.desa}</h1>
-          <p className="text-slate-500 text-xs font-medium uppercase tracking-wide mt-1">Total: {detailData.length} Objek Pajak Terdata</p>
-        </div>
 
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 border-b border-slate-100 text-slate-400 font-bold uppercase tracking-widest">
-                <tr>
-                  <th className="p-4">NOMOR OBJEK PAJAK (NOP)</th>
-                  <th className="p-4">NAMA WAJIB PAJAK</th>
-                  <th className="p-4 text-center">LUAS (M²)</th>
-                  <th className="p-4 text-center">AKSI</th>
+          <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+            <table className="w-full text-left text-[11px] border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 font-bold uppercase tracking-tighter">
+                  <th className="px-6 py-4 italic">Wajib Pajak (Subjek)</th>
+                  <th className="px-6 py-4 italic">Objek Pajak (Tanah)</th>
+                  <th className="px-6 py-4 italic">Administrasi</th>
+                  <th className="px-6 py-4 text-right italic">Navigasi</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
-                {detailData.map((land) => (
-                  <tr key={land.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="p-4 font-mono font-bold text-blue-600 text-sm">
-                      {land.nop || <span className="text-slate-300 italic">Kosong</span>}
+              <tbody className="divide-y divide-slate-100">
+                {filteredRecords.length === 0 ? (
+                   <tr><td colSpan={4} className="p-20 text-center text-slate-300 italic font-medium">Belum ada data terekam di desa ini.</td></tr>
+                ) : filteredRecords.map((r) => (
+                  <tr key={r.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className="px-6 py-5">
+                      <div className="font-bold text-slate-900 uppercase text-sm leading-tight">{r.identities?.nama || 'N/A'}</div>
+                      <div className="text-[10px] text-slate-400 mt-1 font-mono">NIK: {r.identities?.nik || '-'}</div>
+                      <div className="text-[9px] text-indigo-400 mt-0.5 uppercase font-bold tracking-tighter">{r.identities?.pekerjaan || 'Pekerjaan tdk terdata'}</div>
                     </td>
-                    <td className="p-4 font-bold text-slate-700 uppercase">{land.atas_nama_nop || '-'}</td>
-                    <td className="p-4 text-center font-black text-slate-600">
-                      {Number(land.luas_seluruhnya || 0).toLocaleString('id-ID')}
+                    <td className="px-6 py-5">
+                      <div className="font-mono text-slate-700 font-bold flex items-center gap-1">
+                        <Hash size={12} className="text-slate-300"/> {r.lands?.nop || r.nop_asal || 'TANPA NOP'}
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-1 uppercase">
+                        Luas: <span className="font-bold text-slate-900">{r.lands?.luas_seluruhnya || 0} m²</span>
+                      </div>
+                      <div className="text-[9px] text-slate-400 truncate max-w-[200px] mt-0.5">{r.lands?.alamat}</div>
                     </td>
-                    <td className="p-4">
-                      <div className="flex items-center justify-center gap-2">
-                        <button 
-                          title="Cetak SPPT"
-                          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                        >
-                          <Printer size={16} />
+                    <td className="px-6 py-5">
+                      <div className="flex flex-col gap-1.5">
+                        <span className="w-fit px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 rounded text-[9px] font-black tracking-tighter uppercase">
+                          {r.tipe_layanan}
+                        </span>
+                        <div className="text-[9px] text-slate-400 font-bold uppercase">{r.status_subjek} / {r.jenis_subjek}</div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5 text-right">
+                      <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
+                        <button onClick={() => startEdit(r)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="Ubah Data">
+                          <Edit3 size={16}/>
                         </button>
-                        <button 
-                          onClick={() => navigate(`/lands?edit=${land.id}`)}
-                          title="Edit Data"
-                          className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                        >
-                          <Edit3 size={16} />
+                        <button className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all" title="Cetak SPOP">
+                          <Printer size={16}/>
                         </button>
-                        <button 
-                          onClick={() => handleDelete(land.id)}
-                          title="Hapus Data"
-                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                        >
-                          <Trash2 size={16} />
+                        <button onClick={() => handleDelete(r.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Hapus">
+                          <Trash2 size={16}/>
                         </button>
                       </div>
                     </td>
@@ -134,84 +184,133 @@ export const PbbPage: React.FC = () => {
             </table>
           </div>
         </div>
+
+        {/* --- MODAL EDIT / TAMBAH --- */}
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/10 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white w-full max-w-md border border-slate-200 shadow-2xl rounded-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div>
+                  <h2 className="text-xs font-black uppercase tracking-[0.2em] text-slate-800">
+                    {editingId ? 'Update Record' : 'New Database Entry'}
+                  </h2>
+                  <p className="text-[9px] text-slate-400 font-bold mt-0.5 uppercase italic">PBB / SPPT Schema Management</p>
+                </div>
+                <button onClick={closeModal} className="p-2 hover:bg-white rounded-full transition-all"><X size={18} className="text-slate-400"/></button>
+              </div>
+
+              <div className="p-6 space-y-5 overflow-y-auto">
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">1. Pilih Wajib Pajak</label>
+                  <select 
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold focus:border-slate-400 outline-none transition-all appearance-none" 
+                    value={formData.identitas_id}
+                    onChange={(e) => setFormData({...formData, identitas_id: e.target.value})}
+                  >
+                    <option value="">Pilih Identitas...</option>
+                    {identities.map(i => <option key={i.id} value={i.id}>{i.nama.toUpperCase()} ({i.nik})</option>)}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">2. Pilih Objek Tanah</label>
+                  <select 
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold focus:border-slate-400 outline-none transition-all appearance-none"
+                    value={formData.data_tanah_id}
+                    onChange={(e) => setFormData({...formData, data_tanah_id: e.target.value})}
+                  >
+                    <option value="">Pilih NOP / Lokasi...</option>
+                    {allLands.filter(l => (l.desa || "").toUpperCase() === selectedLocation.desa.toUpperCase()).map(l => (
+                      <option key={l.id} value={l.id}>{l.nop || 'NO NOP'} - {l.alamat.substring(0,25)}...</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Jenis Layanan</label>
+                    <select className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold" value={formData.tipe_layanan} onChange={(e) => setFormData({...formData, tipe_layanan: e.target.value as any})}>
+                      <option>PEREKAMAN DATA</option>
+                      <option>PEMUTAKHIRAN DATA</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Status Subjek</label>
+                    <select className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold" value={formData.status_subjek} onChange={(e) => setFormData({...formData, status_subjek: e.target.value as any})}>
+                      <option>PEMILIK</option>
+                      <option>PENYEWA</option>
+                      <option>PENGELOLA</option>
+                      <option>PEMAKAI</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 flex gap-3">
+                   <Info size={16} className="text-indigo-400 mt-0.5 shrink-0"/>
+                   <p className="text-[9px] text-indigo-600 font-medium leading-relaxed italic">Data Desa akan otomatis terdeteksi sebagai <b>{selectedLocation.desa}</b> berdasarkan dashboard yang sedang aktif.</p>
+                </div>
+              </div>
+
+              <div className="p-6 bg-slate-50/80 border-t border-slate-100">
+                <button onClick={handleSave} className="w-full py-3 bg-slate-900 text-white rounded-lg font-black text-[10px] hover:bg-slate-800 transition-all uppercase tracking-[0.2em] shadow-lg shadow-slate-200">
+                  {editingId ? 'Confirm Update' : 'Finalize Record'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
-  // --- TAMPILAN 2: HALAMAN UTAMA (GRID WILAYAH) ---
+  // --- VIEW: DASHBOARD (SCHEMA GRID) ---
   return (
-    <div className="p-4 lg:p-8 bg-[#f8fafc] min-h-screen">
-      <div className="flex justify-between items-start mb-8">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Dashboard PBB / SPPT</h1>
-          <p className="text-slate-500 text-sm font-medium">Monitoring Pajak Bumi dan Bangunan per Wilayah</p>
+    <div className="min-h-screen bg-white p-6 lg:p-10 font-sans text-slate-900">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12 border-b border-slate-100 pb-12">
+          <div>
+            <h1 className="text-3xl font-black tracking-tighter mb-2 uppercase italic italic">PBB</h1>
+            </div>
+          <div className="relative w-full md:w-80">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+            <input 
+              type="text" placeholder="Search kecamatan/desa..." 
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-12 pr-4 text-xs font-bold outline-none focus:border-slate-900 transition-all"
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </div>
-        <button 
-          onClick={() => navigate('/lands')}
-          className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-5 py-3 rounded-2xl font-bold text-xs hover:bg-slate-50 transition-all shadow-sm"
-        >
-          <Plus size={18} className="text-blue-600" /> TAMBAH DATA
-        </button>
-      </div>
 
-      <div className="relative mb-8">
-        <Search className="absolute left-4 top-4 text-slate-300" size={18} />
-        <input 
-          type="text" 
-          placeholder="Cari desa atau kecamatan secara spesifik..." 
-          className="w-full bg-white border-none shadow-sm ring-1 ring-slate-200 rounded-2xl py-4 pl-12 pr-4 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all font-medium"
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
-
-      <div className="space-y-10">
-        {kecamatanList
-          .filter(kec => kec.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                  allLands.some(l => l.kecamatan?.toUpperCase() === kec && l.desa?.toLowerCase().includes(searchTerm.toLowerCase())))
-          .map(kec => {
-            const desas = Array.from(new Set(allLands.filter(l => (l.kecamatan || "").toUpperCase() === kec).map(l => (l.desa || "TANPA DESA").toUpperCase()))).sort();
-            
+        <div className="space-y-16">
+          {kecamatanList.filter(k => k.includes(searchTerm.toUpperCase())).map(kec => {
+            const desas = Array.from(new Set(allLands.filter(l => (l.kecamatan || "").toUpperCase() === kec).map(l => (l.desa || "Tanpa Desa").toUpperCase()))).sort();
             return (
-              <div key={kec} className="animate-in fade-in duration-500">
-                <div className="flex items-center gap-3 mb-5 ml-1">
-                  <div className="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm border border-slate-100 text-blue-600"><Landmark size={20}/></div>
-                  <h2 className="font-black text-slate-800 uppercase tracking-tighter text-xl">{kec}</h2>
-                  <div className="h-[1px] flex-1 bg-slate-200 ml-4 opacity-50"></div>
+              <div key={kec} className="animate-in slide-in-from-bottom-4 duration-500">
+                <div className="flex items-center gap-4 mb-6">
+                  <h2 className="text-xs font-black text-slate-900 uppercase tracking-[0.4em] bg-slate-100 px-4 py-1.5 rounded-full">{kec}</h2>
+                  <div className="h-[1px] flex-1 bg-slate-100"></div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-                  {desas.map(desa => {
-                    const count = allLands.filter(l => (l.kecamatan || "").toUpperCase() === kec && (l.desa || "").toUpperCase() === desa).length;
-                    return (
-                      <button 
-                        key={desa}
-                        onClick={() => setSelectedLocation({kec, desa})}
-                        className="group relative p-6 bg-white rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-blue-900/10 hover:-translate-y-1 transition-all text-left overflow-hidden"
-                      >
-                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                          <Landmark size={80} />
+                  {desas.map(desa => (
+                    <button key={desa} onClick={() => setSelectedLocation({kec, desa})} className="group flex flex-col p-6 border border-slate-100 rounded-2xl hover:border-slate-900 hover:bg-slate-50 transition-all text-left relative overflow-hidden">
+                      <div className="flex justify-between items-start mb-6">
+                        <div className="p-2.5 bg-white border border-slate-100 rounded-xl group-hover:bg-slate-900 group-hover:text-white transition-all">
+                          <MapIcon size={18} />
                         </div>
-                        <div className="flex justify-between items-start mb-6">
-                           <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl group-hover:bg-blue-600 group-hover:text-white transition-all shadow-inner">
-                              <MapPin size={20} />
-                           </div>
-                           <div className="p-1 bg-slate-50 rounded-lg">
-                              <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
-                           </div>
-                        </div>
-                        <h3 className="font-black text-slate-700 uppercase text-base mb-1 group-hover:text-blue-600 transition-colors tracking-tight">{desa}</h3>
-                        <div className="flex items-center gap-2">
-                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em]">{count} BIDANG</span>
-                           <div className="w-1 h-1 bg-slate-300 rounded-full"></div>
-                           <span className="text-[10px] font-bold text-blue-500 uppercase">Lihat Detail</span>
-                        </div>
-                      </button>
-                    );
-                  })}
+                        <ChevronRight size={16} className="text-slate-200 group-hover:text-slate-900 group-hover:translate-x-1 transition-all" />
+                      </div>
+                      <span className="block text-sm font-black text-slate-900 uppercase tracking-tight mb-1">{desa}</span>
+                      <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest italic">
+                        {allLands.filter(l => (l.desa || "").toUpperCase() === desa).length} Objek Terdaftar
+                      </span>
+                    </button>
+                  ))}
                 </div>
               </div>
             );
-        })}
+          })}
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { Identity, LandData, FileRecord, Relation, PtslVillage } from '../types';
+import { Identity, LandData, FileRecord, Relation, PtslVillage,PbbRecord } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -200,6 +200,35 @@ export const db = {
     delete: async (id: string) => {
       const { error } = await supabase.from('relations').delete().eq('id', id);
       if (error) handleError(error, "Gagal menghapus relasi");
+    }
+  },
+
+  pbb: {
+    getAll: async () => {
+      const { data, error } = await supabase
+        .from('pbb_records')
+        .select(`
+          *,
+          identities!identitas_id (nama, nik),
+          lands!data_tanah_id (nop, alamat, luas_seluruhnya)
+        `);
+      
+      if (error) {
+        console.error("Supabase Error Detail:", error.message);
+        // Jika join gagal, ambil data mentahnya saja agar aplikasi tidak crash
+        const { data: rawData } = await supabase.from('pbb_records').select('*');
+        return rawData || [];
+      }
+      return data || [];
+    },
+    add: async (item: PbbRecord) => {
+      // Kita pastikan data yang dikirim bersih
+      const { error } = await supabase.from('pbb_records').insert([item]);
+      if (error) handleError(error, "Gagal simpan data PBB");
+    },
+    delete: async (id: string) => {
+      const { error } = await supabase.from('pbb_records').delete().eq('id', id);
+      if (error) handleError(error, "Gagal hapus data PBB");
     }
   }
 };

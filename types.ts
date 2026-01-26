@@ -219,3 +219,15 @@ export interface Relation {
   data_tanah_id?: string;
   peran: RelationRole;
 }
+
+export interface PbbRecord {
+  id?: string;
+  created_at?: string;
+  desa_id: string;
+  identitas_id: string;
+  data_tanah_id: string;
+  tipe_layanan: string;
+  nop_asal: string;
+  status_subjek: string;
+  jenis_subjek: string;
+}
