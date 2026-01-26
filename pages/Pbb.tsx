@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Search, MapPin, ArrowLeft, Printer, Trash2, 
-  Plus, X, User, Map as MapIcon, ChevronRight, Hash, Edit3, Info
+  Search,  ArrowLeft, Printer, Trash2, 
+  Plus, X, Map as MapIcon, ChevronRight, Hash, Edit3, Info
 } from 'lucide-react';
 import { db, supabase } from '../services/db';
 import { LandData, Identity, PbbRecord } from '../types';
