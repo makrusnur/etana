@@ -17,6 +17,8 @@ export const FilesPage: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [searchWP, setSearchWP] = useState(''); // Untuk cari Subjek
+  const [searchOP, setSearchOP] = useState(''); // Untuk cari Tanah
 
   // STATE UNTUK PETA
   const [showMapPicker, setShowMapPicker] = useState(false);
@@ -203,9 +205,9 @@ export const FilesPage: React.FC = () => {
 
   return (
     <div className="h-[calc(100vh-2rem)] flex gap-6 overflow-hidden">
-      {/* SIDEBAR DAFTAR BERKAS */}
-      <div className="w-1/3 flex flex-col gap-4 border-r border-slate-200 pr-6 overflow-y-auto custom-scrollbar">
-        <div className="flex justify-between items-center sticky top-0 bg-slate-50 py-2 z-10 border-b border-slate-100 mb-2">
+      <div className="w-1/3 flex flex-col gap-4 border-r border-slate-200 pr-4 pl-1 overflow-y-auto custom-scrollbar">
+        {/* Header Sidebar */}
+        <div className="flex justify-between items-center sticky top-0 bg-slate-50 py-4 z-10 border-b border-slate-100 mb-2 px-1">
           <div>
             <h2 className="text-xl font-bold text-slate-800">Manajemen Berkas</h2>
             <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">PPAT Administration</p>
@@ -215,17 +217,19 @@ export const FilesPage: React.FC = () => {
           </Button>
         </div>
 
-        <div className="relative">
-          <Search size={16} className="absolute left-3 top-3 text-slate-400" />
+        {/* Search Bar */}
+        <div className="relative px-1">
+          <Search size={16} className="absolute left-4 top-3.5 text-slate-400" />
           <input 
             placeholder="Cari No. Berkas / Perolehan..." 
-            className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all" 
+            className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all" 
             value={fileSearch} 
             onChange={e => setFileSearch(e.target.value)} 
           />
         </div>
 
-        <div className="space-y-2 mt-2">
+        {/* List Berkas - Tambahkan padding bawah agar tidak terpotong saat scroll */}
+        <div className="space-y-3 mt-2 px-1 pb-10">
           {isLoading ? (
             <div className="text-center p-10 flex flex-col items-center gap-2">
               <div className="w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
@@ -236,23 +240,30 @@ export const FilesPage: React.FC = () => {
               <div 
                 key={f.id} 
                 onClick={() => handleSelect(f)} 
-                className={`p-4 rounded-2xl border-2 cursor-pointer transition-all duration-300 relative group ${
+                className={`p-5 rounded-2xl border-2 cursor-pointer transition-all duration-300 relative group overflow-hidden ${
                   activeFile?.id === f.id 
-                    ? 'border-blue-500 bg-white shadow-xl scale-[1.02]' 
-                    : 'bg-white border-transparent hover:border-slate-300 shadow-sm'
+                    ? 'border-blue-500 bg-white shadow-xl translate-x-1' 
+                    : 'bg-white border-transparent hover:border-slate-200 shadow-sm'
                 }`}
               >
+                {/* Garis indikator aktif di samping */}
+                {activeFile?.id === f.id && (
+                  <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600"></div>
+                )}
+
                 <div className="flex justify-between items-start">
                   <div className="flex-1 pr-2">
-                    <div className="font-black text-slate-800 tracking-tight break-words">{f.nomor_berkas}</div>
-                    <div className="text-[10px] uppercase font-black text-blue-600 mt-1">{f.jenis_perolehan}</div>
-                    <div className="text-[9px] text-slate-400 font-bold mt-2 flex items-center gap-1">
-                      <Calendar size={10} /> {formatDateIndo(f.tanggal)} ({f.hari})
+                    <div className="font-black text-slate-800 tracking-tight text-sm break-words">{f.nomor_berkas}</div>
+                    <div className="text-[9px] uppercase font-black text-blue-600 mt-1 tracking-wider">{f.jenis_perolehan}</div>
+                    <div className="text-[9px] text-slate-400 font-bold mt-3 flex items-center gap-1.5">
+                      <Calendar size={12} className="text-slate-300" /> {formatDateIndo(f.tanggal)}
                     </div>
                   </div>
+                  
+                  {/* Tombol aksi yang hanya muncul saat hover agar tidak penuh */}
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={(e) => handleEditFile(e, f)} className="p-2 text-amber-500 hover:bg-amber-50 rounded-lg"><Edit2 size={16}/></button>
-                    <button onClick={(e) => handleDeleteFile(e, f.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={16}/></button>
+                    <button onClick={(e) => handleEditFile(e, f)} className="p-1.5 text-amber-500 hover:bg-amber-50 rounded-lg"><Edit2 size={14}/></button>
+                    <button onClick={(e) => handleDeleteFile(e, f.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={14}/></button>
                   </div>
                 </div>
               </div>
@@ -305,17 +316,57 @@ export const FilesPage: React.FC = () => {
             )}
 
             <Card title="Penyusunan Struktur Relasi Pihak">
-               <div className="grid grid-cols-2 gap-4 bg-slate-50 p-6 rounded-[2.5rem] border border-slate-200 mb-8 shadow-inner">
-                <div className="col-span-1">
-                  <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 px-1 tracking-widest">Pilih Subjek</label>
-                  <select className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-white text-sm font-bold appearance-none" value={newRel.identityId} onChange={e => setNewRel({...newRel, identityId: e.target.value})}>
-                    <option value="">-- Cari Nama --</option>
-                    {allIdentities.map(i => <option key={i.id} value={i.id}>{toTitleCase(i.nama)}</option>)}
-                  </select>
+              <div className="grid grid-cols-2 gap-4 bg-slate-50 p-6 rounded-[2.5rem] border border-slate-200 mb-8 shadow-inner">
+                
+                {/* SEARCH WAJIB PAJAK / SUBJEK */}
+                <div className="col-span-1 relative">
+                  <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 px-1 tracking-widest">Cari Subjek (Nama/NIK)</label>
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      placeholder="Ketik Nama/NIK..."
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-white text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                      value={searchWP}
+                      onChange={(e) => setSearchWP(e.target.value)}
+                    />
+                    {searchWP && !newRel.identityId && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+                        {allIdentities
+                          .filter(i => i.nama.toLowerCase().includes(searchWP.toLowerCase()) || i.nik.includes(searchWP))
+                          .map(i => (
+                            <div 
+                              key={i.id}
+                              className="p-3 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-none"
+                              onClick={() => {
+                                setNewRel({...newRel, identityId: i.id});
+                                setSearchWP(i.nama.toUpperCase());
+                              }}
+                            >
+                              <p className="text-[11px] font-black text-slate-800">{i.nama.toUpperCase()}</p>
+                              <p className="text-[9px] text-slate-400 font-mono">{i.nik}</p>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                    {newRel.identityId && (
+                      <button 
+                        onClick={() => {setNewRel({...newRel, identityId: ''}); setSearchWP('');}}
+                        className="absolute right-3 top-3 text-red-500 hover:bg-red-50 rounded-full p-0.5"
+                      >
+                        <X size={14}/>
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {/* PILIH PERAN */}
                 <div className="col-span-1">
                   <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 px-1 tracking-widest">Peran</label>
-                  <select className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-white text-sm font-bold appearance-none" value={newRel.role} onChange={e => setNewRel({...newRel, role: e.target.value as any})}>
+                  <select 
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-white text-sm font-bold appearance-none h-[46px]" 
+                    value={newRel.role} 
+                    onChange={e => setNewRel({...newRel, role: e.target.value as any})}
+                  >
                     <option value="PIHAK_1">PIHAK 1</option>
                     <option value="PIHAK_2">PIHAK 2</option>
                     <option value="SAKSI">SAKSI</option>
@@ -323,23 +374,54 @@ export const FilesPage: React.FC = () => {
                   </select>
                 </div>
                 
-                <div className="col-span-2">
-                  <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 px-1 tracking-widest">Objek Tanah Terhubung (Opsional)</label>
-                  <select 
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-white text-sm font-bold appearance-none" 
-                    value={newRel.landId} 
-                    onChange={e => setNewRel({...newRel, landId: e.target.value})}
-                  >
-                    <option value="">-- Tanpa Hubungan Objek Tanah --</option>
-                    {allLands.map(l => (
-                      <option key={l.id} value={l.id}>
-                        {l.nop} - {l.atas_nama_nop}
-                      </option>
-                    ))}
-                  </select>
+                {/* SEARCH OBJEK TANAH */}
+                <div className="col-span-2 relative">
+                  <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 px-1 tracking-widest">Cari Objek Tanah (NOP/Nama NOP)</label>
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      placeholder="Ketik NOP atau Nama yang tertera di NOP..."
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-white text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                      value={searchOP}
+                      onChange={(e) => setSearchOP(e.target.value)}
+                    />
+                    {searchOP && !newRel.landId && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+                        {allLands
+                          .filter(l => (l.nop || "").includes(searchOP) || (l.atas_nama_nop || "").toLowerCase().includes(searchOP.toLowerCase()))
+                          .map(l => (
+                            <div 
+                              key={l.id}
+                              className="p-3 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-none"
+                              onClick={() => {
+                                setNewRel({...newRel, landId: l.id});
+                                setSearchOP(l.nop || 'TANPA NOP');
+                              }}
+                            >
+                              <p className="text-[11px] font-black text-slate-800">{l.nop || 'NO NOP'}</p>
+                              <p className="text-[9px] text-slate-400 font-bold uppercase">{l.atas_nama_nop} - {l.desa}</p>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                    {newRel.landId && (
+                      <button 
+                        onClick={() => {setNewRel({...newRel, landId: ''}); setSearchOP('');}}
+                        className="absolute right-3 top-3 text-red-500 hover:bg-red-50 rounded-full p-0.5"
+                      >
+                        <X size={14}/>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                <Button className="col-span-2 h-12" onClick={handleAddRel}>Hubungkan Pihak</Button>
+                <Button className="col-span-2 h-12 shadow-lg font-black tracking-widest" onClick={() => {
+                    handleAddRel();
+                    setSearchWP(''); // Reset setelah tambah
+                    setSearchOP(''); // Reset setelah tambah
+                }}>
+                  HUBUNGKAN PIHAK KE BERKAS
+                </Button>
               </div>
 
               <div className="space-y-4">

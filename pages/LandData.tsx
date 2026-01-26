@@ -595,7 +595,20 @@ const removeSuratHak = (index: number) => {
                         type="radio"
                         className="w-4 h-4 text-blue-600"
                         checked={form.jenis_dasar_surat === type}
-                        onChange={() => setForm({ ...form, jenis_dasar_surat: type as LandType })}
+                        onChange={() => {
+                          // LOGIKA BARU: Jika pindah ke selain LETTER_C, reset data riwayat dan BAK
+                          const baseUpdate = { ...form, jenis_dasar_surat: type as LandType };
+                          
+                          if (type !== 'LETTER_C') {
+                            setForm({
+                              ...baseUpdate,
+                              riwayat_tanah: [], // Kosongkan riwayat
+                              bak_list: ['']     // Reset narasi BAK ke satu kolom kosong
+                            });
+                          } else {
+                            setForm(baseUpdate);
+                          }
+                        }}
                       />
                       <span className={`text-xs font-black uppercase ${form.jenis_dasar_surat === type ? 'text-blue-700' : 'text-slate-400'}`}>
                         {type.replace('_', ' ')}
@@ -607,46 +620,90 @@ const removeSuratHak = (index: number) => {
               {renderSpecificAlasHak()}
             </Card>
 
-            <Card title="3. Riwayat Kepemilikan (Buku C Desa)">
-              <div className="overflow-x-auto border border-slate-300 rounded-xl bg-white shadow-inner">
-                <table className="w-full text-[10px] text-left">
-                  <thead className="bg-slate-100 font-black uppercase text-slate-600 border-b border-slate-300">
-                    <tr>
-                      <th className="p-3">Nama Pemilik</th>
-                      <th className="p-3">No C</th>
-                      <th className="p-3">Persil</th>
-                      <th className="p-3">Klas</th>
-                      <th className="p-3">Luas (m²)</th>
-                      <th className="p-3">Dasar peralihan</th>
-                      <th className="p-3 text-right">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {(form.riwayat_tanah || []).map((row, idx) => (
-                      <tr key={idx} className="hover:bg-blue-50/30">
-                        <td className="p-2"><input className="w-full border border-slate-300 p-1.5 rounded text-xs outline-none" value={row.atas_nama} onChange={e => updateRiwayat(idx, 'atas_nama', e.target.value)} /></td>
-                        <td className="p-2"><input className="w-full border border-slate-300 p-1.5 rounded text-xs outline-none" value={row.c_no} onChange={e => updateRiwayat(idx, 'c_no', e.target.value)} /></td>
-                        <td className="p-2"><input className="w-full border border-slate-300 p-1.5 rounded text-xs outline-none bg-white" value={row.persil_no} onChange={e => updateRiwayat(idx, 'persil_no', e.target.value)} /></td>
-                        <td className="p-2"><input className="w-full border border-slate-300 p-1.5 rounded text-xs outline-none bg-white" value={row.klas} onChange={e => updateRiwayat(idx, 'klas', e.target.value)} /></td>
-                        <td className="p-2"><input className="w-full border border-slate-300 font-black p-1.5 rounded text-xs outline-none text-blue-700" value={row.luas} onChange={e => updateRiwayat(idx, 'luas', e.target.value)} /></td>
-                        <td className="p-2"><input className="w-full border border-slate-300 p-1.5 rounded text-xs outline-none" value={row.dasar_dialihkan} onChange={e => updateRiwayat(idx, 'dasar_dialihkan', e.target.value)} /></td>
-                        <td className="p-2 text-right">
-                          <button onClick={() => removeRiwayat(idx)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg"><Trash2 size={16} /></button>
-                        </td>
+            {/* HANYA MUNCUL JIKA JENIS DASAR SURAT ADALAH LETTER C */}
+            {form.jenis_dasar_surat === 'LETTER_C' && (
+              <Card title="2.1 Riwayat Kepemilikan (Buku C Desa)">
+                <div className="overflow-x-auto border border-slate-300 rounded-xl bg-white shadow-inner">
+                  <table className="w-full text-[10px] text-left">
+                    <thead className="bg-slate-100 font-black uppercase text-slate-600 border-b border-slate-300">
+                      <tr>
+                        <th className="p-3">Nama Pemilik</th>
+                        <th className="p-3">No C</th>
+                        <th className="p-3">Persil</th>
+                        <th className="p-3">Klas</th>
+                        <th className="p-3">Luas (m²)</th>
+                        <th className="p-3">Dasar peralihan</th>
+                        <th className="p-3 text-right">Aksi</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <Button variant="outline" size="sm" onClick={addRiwayat} className="w-full mt-4 border-dashed">
-                <Plus size={14} className="mr-2" /> Tambah Baris Riwayat
-              </Button>
-            </Card>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {(form.riwayat_tanah || []).map((row, idx) => (
+                        <tr key={idx} className="hover:bg-blue-50/30">
+                          <td className="p-2">
+                            <input 
+                              className="w-full border border-slate-300 p-1.5 rounded text-xs outline-none" 
+                              value={row.atas_nama} 
+                              onChange={e => updateRiwayat(idx, 'atas_nama', e.target.value)} 
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input 
+                              className="w-full border border-slate-300 p-1.5 rounded text-xs outline-none" 
+                              value={row.c_no} 
+                              onChange={e => updateRiwayat(idx, 'c_no', e.target.value)} 
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input 
+                              className="w-full border border-slate-300 p-1.5 rounded text-xs outline-none bg-white" 
+                              value={row.persil_no} 
+                              onChange={e => updateRiwayat(idx, 'persil_no', e.target.value)} 
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input 
+                              className="w-full border border-slate-300 p-1.5 rounded text-xs outline-none bg-white" 
+                              value={row.klas} 
+                              onChange={e => updateRiwayat(idx, 'klas', e.target.value)} 
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input 
+                              className="w-full border border-slate-300 font-black p-1.5 rounded text-xs outline-none text-blue-700" 
+                              value={row.luas} 
+                              onChange={e => updateRiwayat(idx, 'luas', e.target.value)} 
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input 
+                              className="w-full border border-slate-300 p-1.5 rounded text-xs outline-none" 
+                              value={row.dasar_dialihkan} 
+                              onChange={e => updateRiwayat(idx, 'dasar_dialihkan', e.target.value)} 
+                            />
+                          </td>
+                          <td className="p-2 text-right">
+                            <button 
+                              onClick={() => removeRiwayat(idx)} 
+                              className="text-red-500 hover:bg-red-50 p-2 rounded-lg"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <Button variant="outline" size="sm" onClick={addRiwayat} className="w-full mt-4 border-dashed">
+                  <Plus size={14} className="mr-2" /> Tambah Baris Riwayat
+                </Button>
+              </Card>
+            )}
           </div>
 
           {/* KOLOM KANAN (SIDEBAR) */}
           <div className="space-y-6">
-            <Card title="4. Luas & Batas-batas">
+            <Card title="3. Luas & Batas-batas">
               <div className="space-y-6">
                 <div className="flex p-1 bg-slate-100 rounded-lg">
                   <button onClick={() => setIsPartial(false)} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-md ${!isPartial ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}><Layers size={14} className="inline mr-1" /> Seluruhnya</button>
@@ -679,7 +736,7 @@ const removeSuratHak = (index: number) => {
               </div>
             </Card>
 
-            <Card title="5. Titik Koordinat Geo-Lokasi">
+            <Card title="4. Titik Koordinat Geo-Lokasi">
               <div className="space-y-4">
                 <div className="flex items-center gap-2 mb-2">
                   <Crosshair size={18} className="text-blue-500" />
@@ -711,20 +768,37 @@ const removeSuratHak = (index: number) => {
               </div>
             </Card>
 
-            <Card title="6. Narasi BAK (Kesaksian)">
-              <div className="space-y-5">
-                {(form.bak_list || []).map((txt, idx) => (
-                  <div key={idx} className="relative group bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
-                    <div className="flex justify-between items-center mb-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase flex items-center gap-1.5"><AlignLeft size={14} className="text-blue-500" /> Narasi BAK Ke-{idx + 1}</label>
-                      {idx > 0 && <button onClick={() => removeBAK(idx)} className="text-red-400 hover:text-red-600"><Trash2 size={16} /></button>}
-                    </div>
-                    <textarea className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none min-h-[160px] bg-white resize-y" placeholder="Masukkan rincian keterangan saksi..." value={txt} onChange={e => updateBAK(idx, e.target.value)} />
+            {/* HANYA MUNCUL JIKA JENIS DASAR SURAT ADALAH LETTER C */}
+              {form.jenis_dasar_surat === 'LETTER_C' && (
+                <Card title="2.2 Narasi BAK (Kesaksian)">
+                  <div className="space-y-5">
+                    {(form.bak_list || []).map((txt, idx) => (
+                      <div key={idx} className="relative group bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <div className="flex justify-between items-center mb-2">
+                          <label className="text-[10px] font-black text-slate-500 uppercase flex items-center gap-1.5">
+                            <AlignLeft size={14} className="text-blue-500" /> 
+                            Narasi BAK Ke-{idx + 1}
+                          </label>
+                          {idx > 0 && (
+                            <button onClick={() => removeBAK(idx)} className="text-red-400 hover:text-red-600">
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                        <textarea 
+                          className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none min-h-[160px] bg-white resize-y" 
+                          placeholder="Masukkan rincian keterangan saksi..." 
+                          value={txt} 
+                          onChange={e => updateBAK(idx, e.target.value)} 
+                        />
+                      </div>
+                    ))}
+                    <Button variant="outline" size="sm" onClick={addBAK} className="w-full border-dashed bg-white">
+                      <Plus size={14} className="mr-2" /> Tambah Kolom BAK
+                    </Button>
                   </div>
-                ))}
-                <Button variant="outline" size="sm" onClick={addBAK} className="w-full border-dashed bg-white"><Plus size={14} className="mr-2" /> Tambah Kolom BAK</Button>
-              </div>
-            </Card>
+                </Card>
+              )}
           </div>
         </div>
 
