@@ -231,3 +231,46 @@ export interface PbbRecord {
   status_subjek: string;
   jenis_subjek: string;
 }
+
+// Isi file src/types.ts
+export interface Kecamatan {
+  id: string;
+  nama: string;
+}
+
+export interface Desa {
+  id: string;
+  nama: string;
+  kecamatan_id: string;
+}
+
+export interface LetterC {
+  id: string;
+  desa_id: string;
+  nomor_c: string;
+  nama_pemilik: string;
+  alamat_pemilik?: string;
+  created_at?: string;
+}
+
+export interface LetterCPersil {
+  id: string;
+  letter_c_id: string;
+  nomor_persil: string;
+  jenis_tanah: string; // <-- Tambahkan ini Om
+  klas_desa: string;
+  luas_meter: number;
+  asal_usul?: string;
+  created_at?: string;
+}
+
+export interface Mutasi {
+  id: string;
+  c_asal: string;
+  c_tujuan: string;
+  nama_pihak_asal: string;
+  nama_pihak_tujuan: string;
+  luas_mutasi: number;
+  jenis_mutasi: string;
+  tanggal_mutasi: string;
+}

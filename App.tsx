@@ -12,29 +12,22 @@ import { Login } from './pages/Login';
 import { MapMonitoring } from './pages/MapMonitoring';
 import { PtslHalaman } from './pages/PtslMassal';
 import { PbbPage } from './pages/Pbb';
+import { LetterCMain } from './pages/LetterC';
 
-// Komponen Wrapper untuk mendeteksi perubahan rute
 const AppContent: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
   const location = useLocation();
-  // Cek apakah sekarang sedang di halaman map monitoring
   const isMapPage = location.pathname === '/map-monitoring';
 
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900">
       <Sidebar onLogout={onLogout} />
       
-      {/* Main Content: 
-          - Jika isMapPage: padding-right dihapus, padding-top dihapus agar mentok.
-      */}
       <main className={`w-full transition-all duration-500 ease-in-out ${
         isMapPage 
           ? 'lg:pl-[20rem] h-screen overflow-hidden' 
           : 'lg:pl-[20rem] lg:pr-8 pt-20 lg:pt-8 pb-8'
       }`}>
         
-        {/* Container Inner: 
-            - Jika isMapPage: max-w dan padding dibuang agar full frame.
-        */}
         <div className={`h-full ${
           isMapPage 
             ? 'w-full px-0 max-w-none' 
@@ -49,6 +42,8 @@ const AppContent: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             <Route path="/map-monitoring" element={<MapMonitoring />} />
             <Route path="/ptsl" element={<PtslHalaman />} />
             <Route path="/pbb" element={<PbbPage />} />
+            {/* ROUTE BARU KHUSUS LETTER C */}
+            <Route path="/letter-c/*" element={<LetterCMain/>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
