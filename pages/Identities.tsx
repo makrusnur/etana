@@ -3,8 +3,22 @@ import { db } from '../services/db';
 import { processOCR } from '../services/ocr';
 import { Identity } from '../types';
 import { Button, Input, Select, Card, DateInput } from '../components/UI';
-import { Camera, Edit2, Trash2, Plus, Search, Loader2, CheckCircle2, AlertCircle, Users, Fingerprint, Mail, Phone, ShieldCheck, Briefcase, UserCheck } from 'lucide-react';
-import { spellDateIndo , toTitleCase} from '../utils';
+import { 
+  Camera, 
+  Edit2, 
+  Trash2, 
+  Plus, 
+  Search, 
+  Loader2, 
+  CheckCircle2, 
+  AlertCircle, 
+  Users, 
+  Fingerprint, 
+  Mail, 
+  Phone, 
+  ShieldCheck,  
+  UserCheck 
+} from 'lucide-react';import { spellDateIndo , toTitleCase} from '../utils';
 import SignatureCanvas from 'react-signature-canvas';
 
 export const Identities: React.FC = () => {
