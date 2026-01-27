@@ -226,6 +226,7 @@ export const TemplatesPage: React.FC = () => {
         result[`${prefix}_Telp`] = p.telepon || "";
         result[`${prefix}_NPWP`] = p.npwp || "";
         result[`${prefix}_Email`] = p.email || "";
+        result[`${prefix}_Berlaku`] = p.ejaan_ktp_berlaku || "";
       };
 
       mapPerson("P1_1", p1[0]); mapPerson("P1_2", p1[1]); mapPerson("P1_3", p1[2]);
