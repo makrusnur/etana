@@ -18,7 +18,8 @@ import {
   Phone, 
   ShieldCheck,  
   UserCheck 
-} from 'lucide-react';import { spellDateIndo , toTitleCase} from '../utils';
+} from 'lucide-react';
+import { spellDateIndo , toTitleCase} from '../utils';
 import SignatureCanvas from 'react-signature-canvas';
 
 export const Identities: React.FC = () => {
