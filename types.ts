@@ -16,8 +16,10 @@ export interface Identity {
   alamat: string;
   rt: string;
   rw: string;
+  wilayah_type?: string;
   desa: string;
   kecamatan: string;
+  daerah_type?: string;
   kota_kabupaten: string;
   provinsi: string;
   kode_pos?: string;

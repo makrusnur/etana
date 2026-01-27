@@ -34,8 +34,10 @@ export const Identities: React.FC = () => {
     alamat: '', 
     rt: '', 
     rw: '', 
+    wilayah_type: '',
     desa: '', 
     kecamatan: '',
+    daerah_type: '',
     kota_kabupaten: '', 
     provinsi: '', 
     kode_pos: '',
@@ -361,20 +363,91 @@ export const Identities: React.FC = () => {
             </Card>
 
             <Card title="ALAMAT & DOMISILI">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                    <Input label="Alamat" className="md:col-span-2" value={form.alamat} onChange={e => setForm({...form, alamat: e.target.value})} />
-                    <div className="grid grid-cols-2 gap-4">
-                        <Input label="RT" value={form.rt} onChange={e => setForm({...form, rt: e.target.value})} />
-                        <Input label="RW" value={form.rw} onChange={e => setForm({...form, rw: e.target.value})} />
-                    </div>
-                    <Input label="Desa/Kel" value={form.desa} onChange={e => setForm({...form, desa: e.target.value})} />
-                    <Input label="Kecamatan" value={form.kecamatan} onChange={e => setForm({...form, kecamatan: e.target.value})} />
-                    <Input label="Kota/Kab" value={form.kota_kabupaten} onChange={e => setForm({...form, kota_kabupaten: e.target.value})} />
-                    <div className="grid grid-cols-2 gap-4">
-                        <Input label="Provinsi" value={form.provinsi} onChange={e => setForm({...form, provinsi: e.target.value})} />
-                        <Input label="Kode Pos" value={form.kode_pos} maxLength={5} onChange={e => setForm({...form, kode_pos: e.target.value.replace(/\D/g,'')})} />
-                    </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                {/* Alamat Full Width */}
+                <Input 
+                  label="Alamat / Jalan" 
+                  className="md:col-span-2" 
+                  placeholder="Nama Jalan, No. Rumah, Blok..."
+                  value={form.alamat} 
+                  onChange={e => setForm({...form, alamat: e.target.value})} 
+                />
+
+                {/* RT/RW Row */}
+                <div className="grid grid-cols-2 gap-4">
+                  <Input label="RT" placeholder="000" value={form.rt} onChange={e => setForm({...form, rt: e.target.value})} />
+                  <Input label="RW" placeholder="000" value={form.rw} onChange={e => setForm({...form, rw: e.target.value})} />
                 </div>
+
+                {/* Desa atau Kelurahan Selection */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-4 mb-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tingkat Wilayah</label>
+                    <div className="flex gap-3">
+                      {['Desa', 'Kelurahan'].map((opt) => (
+                        <label key={opt} className="flex items-center gap-1.5 cursor-pointer group">
+                          <input 
+                            type="radio" 
+                            name="wilayah_type" 
+                            className="w-3 h-3 accent-slate-900"
+                            checked={form.wilayah_type === opt}
+                            onChange={() => setForm({...form, wilayah_type: opt})} 
+                          />
+                          <span className="text-[11px] font-bold text-slate-600 group-hover:text-slate-900 transition-colors">{opt}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <Input 
+                    label={`Nama ${form.wilayah_type || 'Desa/Kel'}`}
+                    placeholder="Masukkan nama..."
+                    value={form.desa} 
+                    onChange={e => setForm({...form, desa: e.target.value})} 
+                  />
+                </div>
+
+                {/* Kecamatan */}
+                <Input label="Kecamatan" placeholder="Nama Kecamatan..." value={form.kecamatan} onChange={e => setForm({...form, kecamatan: e.target.value})} />
+
+                {/* Kabupaten atau Kota Selection */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-4 mb-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Daerah</label>
+                    <div className="flex gap-3">
+                      {['Kabupaten', 'Kota'].map((opt) => (
+                        <label key={opt} className="flex items-center gap-1.5 cursor-pointer group">
+                          <input 
+                            type="radio" 
+                            name="daerah_type" 
+                            className="w-3 h-3 accent-slate-900"
+                            checked={form.daerah_type === opt}
+                            onChange={() => setForm({...form, daerah_type: opt})} 
+                          />
+                          <span className="text-[11px] font-bold text-slate-600 group-hover:text-slate-900 transition-colors">{opt}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <Input 
+                    label={`Nama ${form.daerah_type || 'Kab/Kota'}`} 
+                    placeholder="Masukkan nama..."
+                    value={form.kota_kabupaten} 
+                    onChange={e => setForm({...form, kota_kabupaten: e.target.value})} 
+                  />
+                </div>
+
+                {/* Provinsi & Kode Pos Row */}
+                <div className="grid grid-cols-2 gap-4">
+                  <Input label="Provinsi" placeholder="Jawa Timur" value={form.provinsi} onChange={e => setForm({...form, provinsi: e.target.value})} />
+                  <Input 
+                    label="Kode Pos" 
+                    placeholder="671xx"
+                    value={form.kode_pos} 
+                    maxLength={5} 
+                    onChange={e => setForm({...form, kode_pos: e.target.value.replace(/\D/g,'')})} 
+                  />
+                </div>
+              </div>
             </Card>
             
             <Card title="DOKUMEN PENDUKUNG">
