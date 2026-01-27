@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { LandData, LandType, LandHistory, BuildingDetail } from '../types';
 import { Button, Input, Card, DateInput, Select } from '../components/UI';
-import { Edit2, Trash2, Plus, Search, MapPin, FileStack, Info, AlignLeft, Layers, Maximize, Crosshair, Coins,  Receipt, TrendingUp, Landmark, X, CheckCircle, Home } from 'lucide-react';
+import { Edit2, Trash2, Plus, Search, MapPin, FileStack,  AlignLeft, Layers, Maximize, Crosshair,   Receipt,  X, CheckCircle, Home } from 'lucide-react';
 import { generateId, terbilang, spellDateIndo, generateUUID} from '../utils';
 import LandMap from '../components/LandMap';
 import { useSearchParams } from 'react-router-dom';
@@ -25,12 +25,14 @@ export const LandDataPage: React.FC = () => {
     id: '', 
     nop: '', 
     atas_nama_nop: '', 
+    jenis_kades: '',
     nama_kepala_desa: '', 
     penggunaan_tanah: '', 
     alamat: '', 
     rt: '', 
     rw: '', 
-    desa: '', 
+    desa: '',
+    tipe_wilayah: '',
     kecamatan: '', 
     kabupaten_kota: 'Pasuruan', 
     kewajiban_pajak: '', 
@@ -378,213 +380,204 @@ const removeSuratHak = (index: number) => {
           {/* KOLOM KIRI (LEBAR) */}
           <div className="lg:col-span-2 space-y-6">
             <Card title="1. Informasi Pajak (SPPT) & Lokasi">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                <Input label="Nomor Objek Pajak (NOP)" value={form.nop} onChange={e => setForm({ ...form, nop: e.target.value })} />
-                <Input label="Atas Nama Sesuai NOP" value={form.atas_nama_nop} onChange={e => setForm({ ...form, atas_nama_nop: e.target.value })} />
-                <Input label="Penggunaan Tanah" placeholder="Pekarangan / Sawah" value={form.penggunaan_tanah} onChange={e => setForm({ ...form, penggunaan_tanah: e.target.value })} />
-                <Input label="Kepala Desa / Lurah Saat Ini" value={form.nama_kepala_desa} onChange={e => setForm({ ...form, nama_kepala_desa: e.target.value })} />
-                <Input label="Alamat / Letak Tanah" className="col-span-2" value={form.alamat} onChange={e => setForm({ ...form, alamat: e.target.value })} />
-                <div className="grid grid-cols-2 gap-4">
-                  <Input label="RT" value={form.rt} onChange={e => setForm({ ...form, rt: e.target.value })} />
-                  <Input label="RW" value={form.rw} onChange={e => setForm({ ...form, rw: e.target.value })} />
-                </div>
-                <Input label="Desa/Kelurahan" value={form.desa} onChange={e => setForm({ ...form, desa: e.target.value })} />
-                <Input label="Kecamatan" value={form.kecamatan} onChange={e => setForm({ ...form, kecamatan: e.target.value })} />
-                <Input label="Kota / Kabupaten" value={form.kabupaten_kota} readOnly />
-                <Input label="Kewajiban Pajak" placeholder="...." value={form.kewajiban_pajak} onChange={e => setForm({ ...form, kewajiban_pajak: e.target.value })} />
-                </div>
-                <div className="mt-8 space-y-4">
-                  <div className="flex justify-between items-center border-b pb-2">
-                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-tighter">
-                      Riwayat Surat Hak Sebelumnya (Dinamis)
-                    </h3>
+              <div className="space-y-10">
+                
+                {/* BAGIAN A: IDENTITAS & PEMIMPIN */}
+                <section>
+                  <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                    <span className="w-8 h-[1px] bg-slate-200"></span> Identitas Objek & Pimpinan
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                    <Input label="Nomor Objek Pajak (NOP)" placeholder="00.00.000..." value={form.nop} onChange={e => setForm({ ...form, nop: e.target.value })} />
+                    <Input label="Atas Nama Sesuai NOP" placeholder="Nama Pemilik" value={form.atas_nama_nop} onChange={e => setForm({ ...form, atas_nama_nop: e.target.value })} />
+                    <Input label="Penggunaan Tanah" placeholder="Pekarangan / Sawah" value={form.penggunaan_tanah} onChange={e => setForm({ ...form, penggunaan_tanah: e.target.value })} />
+
+                    {/* JABATAN PIMPINAN - Lurus & Safe Type */}
+                    <div className="flex flex-col">
+                      <div className="flex items-center justify-between h-[18px] mb-1.5 px-1">
+                        <label className="text-[12px] font-semibold text-slate-700">Jabatan Pimpinan</label>
+                        <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                          {(["Kepala Desa", "Lurah"] as const).map((opt) => (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => setForm({ ...form, jenis_kades: opt as "Kepala Desa" | "Lurah" })}
+                              className={`px-3 py-0.5 text-[9px] font-black uppercase rounded-md transition-all ${
+                                form.jenis_kades === opt ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                              }`}
+                            >
+                              {opt}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <Input 
+                        placeholder={`Nama ${form.jenis_kades || 'Pimpinan'} Saat Ini`}
+                        value={form.nama_kepala_desa} 
+                        onChange={e => setForm({ ...form, nama_kepala_desa: e.target.value })} 
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                {/* BAGIAN B: LOKASI & WILAYAH */}
+                <section className="bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100">
+                  <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                    <span className="w-8 h-[1px] bg-slate-200"></span> Lokasi Geografis
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                    <div className="md:col-span-2">
+                      <Input label="Alamat / Letak Tanah" placeholder="Jl. Nama Jalan, No. Rumah" value={form.alamat} onChange={e => setForm({ ...form, alamat: e.target.value })} />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <Input label="RT" placeholder="000" value={form.rt} onChange={e => setForm({ ...form, rt: e.target.value })} />
+                      <Input label="RW" placeholder="000" value={form.rw} onChange={e => setForm({ ...form, rw: e.target.value })} />
+                    </div>
+
+                    {/* TIPE WILAYAH - Lurus & Safe Type */}
+                    <div className="flex flex-col">
+                      <div className="flex items-center justify-between h-[18px] mb-1.5 px-1">
+                        <label className="text-[12px] font-semibold text-slate-700">Tipe Wilayah</label>
+                        <div className="flex bg-slate-200/50 p-0.5 rounded-lg border border-slate-200">
+                          {(["Desa", "Kelurahan"] as const).map((opt) => (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => setForm({ ...form, tipe_wilayah: opt as "Desa" | "Kelurahan" })}
+                              className={`px-3 py-0.5 text-[9px] font-black uppercase rounded-md transition-all ${
+                                form.tipe_wilayah === opt ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                              }`}
+                            >
+                              {opt}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <Input 
+                        placeholder={`Nama ${form.tipe_wilayah || "Desa/Kelurahan"}`}
+                        value={form.desa} 
+                        onChange={e => setForm({ ...form, desa: e.target.value })} 
+                      />
+                    </div>
+
+                    <Input label="Kecamatan" placeholder="Kecamatan" value={form.kecamatan} onChange={e => setForm({ ...form, kecamatan: e.target.value })} />
+                    <Input label="Kota / Kabupaten" value={form.kabupaten_kota} readOnly className="bg-slate-100/50" />
+                  </div>
+                </section>
+
+                {/* BAGIAN C: RIWAYAT SURAT HAK */}
+                <section className="space-y-4">
+                  <div className="flex justify-between items-end border-b border-slate-100 pb-2 px-1">
+                    <div>
+                      <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-[0.2em]">Riwayat Surat Hak</h3>
+                      <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">Daftar kronologi kepemilikan sebelumnya</p>
+                    </div>
                     <button 
                       type="button"
                       onClick={addSuratHak}
-                      className="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white px-4 py-2 rounded-xl text-[10px] font-bold transition-all shadow-sm border border-blue-100"
+                      className="bg-white text-blue-600 hover:bg-blue-600 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black transition-all shadow-sm border border-blue-100"
                     >
-                      + TAMBAH RIWAYAT SURAT
+                      + TAMBAH DATA
                     </button>
                   </div>
 
-                  <div className="grid gap-4">
-                    {form.surat_hak_sebelumnya && form.surat_hak_sebelumnya.map((item, index) => (
-                      <div key={index} className="group relative grid grid-cols-1 md:grid-cols-4 gap-4 p-6 bg-slate-50/50 rounded-[24px] border border-slate-200 transition-all hover:bg-white hover:shadow-md">
-                        <Input 
-                          label="Jenis" 
-                          placeholder="Contoh: Akta" 
-                          value={item.jenis} 
-                          onChange={(e) => updateSuratHak(index, 'jenis', e.target.value)} 
-                        />
-                        <Input 
-                          label="Tanggal" 
-                          type="date" 
-                          value={item.tanggal} 
-                          onChange={(e) => updateSuratHak(index, 'tanggal', e.target.value)} 
-                        />
-                        <Input 
-                          label="Nomor" 
-                          placeholder="No. Surat" 
-                          value={item.nomor} 
-                          onChange={(e) => updateSuratHak(index, 'nomor', e.target.value)} 
-                        />
+                  <div className="space-y-3">
+                    {form.surat_hak_sebelumnya?.map((item, index) => (
+                      <div key={index} className="group relative grid grid-cols-1 md:grid-cols-4 gap-4 p-5 bg-white rounded-3xl border border-slate-200 transition-all hover:shadow-xl hover:border-blue-200">
+                        <Input label="Jenis" placeholder="Akta/Sertifikat" value={item.jenis} onChange={(e) => updateSuratHak(index, 'jenis', e.target.value)} />
+                        <Input label="Tanggal" type="date" value={item.tanggal} onChange={(e) => updateSuratHak(index, 'tanggal', e.target.value)} />
+                        <Input label="Nomor" placeholder="No. Surat" value={item.nomor} onChange={(e) => updateSuratHak(index, 'nomor', e.target.value)} />
                         <div className="relative">
-                          <Input 
-                            label="Nama PPAT/Notaris" 
-                            placeholder="Nama Lengkap" 
-                            value={item.nama_ppat} 
-                            onChange={(e) => updateSuratHak(index, 'nama_ppat', e.target.value)} 
-                          />
-                          {/* Tombol Hapus Baris */}
+                          <Input label="PPAT/Notaris" placeholder="Nama Lengkap" value={item.nama_ppat} onChange={(e) => updateSuratHak(index, 'nama_ppat', e.target.value)} />
                           <button 
                             type="button"
                             onClick={() => removeSuratHak(index)}
-                            className="absolute -top-2 -right-2 bg-white text-red-500 shadow-sm border border-red-100 rounded-full p-1.5 hover:bg-red-500 hover:text-white transition-all opacity-0 group-hover:opacity-100"
+                            className="absolute -top-3 -right-3 bg-red-50 text-red-500 shadow-md border border-red-100 rounded-full p-1.5 hover:bg-red-500 hover:text-white transition-all opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100"
                           >
                             <X size={14} />
                           </button>
                         </div>
                       </div>
                     ))}
-                    
-                    {form.surat_hak_sebelumnya.length === 0 && (
-                      <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-[32px] bg-slate-50/30">
-                        <p className="text-xs text-slate-400 font-medium">Klik tombol tambah jika ada riwayat surat sebelumnya</p>
-                      </div>
-                    )}
                   </div>
-                </div>
+                </section>
 
-              {/* Rincian SPPT & NJOP */}
-              <div className="mt-10 p-1 bg-slate-100/50 rounded-[2.5rem] border border-slate-200">
-                <div className="bg-white rounded-[2.2rem] p-8 shadow-sm">
-                  <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100 shadow-sm">
-                        <Receipt size={22} />
+                {/* BAGIAN D: KEUANGAN (NJOP & TRANSAKSI) */}
+                <section className="pt-6 border-t border-slate-100">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 px-1">
+                        <Receipt size={16} className="text-blue-500" />
+                        <span className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-800">Perhitungan NJOP</span>
+                        <div className="ml-auto w-24">
+                          <Input label="Tahun" value={form.sppt_tahun} onChange={e => setForm({ ...form, sppt_tahun: e.target.value })} />
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-800">SPPT & Nilai NJOP</span>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Penetapan Nilai Objek Pajak</p>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="p-5 bg-blue-50/50 rounded-3xl border border-blue-100">
+                          <p className="text-[9px] font-black text-blue-400 uppercase mb-3">Objek Bumi</p>
+                          <div className="space-y-3">
+                            <Input label="Luas (M²)" type="number" value={form.pajak_bumi_luas} onChange={e => setForm({ ...form, pajak_bumi_luas: parseFloat(e.target.value) || 0 })} />
+                            <Input label="NJOP (Rp)" type="number" value={form.pajak_bumi_njop} onChange={e => setForm({ ...form, pajak_bumi_njop: parseFloat(e.target.value) || 0 })} />
+                          </div>
+                        </div>
+                        <div className="p-5 bg-emerald-50/50 rounded-3xl border border-emerald-100">
+                          <p className="text-[9px] font-black text-emerald-400 uppercase mb-3">Objek Bangunan</p>
+                          <div className="space-y-3">
+                            <Input label="Luas (M²)" type="number" value={form.pajak_bangunan_luas} onChange={e => setForm({ ...form, pajak_bangunan_luas: parseFloat(e.target.value) || 0 })} />
+                            <Input label="NJOP (Rp)" type="number" value={form.pajak_bangunan_njop} onChange={e => setForm({ ...form, pajak_bangunan_njop: parseFloat(e.target.value) || 0 })} />
+                          </div>
+                        </div>
                       </div>
+                      
+                      {/* Tombol Detail Bangunan Kembali Hadir */}
+                      <Button 
+                        variant="outline" 
+                        className="w-full border-slate-200 text-slate-600 hover:bg-slate-50 font-bold text-[10px] h-12 rounded-2xl border-dashed"
+                        onClick={() => setShowBuildingModal(true)}
+                      >
+                        <Home size={14} className="mr-2" /> DETAIL RINCIAN BANGUNAN
+                      </Button>
                     </div>
-                    <div className="w-32">
-                      <Input label="Tahun Pajak" value={form.sppt_tahun} onChange={e => setForm({ ...form, sppt_tahun: e.target.value })} />
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 flex flex-col group hover:border-blue-200 transition-all">
-                      <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-200/50">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Objek Bumi</span>
-                        </div>
-                        <TrendingUp size={16} className="text-blue-400 opacity-40 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <Input label="Luas (M²)" type="number" value={form.pajak_bumi_luas} onChange={e => setForm({ ...form, pajak_bumi_luas: parseFloat(e.target.value) || 0 })} />
-                          <Input label="NJOP/M² (Rp)" type="number" value={form.pajak_bumi_njop} onChange={e => setForm({ ...form, pajak_bumi_njop: parseFloat(e.target.value) || 0 })} />
-                        </div>
-                        <div className="bg-white p-4 rounded-2xl border border-slate-200/50 shadow-inner">
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total NJOP Bumi</p>
-                          <div className="text-xl font-black text-slate-900 tracking-tight">Rp {(form.pajak_bumi_total || 0).toLocaleString('id-ID')}</div>
+                    <div className="flex flex-col gap-4">
+                      <div className="flex-1 bg-slate-900 rounded-[2.5rem] p-8 text-white flex flex-col justify-center">
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-2">Grand Total NJOP</p>
+                        <div className="text-4xl font-black tracking-tighter mb-4">
+                          Rp {(form.pajak_grand_total || 0).toLocaleString('id-ID')}
                         </div>
                       </div>
-                    </div>
 
-                    <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 flex flex-col group hover:border-emerald-200 transition-all">
-                      <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-200/50">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Objek Bangunan</span>
+                      <div className="flex-1 bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-sm flex flex-col justify-center">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4 text-center">Nilai Transaksi Riil</p>
+                        <div className="relative">
+                          <span className="absolute left-0 top-1/2 -translate-y-1/2 text-2xl font-black text-slate-300">Rp</span>
+                          <input
+                            type="number"
+                            className="w-full border-none p-0 pl-10 text-4xl font-black text-slate-900 outline-none placeholder-slate-200"
+                            placeholder="0"
+                            value={form.harga_transaksi || ''}
+                            onChange={e => {
+                              const v = parseFloat(e.target.value) || 0;
+                              // @ts-ignore (Mengabaikan jika fungsi terbilang belum ada di file ini)
+                              const text = typeof terbilang === 'function' ? terbilang(v) + " rupiah" : "";
+                              setForm({ ...form, harga_transaksi: v, ejaan_harga_transaksi: text });
+                            }}
+                          />
                         </div>
-                        <TrendingUp size={16} className="text-emerald-400 opacity-40 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <Input label="Luas (M²)" type="number" value={form.pajak_bangunan_luas} onChange={e => setForm({ ...form, pajak_bangunan_luas: parseFloat(e.target.value) || 0 })} />
-                          <Input label="NJOP/M² (Rp)" type="number" value={form.pajak_bangunan_njop} onChange={e => setForm({ ...form, pajak_bangunan_njop: parseFloat(e.target.value) || 0 })} />
-                        </div>
-                        
-                        <div className="bg-white p-4 rounded-2xl border border-slate-200/50 shadow-inner">
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total NJOP Bangunan</p>
-                          <div className="text-xl font-black text-slate-900 tracking-tight">Rp {(form.pajak_bangunan_total || 0).toLocaleString('id-ID')}</div>
-                        </div>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="w-full border-blue-200 text-blue-600 bg-blue-50/50 hover:bg-blue-100 font-black tracking-widest uppercase text-[10px] h-11 rounded-xl"
-                          onClick={() => setShowBuildingModal(true)}
-                        >
-                          <Home size={14} className="mr-2" /> 
-                          {form.detail_bangunan && form.detail_bangunan.length > 0 
-                            ? `Kelola ${form.detail_bangunan.length} Detail Bangunan` 
-                            : 'Masukkan Detail Bangunan'}
-                        </Button>
+                        {form.ejaan_harga_transaksi && (
+                          <p className="mt-4 text-[10px] font-bold text-blue-600 italic border-t border-blue-50 pt-4 leading-relaxed">
+                            "{form.ejaan_harga_transaksi}"
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
-
-                  <div className="mt-8 bg-slate-900 rounded-[2rem] p-8 text-white relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-10 opacity-5 scale-150 rotate-12 transition-transform group-hover:scale-125 duration-700">
-                      <Landmark size={120} />
-                    </div>
-                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-2">Akumulasi Total NJOP</p>
-                        <h4 className="text-4xl font-black tracking-tighter">Rp {(form.pajak_grand_total || 0).toLocaleString('id-ID')}</h4>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">Status Pajak Terdaftar</p>
-                        <div className="px-5 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-emerald-400 inline-block backdrop-blur-md">
-                          Sudah Tervalidasi Sistem
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Harga Transaksi */}
-                <div className="mt-6 bg-white rounded-[2.2rem] p-8 shadow-sm border border-slate-200/50 relative overflow-hidden group">
-                  <div className="relative z-10">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 shadow-sm">
-                        <Coins size={22} />
-                      </div>
-                      <div>
-                        <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-800">Nilai Transaksi Riil</span>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Nilai perolehan akta</p>
-                      </div>
-                    </div>
-                    <div className="relative">
-                      <div className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-slate-300 text-3xl select-none">Rp</div>
-                      <input
-                        type="number"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] p-8 pl-20 text-5xl font-black text-slate-900 outline-none focus:bg-white focus:ring-8 focus:ring-blue-500/5 focus:border-blue-500 transition-all shadow-inner"
-                        placeholder="0"
-                        value={form.harga_transaksi || ''}
-                        onChange={e => {
-                          const v = parseFloat(e.target.value) || 0;
-                          setForm({ ...form, harga_transaksi: v, ejaan_harga_transaksi: terbilang(v) + " rupiah" });
-                        }}
-                      />
-                    </div>
-                    {form.ejaan_harga_transaksi && (
-                      <div className="mt-6 p-5 bg-blue-50/30 rounded-2xl border border-blue-100/50 flex items-start gap-4">
-                        <Info size={16} className="text-blue-500 mt-0.5" />
-                        <div>
-                          <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">Terbilang</p>
-                          <div className="text-xs font-bold text-blue-700 italic">({form.ejaan_harga_transaksi})</div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                </section>
               </div>
             </Card>
-
             <Card title="2. Jenis Dasar Hak / Alas Hak">
               <div className="flex items-center gap-4 mb-4 p-4 bg-blue-50/50 border border-blue-100 rounded-xl">
                 <FileStack className="text-blue-600" size={24} />

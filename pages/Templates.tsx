@@ -213,8 +213,10 @@ export const TemplatesPage: React.FC = () => {
         result[`${prefix}_Alamat`] = p.alamat || "";
         result[`${prefix}_RT`] = p.rt || "";
         result[`${prefix}_RW`] = p.rw || "";
+        result[`${prefix}_Des/Kel`] = p.daerah_type || "";
         result[`${prefix}_Desa`] = p.desa || "";
         result[`${prefix}_Kec`] = p.kecamatan || "";
+        result[`${prefix}_Kec`] = p.wilayah_type || "";
         result[`${prefix}_Kota`] = p.kota_kabupaten || "";
         result[`${prefix}_Prov`] = p.provinsi || "";
         result[`${prefix}_Pekerjaan`] = p.pekerjaan || "";

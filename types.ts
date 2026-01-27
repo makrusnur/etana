@@ -36,10 +36,8 @@ export interface Identity {
   ttd_digital?: string;
   sidik_jari?: string;
   created_at: string;
-  nib_badan?: string;
   telepon?: string;
-  npwp?: string;
-  npwp_badan?: string; 
+  npwp?: string; 
   email?: string;
 }
 
@@ -87,11 +85,13 @@ export interface LandData {
   id: string;
   nop: string;
   atas_nama_nop: string;
+  jenis_kades: 'Kepala Desa' | 'Lurah' | '';
   nama_kepala_desa?: string;
   penggunaan_tanah?: string;
   alamat: string;
   rt: string;
   rw: string;
+  tipe_wilayah: 'Desa' | 'Kelurahan' | '';
   desa: string;
   kecamatan: string;
   kabupaten_kota: string;
@@ -183,6 +183,7 @@ export interface FileRecord {
   register_waris_kecamatan?: string;
   tanggal_waris?: string;
   ejaan_tanggal_waris: string;
+
 
   latitude?: number;  // Tambahkan ini
   longitude?: number; // Tambahkan ini

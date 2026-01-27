@@ -54,8 +54,6 @@ export const Identities: React.FC = () => {
     nama_bapak_kandung: '',
     nama_ibuk_kandung: '',
     pendidikan_terakhir: '',
-    nib_badan: '',
-    npwp_badan: '',
     telepon: '',
     npwp: '',
     email: ''
@@ -471,8 +469,6 @@ export const Identities: React.FC = () => {
                     <Input label="Nomor Telepon / WA" value={form.telepon} onChange={e => setForm({...form, telepon: e.target.value})} />
                     <Input label="Alamat Email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
                     <Input label="NPWP Pribadi" value={form.npwp} onChange={e => setForm({...form, npwp: e.target.value})} />
-                    <Input label="NPWP Badan Usaha" placeholder="Jika ada" value={form.npwp_badan} onChange={e => setForm({...form, npwp_badan: e.target.value})} />
-                    <Input label="NIB (Badan Usaha)" placeholder="Jika ada" value={form.nib_badan} onChange={e => setForm({...form, nib_badan: e.target.value})} />
                 </div>
             </Card>
 
@@ -615,7 +611,6 @@ export const Identities: React.FC = () => {
                        {item.telepon && <span title={item.telepon}><Phone size={14} className="text-emerald-500" /></span>}
                        {item.email && <span title={item.email}><Mail size={14} className="text-blue-500" /></span>}
                        {item.npwp && <span title="NPWP Tersedia"><ShieldCheck size={14} className="text-amber-500" /></span>}
-                       {item.nib_badan && <span title="NIB Badan Tersedia"><Briefcase size={14} className="text-purple-500" /></span>}
                     </div>
                   </td>
                   <td className="p-6 text-right">
