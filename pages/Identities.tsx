@@ -138,7 +138,7 @@ export const Identities: React.FC = () => {
   if (e.target.files && e.target.files[0]) {
     const file = e.target.files[0];
     if (file.size > 5 * 1024 * 1024) {
-      alert("Ukuran foto terlalu besar. Silakan gunakan foto yang lebih kecil (maksimal 5MB).");
+      alert("Ukuran foto terlalu besar (maksimal 5MB).");
       return;
     }
 
@@ -147,12 +147,14 @@ export const Identities: React.FC = () => {
 
     try {
       const result = await processOCR(file);
-      if (!result || typeof result !== 'object') throw new Error("Format data OCR tidak valid.");
+      if (!result || typeof result !== 'object') throw new Error("Format data tidak valid.");
+
+      // Deteksi apakah AI membaca teks "HIDUP"
+      const isLifeTime = result.ktp_berlaku?.toUpperCase().includes('HIDUP');
 
       setForm((prev) => ({ 
         ...prev, 
         ...result, 
-        // Field teks standar (Title Case)
         nama: toTitleCase(result.nama || prev.nama),
         tempat_lahir: toTitleCase(result.tempat_lahir || prev.tempat_lahir),
         pekerjaan: toTitleCase(result.pekerjaan || prev.pekerjaan),
@@ -162,16 +164,15 @@ export const Identities: React.FC = () => {
         kota_kabupaten: toTitleCase(result.kota_kabupaten || prev.kota_kabupaten),
         provinsi: toTitleCase(result.provinsi || prev.provinsi),
         
-        // --- TAMBAHAN FIELD BARU ---
-        jenis_kelamin: result.jenis_kelamin || prev.jenis_kelamin,
-        status_perkawinan: result.status_perkawinan || prev.status_perkawinan,
-        kewarganegaraan: result.kewarganegaraan || prev.kewarganegaraan,
-        // ---------------------------
-
-        is_seumur_hidup: result.ktp_berlaku?.toUpperCase() === 'SEUMUR HIDUP' 
+        // Logika Krusial:
+        is_seumur_hidup: isLifeTime,
+        // Jika seumur hidup, kita set kosong di form agar tidak bentrok
+        ktp_berlaku: isLifeTime ? '' : (result.ktp_berlaku || ''),
+        ejaan_tanggal_ktp_berlaku: isLifeTime ? 'SEUMUR HIDUP' : (result.ejaan_tanggal_ktp_berlaku || '')
       }));
     } catch (err: any) {
-      alert("AI gagal membaca data. Pastikan foto KTP jelas.");
+      const msg = err?.message?.includes('503') ? "Server AI Sibuk, coba 10 detik lagi." : "Gagal scan KTP.";
+        alert(msg);
     } finally {
       setIsProcessing(false);
       e.target.value = '';
@@ -204,35 +205,50 @@ export const Identities: React.FC = () => {
     setForm(prev => ({ ...prev, ttd_digital: '' }));
   };
 
-  const handleSave = async () => {
-    if (!form.nama || !form.nik) return alert('Nama dan NIK wajib diisi');
-    const payload = { 
-      ...form, 
-      nama: toTitleCase(form.nama),
-      nama_bapak_kandung: toTitleCase(form.nama_bapak_kandung || ''),
-      nama_ibuk_kandung: toTitleCase(form.nama_ibuk_kandung || ''),
-      pekerjaan: toTitleCase(form.pekerjaan),
-      desa: toTitleCase(form.desa),
-      kecamatan: toTitleCase(form.kecamatan),
-      alamat: toTitleCase(form.alamat),
-      ejaan_tanggal_lahir: toTitleCase(form.ejaan_tanggal_lahir || spellDateIndo(form.tanggal_lahir)),
-      created_at: form.created_at || new Date().toISOString() 
-    };
-    try {
-      if (editingId) await db.identities.update(editingId, payload);
-      else await db.identities.add(payload);
-      setView('list'); setEditingId(null); setForm(emptyForm);
-    } catch (err: any) {
-      alert(err?.message || "Terjadi kesalahan saat menyimpan data.");
-    }
+ const handleSave = async () => {
+  if (!form.nama || !form.nik) return alert('Nama dan NIK wajib diisi');
+
+  // 1. KITA PISAHKAN id dari data lainnya agar tidak ikut terkirim ke database
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { id, ...dataTanpaId } = form; 
+
+  const payload: any = { 
+    ...dataTanpaId, // Pakai data yang sudah bersih dari properti 'id'
+    nama: toTitleCase(form.nama),
+    // Kirim null untuk kolom DATE jika seumur hidup
+    ktp_berlaku: form.is_seumur_hidup ? null : (form.ktp_berlaku || null),
+    ejaan_tanggal_lahir: toTitleCase(form.ejaan_tanggal_lahir || (form.tanggal_lahir ? spellDateIndo(form.tanggal_lahir) : '')),
+    created_at: form.created_at || new Date().toISOString() 
   };
+
+  try {
+    if (editingId) {
+      // Saat EDIT, kita butuh editingId untuk tahu baris mana yang diupdate
+      await db.identities.update(editingId, payload);
+    } else {
+      // Saat TAMBAH BARU, pastikan payload tidak punya properti 'id' sama sekali
+      // supaya Supabase otomatis men-generate UUID-nya.
+      await db.identities.add(payload);
+    }
+    
+    alert("Berhasil disimpan!");
+    setView('list'); 
+    setEditingId(null); 
+    setForm(emptyForm);
+  } catch (err: any) {
+    console.error("Save Error:", err);
+    alert(err?.message || "Terjadi kesalahan saat menyimpan.");
+  }
+};
 
   const toggleSeumurHidup = (checked: boolean) => {
     setForm(prev => ({
       ...prev,
       is_seumur_hidup: checked,
-      ktp_berlaku: checked ? 'Seumur Hidup' : '',
-      ejaan_tanggal_ktp_berlaku: checked ? 'Seumur Hidup' : ''
+      // Jangan isi 'Seumur Hidup' ke sini karena ini kolom DATE
+      // Biarkan kosong, nanti di handleSave kita ubah jadi null
+      ktp_berlaku: checked ? '' : '', 
+      ejaan_tanggal_ktp_berlaku: checked ? 'SEUMUR HIDUP' : ''
     }));
   };
 
@@ -465,19 +481,32 @@ export const Identities: React.FC = () => {
             
             <Card title="DOKUMEN PENDUKUNG">
                 <div className="flex justify-between items-center mb-6 px-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Masa Berlaku KTP</label>
-                    <label className="flex items-center gap-2 text-[10px] font-black text-blue-600 uppercase tracking-widest cursor-pointer group">
-                        <input type="checkbox" className="w-4 h-4 rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500/20" checked={form.is_seumur_hidup} onChange={e => toggleSeumurHidup(e.target.checked)} /> Set Seumur Hidup
-                    </label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    Masa Berlaku KTP
+                  </label>
+                  <label className="flex items-center gap-2 text-[10px] font-black text-blue-600 uppercase tracking-widest cursor-pointer group">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500/20" 
+                      checked={form.is_seumur_hidup} 
+                      onChange={e => toggleSeumurHidup(e.target.checked)} 
+                    /> 
+                    Set Seumur Hidup
+                  </label>
                 </div>
+                
                 {!form.is_seumur_hidup ? (
-                    <DateInput value={form.ktp_berlaku} onChange={val => setForm({...form, ktp_berlaku: val})} />
+                  <DateInput 
+                    value={form.ktp_berlaku} 
+                    onChange={val => setForm({...form, ktp_berlaku: val})} 
+                  />
                 ) : (
-                    <div className="h-14 px-6 flex items-center bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-2xl text-xs font-black uppercase tracking-widest shadow-inner">
-                        <CheckCircle2 size={16} className="mr-3" /> SEUMUR HIDUP
-                    </div>
+                  <div className="h-14 px-6 flex items-center bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-2xl text-xs font-black uppercase tracking-widest shadow-inner animate-in fade-in duration-300">
+                    <CheckCircle2 size={16} className="mr-3 text-emerald-500" /> 
+                    SEUMUR HIDUP
+                  </div>
                 )}
-            </Card>
+              </Card>
 
             <Card title="KONTAK & LEGALITAS">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
