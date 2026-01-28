@@ -216,7 +216,7 @@ export const TemplatesPage: React.FC = () => {
         result[`${prefix}_Des/Kel`] = p.daerah_type || "";
         result[`${prefix}_Desa`] = p.desa || "";
         result[`${prefix}_Kec`] = p.kecamatan || "";
-        result[`${prefix}_Kec`] = p.wilayah_type || "";
+        result[`${prefix}_Kab/Kot`] = p.wilayah_type || "";
         result[`${prefix}_Kota`] = p.kota_kabupaten || "";
         result[`${prefix}_Prov`] = p.provinsi || "";
         result[`${prefix}_Pekerjaan`] = p.pekerjaan || "";
@@ -233,7 +233,14 @@ export const TemplatesPage: React.FC = () => {
 
       mapPerson("P1_1", p1[0]); mapPerson("P1_2", p1[1]); mapPerson("P1_3", p1[2]);
       mapPerson("P2_1", p2[0]); mapPerson("P2_2", p2[1]);
-      mapPerson("Saksi1", saksi[0]); mapPerson("Saksi2", saksi[1]); mapPerson("Saksi3", saksi[2]); mapPerson("Saksi4", saksi[3]);
+      mapPerson("Saksi1", saksi[0]); 
+      mapPerson("Saksi2", saksi[1]); 
+      mapPerson("Saksi3", saksi[2]); 
+      mapPerson("Saksi4", saksi[3]);
+      mapPerson("Saksi5", saksi[4]); 
+      mapPerson("Saksi6", saksi[5]); 
+      mapPerson("Saksi7", saksi[6]);
+      
       mapPerson("Setuju1", setuju[0],);
       mapPerson("Setuju2", setuju[1],);
       mapPerson("Setuju3", setuju[2],);
