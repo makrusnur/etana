@@ -234,7 +234,15 @@ export const TemplatesPage: React.FC = () => {
       mapPerson("P1_1", p1[0]); mapPerson("P1_2", p1[1]); mapPerson("P1_3", p1[2]);
       mapPerson("P2_1", p2[0]); mapPerson("P2_2", p2[1]);
       mapPerson("Saksi1", saksi[0]); mapPerson("Saksi2", saksi[1]); mapPerson("Saksi3", saksi[2]); mapPerson("Saksi4", saksi[3]);
-      mapPerson("Setuju1", setuju[0]);
+      mapPerson("Setuju1", setuju[0],);
+      mapPerson("Setuju2", setuju[1],);
+      mapPerson("Setuju3", setuju[2],);
+      mapPerson("Setuju4", setuju[3],);
+      mapPerson("Setuju5", setuju[4],);
+      mapPerson("Setuju6", setuju[5],);
+      mapPerson("Setuju7", setuju[6],);
+      mapPerson("Setuju8", setuju[7],);
+
 
       result._countP1 = p1.length;
       result._countP2 = p2.length;

@@ -49,7 +49,7 @@ export const DataLetterC = () => {
     desas: desas.filter(d => 
       d.kecamatan_id === kec.id && d.nama.toLowerCase().includes(searchTerm.toLowerCase())
     )
-  })).filter(kec => (kec.desas?.length ?? 0) > 0);
+  }))
 
   return (
     <div className="flex h-[calc(100vh-140px)] gap-8 p-4 bg-[#F8F9FA] text-zinc-900">
@@ -76,29 +76,52 @@ export const DataLetterC = () => {
           </div>
         </div>
 
+        {/* ... bagian pencarian ... */}
+
         <div className="flex-1 overflow-y-auto px-2 space-y-6">
-          {loading ? <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-zinc-300"/></div> : 
+          {loading ? (
+            <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-zinc-300"/></div>
+          ) : (
             filteredKecamatans.map(k => (
-              <div key={k.id}>
+              <div key={k.id} className="group">
                 <div className="flex items-center gap-3 mb-2 px-2">
-                  <div className="h-[1px] flex-1 bg-zinc-100"></div>
                   <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">{k.nama}</span>
                   <div className="h-[1px] flex-1 bg-zinc-100"></div>
+                  {/* TOMBOL TAMBAH DESA */}
+                  <button 
+                    onClick={async () => {
+                      const n = prompt(`Tambah Desa di Kec. ${k.nama}:`);
+                      if(n) { 
+                        await supabase.from('desa').insert([{ nama: n, kecamatan_id: k.id }]); 
+                        fetchData(); 
+                      }
+                    }}
+                    className="p-1.5 hover:bg-zinc-200 rounded-md text-zinc-400 hover:text-zinc-900 transition-all"
+                    title="Tambah Desa"
+                  >
+                    <Plus size={12}/>
+                  </button>
                 </div>
+
                 {k.desas?.map(d => (
                   <button 
                     key={d.id} 
                     onClick={() => { setSelectedDesaId(d.id); localStorage.setItem('last_selected_desa_id', d.id); }}
                     className={`w-full flex items-center justify-between px-5 py-3.5 rounded-2xl text-[13px] font-bold mb-1 transition-all ${
-                      selectedDesaId === d.id ? 'bg-zinc-900 text-white shadow-xl shadow-zinc-400/20' : 'text-zinc-600 hover:bg-white hover:shadow-sm'
+                      selectedDesaId === d.id 
+                        ? 'bg-zinc-900 text-white shadow-xl shadow-zinc-400/20' 
+                        : 'text-zinc-600 hover:bg-white hover:shadow-sm'
                     }`}
                   >
-                    <span className="flex items-center gap-3"><MapPin size={14} className="opacity-40"/> {d.nama}</span>
+                    <span className="flex items-center gap-3">
+                      <MapPin size={14} className={selectedDesaId === d.id ? "opacity-100" : "opacity-40"}/> 
+                      {d.nama}
+                    </span>
                   </button>
                 ))}
               </div>
             ))
-          }
+          )}
         </div>
       </div>
 

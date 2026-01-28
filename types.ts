@@ -221,6 +221,7 @@ export interface Relation {
   identitas_id: string;
   data_tanah_id?: string;
   peran: RelationRole;
+  persetujuan?: string;
 }
 
 export interface PbbRecord {
