@@ -494,33 +494,51 @@ export const Identities: React.FC = () => {
             </Card>
             
             <Card title="DOKUMEN PENDUKUNG">
-                <div className="flex justify-between items-center mb-6 px-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    Masa Berlaku KTP
-                  </label>
-                  <label className="flex items-center gap-2 text-[10px] font-black text-blue-600 uppercase tracking-widest cursor-pointer group">
-                    <input 
-                      type="checkbox" 
-                      className="w-4 h-4 rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500/20" 
-                      checked={form.is_seumur_hidup} 
-                      onChange={e => toggleSeumurHidup(e.target.checked)} 
-                    /> 
-                    Set Seumur Hidup
-                  </label>
-                </div>
-                
-                {!form.is_seumur_hidup ? (
+              <div className="flex justify-between items-center mb-6 px-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Masa Berlaku KTP
+                </label>
+                <label className="flex items-center gap-2 text-[10px] font-black text-blue-600 uppercase tracking-widest cursor-pointer group">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500/20" 
+                    checked={form.is_seumur_hidup} 
+                    onChange={e => toggleSeumurHidup(e.target.checked)} 
+                  /> 
+                  Set Seumur Hidup
+                </label>
+              </div>
+              
+              {!form.is_seumur_hidup ? (
+                <div className="space-y-3">
                   <DateInput 
                     value={form.ktp_berlaku} 
                     onChange={val => setForm({...form, ktp_berlaku: val})} 
                   />
-                ) : (
+                  {/* TAMPILKAN EJAAN DI SINI (SAAT INPUT TANGGAL) */}
+                  {form.ejaan_tanggal_ktp_berlaku && (
+                    <div className="px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl">
+                      <p className="text-[11px] font-black text-slate-500 leading-relaxed tracking-wider">
+                        {form.ejaan_tanggal_ktp_berlaku}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
                   <div className="h-14 px-6 flex items-center bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-2xl text-xs font-black uppercase tracking-widest shadow-inner animate-in fade-in duration-300">
                     <CheckCircle2 size={16} className="mr-3 text-emerald-500" /> 
                     SEUMUR HIDUP
                   </div>
-                )}
-              </Card>
+                  {/* TAMPILKAN EJAAN DI SINI (SAAT SEUMUR HIDUP) */}
+                  <div className="px-4 py-2 bg-emerald-100/30 border border-emerald-100/50 rounded-xl">
+                    <p className="text-[12px] text-blue-600 font-bold mt-1.5">
+                      {form.ejaan_tanggal_ktp_berlaku || 'SEUMUR HIDUP'}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </Card>
 
             <Card title="KONTAK & LEGALITAS">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
