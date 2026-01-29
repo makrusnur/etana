@@ -134,6 +134,8 @@ export const Identities: React.FC = () => {
     }
   };
 
+
+
   const handleOCR = async (e: React.ChangeEvent<HTMLInputElement>) => {
   if (e.target.files && e.target.files[0]) {
     const file = e.target.files[0];
@@ -157,13 +159,25 @@ export const Identities: React.FC = () => {
         ...result, 
         nama: toTitleCase(result.nama || prev.nama),
         tempat_lahir: toTitleCase(result.tempat_lahir || prev.tempat_lahir),
+        jenis_kelamin: /laki/i.test(result.jenis_kelamin || "") 
+          ? "Laki-laki" 
+          : /perempuan/i.test(result.jenis_kelamin || "") 
+            ? "Perempuan" 
+            : "",
         pekerjaan: toTitleCase(result.pekerjaan || prev.pekerjaan),
         alamat: toTitleCase(result.alamat || prev.alamat),
         desa: toTitleCase(result.desa || prev.desa),
         kecamatan: toTitleCase(result.kecamatan || prev.kecamatan),
-        kota_kabupaten: toTitleCase(result.kota_kabupaten || prev.kota_kabupaten),
-        provinsi: toTitleCase(result.provinsi || prev.provinsi),
-        
+        kota_kabupaten: toTitleCase(
+            (result.kota_kabupaten || "")
+              .replace(/KABUPATEN|KOTA|KAB/gi, "") // Hapus kata "KABUPATEN" atau "KOTA"
+              .trim()
+          ),
+        provinsi: toTitleCase(
+            (result.provinsi || "")
+              .replace(/PROVINSI|PROV/gi, "") // Hapus kata "PROVINSI"
+              .trim()
+          ),
         // Logika Krusial:
         is_seumur_hidup: isLifeTime,
         // Jika seumur hidup, kita set kosong di form agar tidak bentrok
@@ -450,6 +464,7 @@ export const Identities: React.FC = () => {
                             name="daerah_type" 
                             className="w-3 h-3 accent-slate-900"
                             checked={form.daerah_type === opt}
+                            // Pastikan saat pilih radio, input di bawah tidak berubah isinya
                             onChange={() => setForm({...form, daerah_type: opt})} 
                           />
                           <span className="text-[11px] font-bold text-slate-600 group-hover:text-slate-900 transition-colors">{opt}</span>
@@ -458,13 +473,12 @@ export const Identities: React.FC = () => {
                     </div>
                   </div>
                   <Input 
-                    label={`Nama ${form.daerah_type || 'Kab/Kota'}`} 
-                    placeholder="Masukkan nama..."
+                    label={`Nama ${form.daerah_type || 'Kab/Kota'}`}
+                    placeholder="Masukkan nama daerah saja (contoh: PASURUAN)..."
                     value={form.kota_kabupaten} 
                     onChange={e => setForm({...form, kota_kabupaten: e.target.value})} 
                   />
                 </div>
-
                 {/* Provinsi & Kode Pos Row */}
                 <div className="grid grid-cols-2 gap-4">
                   <Input label="Provinsi" placeholder="Jawa Timur" value={form.provinsi} onChange={e => setForm({...form, provinsi: e.target.value})} />

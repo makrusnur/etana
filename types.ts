@@ -173,6 +173,7 @@ export interface FileRecord {
   village_id?: string; // Menghubungkan ke PtslVillage (Untuk PTSL)
   nomor_berkas: string; // NUB
   nomor_register: string; 
+  tanggal_register: string;
   hari: string; 
   tanggal: string;
   keterangan: string;
@@ -184,10 +185,8 @@ export interface FileRecord {
   tanggal_waris?: string;
   ejaan_tanggal_waris: string;
 
-
   latitude?: number;  // Tambahkan ini
   longitude?: number; // Tambahkan ini
-
   // === TAMBAHAN BARU (UNTUK 12 POIN PTSL) ===
   kasun?: string;                               // Poin 3
   jenis_tanah?: string;                         // Poin 4
@@ -198,14 +197,12 @@ export interface FileRecord {
   tahun_penjual?: string;                       // Poin 8
   sebab_perolehan?: string;                     // Poin 9 (Jual beli, hibah, waris)
   bukti_perolehan?: string;                     // Poin 10 (Segel, akta, kwitansi)
-  
-  // Poin 11: Batas-batas
+    // Poin 11: Batas-batas
   batas_utara?: string;
   batas_timur?: string;
   batas_selatan?: string;
   batas_barat?: string;
-  
-  // Poin 12: Ceklis Kelengkapan (Boolean)
+    // Poin 12: Ceklis Kelengkapan (Boolean)
   cek_ktp?: boolean;
   cek_kk?: boolean;
   cek_sppt?: boolean;

@@ -107,6 +107,7 @@ export const TemplatesPage: React.FC = () => {
         // 1. BERKAS (FileRecord)
         No_Berkas: fileData.nomor_berkas,
         No_Register: fileData.nomor_register,
+        tgl_Register: fileData.tanggal_register,
         Hari_Berkas: fileData.hari,
         Tgl_Surat: formatDateIndo(fileData.tanggal),
         Tgl_Ejaan: spellDateIndo(fileData.tanggal),
@@ -125,6 +126,7 @@ export const TemplatesPage: React.FC = () => {
         T_Alamat: landObj?.alamat || "",
         T_RT: landObj?.rt || "",
         T_RW: landObj?.rw || "",
+        T_Des_Kel: landObj?.tipe_wilayah || "", 
         T_Desa: landObj?.desa || "",
         T_Kec: landObj?.kecamatan || "",
         T_Kota: landObj?.kabupaten_kota || "",
