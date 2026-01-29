@@ -196,7 +196,7 @@ export const TemplatesPage: React.FC = () => {
       }
 
       const mapPerson = (prefix: string, p: any) => {
-        const fields = ["Sebutan", "Nama", "NIK", "Lahir_Tempat", "Lahir_Tgl", "Lahir_Ejaan", "Agama", "Alamat", "RT", "RW", "Desa", "Kec", "Kota", "Prov", "Pekerjaan", "Umur", "Ibu", "Bapak", "Pendidikan", "KTP_Exp", "Kawin", "Darah", "Telp", "NPWP", "Email"];
+        const fields = ["Sebutan", "Nama", "NIK", "Lahir_Tempat", "Lahir_Tgl", "Lahir_Ejaan", "Agama", "Alamat", "RT", "RW", , "Des/Kel","Desa", "Kec", "Kab/Kot", "Kota", "Prov", "Pekerjaan", "Umur", "Ibu", "Bapak", "Pendidikan", "KTP_Exp", "Kawin", "Darah", "Telp", "NPWP", "Email", "Berlaku"];
         if (!p) {
           fields.forEach(f => result[`${prefix}_${f}`] = "");
           return;
@@ -231,8 +231,20 @@ export const TemplatesPage: React.FC = () => {
         result[`${prefix}_Berlaku`] = p.ejaan_ktp_berlaku || "";
       };
 
-      mapPerson("P1_1", p1[0]); mapPerson("P1_2", p1[1]); mapPerson("P1_3", p1[2]);
-      mapPerson("P2_1", p2[0]); mapPerson("P2_2", p2[1]);
+      mapPerson("P1_1", p1[0]);  
+      mapPerson("P1_2", p1[1]);
+      mapPerson("P1_3", p1[2]);
+      mapPerson("P1_4", p1[3]);  
+      mapPerson("P1_5", p1[4]);
+      mapPerson("P1_6", p1[5]);
+
+      mapPerson("P2_1", p2[0]);
+      mapPerson("P2_2", p2[1]);
+      mapPerson("P2_3", p2[2]);
+      mapPerson("P2_4", p2[3]);
+      mapPerson("P2_5", p2[4]);
+      mapPerson("P2_6", p2[5]);
+      
       mapPerson("Saksi1", saksi[0]); 
       mapPerson("Saksi2", saksi[1]); 
       mapPerson("Saksi3", saksi[2]); 
@@ -249,7 +261,6 @@ export const TemplatesPage: React.FC = () => {
       mapPerson("Setuju6", setuju[5],);
       mapPerson("Setuju7", setuju[6],);
       mapPerson("Setuju8", setuju[7],);
-
 
       result._countP1 = p1.length;
       result._countP2 = p2.length;
