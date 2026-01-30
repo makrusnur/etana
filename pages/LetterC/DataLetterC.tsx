@@ -48,6 +48,26 @@ export const DataLetterC = () => {
   useEffect(() => { fetchData(); }, []);
   useEffect(() => { fetchKohir(); }, [selectedDesaId]);
 
+  const handleDelete = async (id: string) => {
+  if (confirm("Apakah Anda yakin ingin menghapus data Kohir ini? Semua rincian persil juga akan ikut terhapus.")) {
+    try {
+      // 1. Hapus rincian persil dulu (karena foreign key)
+      await supabase.from('letter_c_persil').delete().eq('letter_c_id', id);
+      
+      // 2. Hapus data utama Letter C
+      const { error } = await supabase.from('letter_c').delete().eq('id', id);
+      
+      if (error) throw error;
+      
+      // 3. Refresh data
+      fetchKohir();
+      alert("Data berhasil dihapus");
+    } catch (err: any) {
+      alert("Gagal menghapus: " + err.message);
+      }
+    }
+  };
+
   const handleEdit = (kohir: LetterC) => {
     setSelectedKohir(kohir);
     setShowModal(true);
@@ -170,6 +190,12 @@ export const DataLetterC = () => {
                         )}
                         <button onClick={() => handleEdit(k)} className="p-3 text-zinc-400 hover:text-zinc-900 hover:bg-white rounded-xl border border-transparent hover:border-zinc-100 transition-all">
                           <Edit3 size={18}/>
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(k.id)} 
+                          className="p-3 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        >
+                          <Trash2 size={18}/>
                         </button>
                       </td>
                     </tr>
@@ -331,6 +357,7 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess }: FormTamba
     newRows[index] = { ...newRows[index], [field]: value };
     setRows(newRows);
   };
+
 
   return (
     <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-md z-[100] flex items-end lg:items-center justify-center p-0 lg:p-6 text-zinc-900">

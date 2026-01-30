@@ -279,6 +279,7 @@ export interface Mutasi {
   c_tujuan: string;
   nama_pihak_asal: string;
   nama_pihak_tujuan: string;
+  alamat_pihak_tujuan: string;
   luas_mutasi: number;
   jenis_mutasi: string;
   tanggal_mutasi: string;

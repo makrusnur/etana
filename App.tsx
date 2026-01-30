@@ -13,6 +13,7 @@ import { MapMonitoring } from './pages/MapMonitoring';
 import { PtslHalaman } from './pages/PtslMassal';
 import { PbbPage } from './pages/Pbb';
 import { LetterCMain } from './pages/LetterC';
+import { MutasiC } from './pages/LetterC/MutasiC';
 
 const AppContent: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
   const location = useLocation();
@@ -43,6 +44,7 @@ const AppContent: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             <Route path="/ptsl" element={<PtslHalaman />} />
             <Route path="/pbb" element={<PbbPage />} />
             {/* ROUTE BARU KHUSUS LETTER C */}
+            <Route path="/letter-c/mutasi" element={<MutasiC />} />
             <Route path="/letter-c/*" element={<LetterCMain/>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
