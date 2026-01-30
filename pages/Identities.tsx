@@ -60,6 +60,7 @@ export const Identities: React.FC = () => {
     kewarganegaraan: '',
     ktp_berlaku: '',
     ejaan_tanggal_ktp_berlaku: '', 
+    juncto:'',
     foto_ktp: '', 
     foto_verifikasi: '',
     ttd_digital: '',
@@ -219,41 +220,46 @@ export const Identities: React.FC = () => {
     setForm(prev => ({ ...prev, ttd_digital: '' }));
   };
 
- const handleSave = async () => {
-  if (!form.nama || !form.nik) return alert('Nama dan NIK wajib diisi');
+    const handleSave = async () => {
+    if (!form.nama || !form.nik) return alert('Nama dan NIK wajib diisi');
 
-  // 1. KITA PISAHKAN id dari data lainnya agar tidak ikut terkirim ke database
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { id, ...dataTanpaId } = form; 
+    // 1. KITA PISAHKAN id dari data lainnya
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id, ...dataTanpaId } = form; 
 
-  const payload: any = { 
-    ...dataTanpaId, // Pakai data yang sudah bersih dari properti 'id'
-    nama: toTitleCase(form.nama),
-    // Kirim null untuk kolom DATE jika seumur hidup
-    ktp_berlaku: form.is_seumur_hidup ? null : (form.ktp_berlaku || null),
-    ejaan_tanggal_lahir: toTitleCase(form.ejaan_tanggal_lahir || (form.tanggal_lahir ? spellDateIndo(form.tanggal_lahir) : '')),
-    created_at: form.created_at || new Date().toISOString() 
-  };
-
-  try {
-    if (editingId) {
-      // Saat EDIT, kita butuh editingId untuk tahu baris mana yang diupdate
-      await db.identities.update(editingId, payload);
-    } else {
-      // Saat TAMBAH BARU, pastikan payload tidak punya properti 'id' sama sekali
-      // supaya Supabase otomatis men-generate UUID-nya.
-      await db.identities.add(payload);
-    }
+    // 2. LOGIKA JUNCTO: Jika seumur hidup (true) maka kosongkan, jika tidak (false) maka isi teks paten
+    const teksJunctoPaten = "akan tetapi berdasarkan pasal 64 ayat ( 7 ) huruf a juncto pasal ( 101 ) huruf c Undang-undang Nomor 24 Tahun 2013 dan berdasarkan Surat Edaran Menteri Dalam Negeri Republik Indonesia nomor : 470/296/SJ, tanggal 29-01-2016 (dua puluh sembilan ";
     
-    alert("Berhasil disimpan!");
-    setView('list'); 
-    setEditingId(null); 
-    setForm(emptyForm);
-  } catch (err: any) {
-    console.error("Save Error:", err);
-    alert(err?.message || "Terjadi kesalahan saat menyimpan.");
-  }
-};
+    const payload: any = { 
+      ...dataTanpaId, 
+      nama: toTitleCase(form.nama),
+      
+      // Kirim null untuk kolom DATE jika seumur hidup
+      ktp_berlaku: form.is_seumur_hidup ? null : (form.ktp_berlaku || null),
+      
+      // LOGIKA BARU: Simpan juncto hanya jika BUKAN seumur hidup
+      juncto: form.is_seumur_hidup ? '' : teksJunctoPaten,
+      
+      ejaan_tanggal_lahir: toTitleCase(form.ejaan_tanggal_lahir || (form.tanggal_lahir ? spellDateIndo(form.tanggal_lahir) : '')),
+      created_at: form.created_at || new Date().toISOString() 
+    };
+
+    try {
+      if (editingId) {
+        await db.identities.update(editingId, payload);
+      } else {
+        await db.identities.add(payload);
+      }
+      
+      alert("Berhasil disimpan!");
+      setView('list'); 
+      setEditingId(null); 
+      setForm(emptyForm);
+    } catch (err: any) {
+      console.error("Save Error:", err);
+      alert(err?.message || "Terjadi kesalahan saat menyimpan.");
+    }
+  };
 
   const toggleSeumurHidup = (checked: boolean) => {
     setForm(prev => ({

@@ -115,6 +115,7 @@ export const TemplatesPage: React.FC = () => {
         Cak_Tanah: fileData.cakupan_tanah,
         Pihak_Penanggung: fileData.pihak_penanggung,
         Jum_Saksi: fileData.jumlah_saksi,
+        Alamat_Setuju: fileData.alamat_persetujuan,
         Ket_Berkas: fileData.keterangan,
         Jenis_Perolehan: fileData.jenis_perolehan,
         Thn_Perolehan: fileData.tahun_perolehan,
@@ -235,6 +236,7 @@ export const TemplatesPage: React.FC = () => {
         result[`${prefix}_NPWP`] = p.npwp || "";
         result[`${prefix}_Email`] = p.email || "";
         result[`${prefix}_Berlaku`] = p.ejaan_ktp_berlaku || "";
+        result[`${prefix}_Juncto`] = p.juncto || "";  
       };
 
       mapPerson("P1_1", p1[0]);  
