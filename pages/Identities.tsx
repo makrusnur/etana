@@ -347,7 +347,25 @@ export const Identities: React.FC = () => {
                         <option value="Duda">Duda</option>
                         <option value="Janda">Janda</option>
                     </Select>
-                    <Input label="NIK" value={form.nik} maxLength={16} onChange={e => setForm({...form, nik: e.target.value.replace(/\D/g,'')})} />
+                    <Input 
+                      label="NIK" 
+                      value={
+                        form.nik
+                          .replace(/\D/g, '') // Bersihkan dari karakter non-angka
+                          .replace(/^(\d{6})(\d{6})(\d{4}).*/, '$1.$2.$3') // Format titik 6.6.4
+                          .replace(/^(\d{6})(\d{1,6})/, '$1.$2') // Format titik saat baru mencapai 7-12 digit
+                          .replace(/^(\d{6}\.\d{6})(\d{1,4})/, '$1.$2') // Format titik saat baru mencapai 13-16 digit
+                      } 
+                      maxLength={19} // NIK 16 digit + 3 titik pemisah
+                      placeholder="Contoh: 320101.121290.0001"
+                      onChange={e => {
+                        // Ambil nilai mentah (hanya angka) untuk disimpan ke state database
+                        const rawValue = e.target.value.replace(/\D/g, '');
+                        if (rawValue.length <= 16) {
+                          setForm({...form, nik: rawValue});
+                        }
+                      }} 
+                    />
                     <Input label="Nama Lengkap" className="text-blue-600 font-bold" value={form.nama} onChange={e => setForm({...form, nama: e.target.value})} />
                     <Input label="Alias / Disebut Juga" placeholder="Contoh: Haji Somad" value={form.alias} onChange={e => setForm({...form, alias: e.target.value})} />
                     <Input label="Tempat Lahir" value={form.tempat_lahir} onChange={e => setForm({...form, tempat_lahir: e.target.value})} />

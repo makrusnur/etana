@@ -179,6 +179,13 @@ export interface FileRecord {
   keterangan: string;
   jenis_perolehan: string;
   tahun_perolehan: string;
+  
+  keterangan_persetujuan: string;
+  cakupan_tanah: string;
+  pihak_penanggung: string;
+  jumlah_saksi: string;
+  alamat_persetujuan: string;
+  
   created_at: string;
   register_waris_desa?: string;
   register_waris_kecamatan?: string;
@@ -251,6 +258,7 @@ export interface LetterC {
   nomor_c: string;
   nama_pemilik: string;
   alamat_pemilik?: string;
+  image_url?: string;
   created_at?: string;
 }
 

@@ -3,7 +3,7 @@ import { exportToExcel, generateWordDocument } from '../services/export';
 import { db } from '../services/db';
 import { Card, Button, Select } from '../components/UI';
 import { Printer, X, Database, Copy, ClipboardCheck, UserCheck, FileSpreadsheet, MapPin, FileText, Ruler, Coins, History, Search, Users } from 'lucide-react';
-import { formatDateIndo, spellDateIndo, terbilang } from '../utils';
+import { formatDateIndo, spellDateIndo, terbilang, formatDateStrip } from '../utils';
 import { FileRecord, LandData } from '../types';
 
 export const TemplatesPage: React.FC = () => {
@@ -87,7 +87,7 @@ export const TemplatesPage: React.FC = () => {
           const enriched = { 
             ...person, 
             umur: calculateAge(person.tanggal_lahir),
-            tgl_lahir_indo: formatDateIndo(person.tanggal_lahir),
+            tgl_lahir_indo: formatDateStrip(person.tanggal_lahir),
             ktp_berlaku_indo: person.ktp_berlaku === 'SEUMUR HIDUP' ? 'SEUMUR HIDUP' : formatDateIndo(person.ktp_berlaku),
             ejaan_lahir: spellDateIndo(person.tanggal_lahir),
             ejaan_berlaku: person.ktp_berlaku === 'SEUMUR HIDUP' ? 'SEUMUR HIDUP' : spellDateIndo(person.ktp_berlaku)
@@ -107,10 +107,14 @@ export const TemplatesPage: React.FC = () => {
         // 1. BERKAS (FileRecord)
         No_Berkas: fileData.nomor_berkas,
         No_Register: fileData.nomor_register,
-        tgl_Register: fileData.tanggal_register,
+        Tgl_Register: formatDateStrip(fileData.tanggal_register),
         Hari_Berkas: fileData.hari,
-        Tgl_Surat: formatDateIndo(fileData.tanggal),
+        Tgl_Surat: formatDateStrip(fileData.tanggal),
         Tgl_Ejaan: spellDateIndo(fileData.tanggal),
+        Ket_Setuju: fileData.keterangan_persetujuan,
+        Cak_Tanah: fileData.cakupan_tanah,
+        Pihak_Penanggung: fileData.pihak_penanggung,
+        Jum_Saksi: fileData.jumlah_saksi,
         Ket_Berkas: fileData.keterangan,
         Jenis_Perolehan: fileData.jenis_perolehan,
         Thn_Perolehan: fileData.tahun_perolehan,
@@ -226,7 +230,7 @@ export const TemplatesPage: React.FC = () => {
         result[`${prefix}_Ibu`] = p.nama_ibuk_kandung || "";
         result[`${prefix}_Bapak`] = p.nama_bapak_kandung || "";
         result[`${prefix}_Pendidikan`] = p.pendidikan_terakhir || "";
-        result[`${prefix}_KTP_Exp`] = p.ktp_berlaku_indo || "";
+        result[`(${prefix}_KTP_Exp)`] = p.ktp_berlaku_indo || "";
         result[`${prefix}_Telp`] = p.telepon || "";
         result[`${prefix}_NPWP`] = p.npwp || "";
         result[`${prefix}_Email`] = p.email || "";

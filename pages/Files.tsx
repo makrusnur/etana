@@ -49,6 +49,11 @@ export const FilesPage: React.FC = () => {
     register_waris_kecamatan: '',
     tanggal_waris: '',
     ejaan_tanggal_waris: '',
+    keterangan_persetujuan: '',
+    alamat_persetujuan: '',
+    cakupan_tanah: 'sebidang tanah',
+    pihak_penanggung: '',
+    jumlah_saksi: '',
     kategori: 'PPAT_NOTARIS'
   };
 
@@ -123,12 +128,19 @@ export const FilesPage: React.FC = () => {
         kategori: 'PPAT_NOTARIS',
         nomor_berkas: formFile.nomor_berkas!.toUpperCase(),
         nomor_register: formFile.nomor_register?.toUpperCase() || '',
+        
+        keterangan_persetujuan: formFile.keterangan_persetujuan?.toUpperCase() || '',
+        cakupan_tanah: formFile.cakupan_tanah, // Ini biasanya sudah fix dari pilihan
+        pihak_penanggung: formFile.pihak_penanggung?.toUpperCase()|| '',
+        jumlah_saksi: formFile.jumlah_saksi?.toUpperCase() || '',
+        
         latitude: selectedCoords.lat,
         longitude: selectedCoords.lng,
         tanggal: formFile.tanggal || undefined,
         tanggal_waris: formFile.tanggal_waris || undefined,
         hari: formFile.hari || getDayNameIndo(formFile.tanggal || ''),
         jenis_perolehan: formFile.jenis_perolehan!.toUpperCase(),
+
         created_at: formFile.created_at || new Date().toISOString()
       } as FileRecord;
 
@@ -594,8 +606,12 @@ export const FilesPage: React.FC = () => {
                             <option value="PIHAK_1">PIHAK 1 </option>
                             <option value="PIHAK_2">PIHAK 2 </option>
                             <option value="SAKSI">SAKSI</option>
-                            <option value="PERSETUJUAN_PIHAK_1">PERSETUJUAN PIHAK 1</option>
-                          </select>
+                            <option value="PERSETUJUAN_ISTRI">PERSETUJUAN ISTRI KE 1</option>
+                            <option value="PERSETUJUAN_SUAMI">PERSETUJUAN SUAMI</option>
+                            <option value="PERSETUJUAN_ANAK">PERSETUJUAN ANAK</option>
+                            <option value="PERSETUJUAN_SAUDARA">PERSETUJUAN SAUDARA</option>
+                            <option value="PERSETUJUAN_ORANGTUA">PERSETUJUAN ORANG TUA</option>
+                            </select>
                         </div>
                       </div>
 
@@ -824,6 +840,73 @@ export const FilesPage: React.FC = () => {
                   </div>
                 </div>
               )}
+
+              {/* Section: Detail Kesepakatan & Saksi */}
+              <div className="border-b pb-4 mb-4 bg-slate-50/50 p-4 rounded-lg">
+                <h4 className="text-[11px] font-bold text-slate-600 uppercase tracking-widest mb-3">Detail Kesepakatan & Saksi</h4>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Input Keterangan Persetujuan (Manual String) */}
+                  <div className="col-span-2">
+                    <Input 
+                      label="Keterangan Persetujuan" 
+                      placeholder="Contoh: Telah disetujui oleh seluruh ahli waris..." 
+                      value={formFile.keterangan_persetujuan} 
+                      onChange={e => setFormFile({...formFile, keterangan_persetujuan: e.target.value})} 
+                    />
+                  </div>
+
+                  {/* Input Cakupan Tanah (Dropdown String) */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1.5">Cakupan Objek</label>
+                    <select 
+                      className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-md text-sm font-bold focus:border-blue-600 focus:ring-2 focus:ring-blue-500 outline-none h-[40px]"
+                      value={formFile.cakupan_tanah}
+                      onChange={e => setFormFile({...formFile, cakupan_tanah: e.target.value})}
+                    >
+                      <option value="sebidang tanah">SEBIDANG TANAH</option>
+                      <option value="sebagian atas sebidang tanah">SEBAGIAN ATAS SEBIDANG TANAH</option>
+                    </select>
+                  </div>
+
+                  {/* Input Pihak Terkait (Dropdown) */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1.5">Pihak Penanggung</label>
+                    <select 
+                      className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-md text-sm font-bold focus:border-blue-600 focus:ring-2 focus:ring-blue-500 outline-none h-[40px]"
+                      value={formFile.pihak_penanggung}
+                      onChange={e => setFormFile({...formFile, pihak_penanggung: e.target.value})}
+                    >
+                      <option value="Pihak Pertama">PIHAK PERTAMA</option>
+                      <option value="Pihak Kedua">PIHAK KEDUA</option>
+                      <option value="Pihak Pertama dan Kedua">PIHAK PERTAMA DAN KEDUA</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1.5">
+                      Alamat Persetujuan (Suami/Istri)
+                    </label>
+                    <select 
+                      className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-md text-sm font-bold focus:border-blue-600 focus:ring-2 focus:ring-blue-500 outline-none h-[40px]"
+                      value={formFile.alamat_persetujuan}
+                      onChange={e => setFormFile({...formFile, alamat_persetujuan: e.target.value})}
+                    >
+                      <option value="Sama dengan suaminya">SAMA DENGAN SUAMINYA</option>
+                      <option value="Sama dengan istrinya">SAMA DENGAN ISTRINYA</option>
+                      <option value="di">DI</option>
+                    </select>
+                  </div>
+                  {/* Input Jumlah Saksi (Manual String) */}
+                  <div className="col-span-2">
+                    <Input 
+                      label="Jumlah Saksi" 
+                      placeholder="Contoh: Dua" 
+                      value={formFile.jumlah_saksi} 
+                      onChange={e => setFormFile({...formFile, jumlah_saksi: e.target.value})} 
+                    />
+                  </div>
+                </div>
+              </div>
 
               {/* Section: Keterangan */}
               <div className="border-b pb-4 mb-4">

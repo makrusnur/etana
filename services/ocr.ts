@@ -98,4 +98,79 @@ export const processOCR = async (imageFile: File): Promise<Partial<Identity>> =>
     console.error("OCR AI Error:", error);
     throw new Error(error?.message || "Gagal mengekstraksi data KTP. Pastikan API Key valid.");
   }
+  
+};
+export const processLetterC = async (imageFile: File): Promise<any> => {
+  const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
+
+  if (!apiKey) throw new Error("API Key Gemini belum dipasang.");
+
+  const ai = new GoogleGenAI({ apiKey: apiKey });
+  
+  const base64Data = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(imageFile);
+  });
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview', // Gunakan versi terbaru
+      contents: {
+        parts: [
+          { inlineData: { data: base64Data, mimeType: imageFile.type } },
+          { text: `Ekstrak data dari dokumen Letter C (Buku Pendaftaran Tanah) berikut. 
+            Ambil informasi identitas pemilik dan rincian persil dalam tabel.
+            Format harus JSON valid.` 
+          }
+        ]
+      },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            nomor_c: { type: Type.STRING },
+            nama_pemilik: { type: Type.STRING },
+            alamat_pemilik: { type: Type.STRING },
+            persils: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  nomor_persil: { type: Type.STRING },
+                  jenis_tanah: { type: Type.STRING, description: "Tanah Kering atau Sawah" },
+                  klas_desa: { type: Type.STRING },
+                  luas_meter: { type: Type.NUMBER },
+                  asal_usul: { type: Type.STRING }
+                }
+              }
+            }
+          },
+          required: ["nomor_c", "nama_pemilik"]
+        }
+      }
+    });
+
+    const text = response.text;
+    if (!text) throw new Error("AI tidak mengembalikan data.");
+    
+    const result = JSON.parse(text);
+
+    // Pembersihan data sederhana
+    return {
+      nomor_c: result.nomor_c?.toUpperCase() || '',
+      nama_pemilik: result.nama_pemilik?.toUpperCase() || '',
+      alamat_pemilik: result.alamat_pemilik || '',
+      persils: result.persils?.map((p: any) => ({
+        ...p,
+        jenis_tanah: p.jenis_tanah?.includes('Sawah') ? 'Sawah' : 'Tanah Kering',
+        nomor_persil: p.nomor_persil || ''
+      })) || []
+    };
+  } catch (error: any) {
+    console.error("Letter C OCR Error:", error);
+    throw error;
+  }
 };

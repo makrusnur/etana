@@ -388,7 +388,29 @@ const removeSuratHak = (index: number) => {
                     <span className="w-8 h-[1px] bg-slate-200"></span> Identitas Objek & Pimpinan
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                    <Input label="Nomor Objek Pajak (NOP)" placeholder="00.00.000..." value={form.nop} onChange={e => setForm({ ...form, nop: e.target.value })} />
+                    <Input 
+                      label="Nomor Objek Pajak (NOP)" 
+                      placeholder="32.01.001.001.001-0001.0" 
+                      maxLength={25} // 18 angka + 7 karakter pemisah (titik/strip)
+                      value={
+                        form.nop
+                          .replace(/\D/g, '') // Bersihkan dari karakter non-angka
+                          // Logika Regex untuk menyisipkan pemisah secara bertahap
+                          .replace(/^(\d{2})(\d)/, '$1.$2') // xx.x
+                          .replace(/^(\d{2}\.\d{2})(\d)/, '$1.$2') // xx.xx.x
+                          .replace(/^(\d{2}\.\d{2}\.\d{3})(\d)/, '$1.$2') // xx.xx.xxx.x
+                          .replace(/^(\d{2}\.\d{2}\.\d{3}\.\d{3})(\d)/, '$1.$2') // xx.xx.xxx.xxx.x
+                          .replace(/^(\d{2}\.\d{2}\.\d{3}\.\d{3}\.\d{3})(\d)/, '$1-$2') // xx.xx.xxx.xxx.xxx-x
+                          .replace(/^(\d{2}\.\d{2}\.\d{3}\.\d{3}\.\d{3}-\d{4})(\d)/, '$1.$2') // xx.xx.xxx.xxx.xxx-xxxx.x
+                      } 
+                      onChange={e => {
+                        // Ambil nilai mentah (hanya angka) untuk disimpan ke state
+                        const rawValue = e.target.value.replace(/\D/g, '');
+                        if (rawValue.length <= 18) {
+                          setForm({...form, nop: rawValue});
+                        }
+                      }} 
+                    />
                     <Input label="Atas Nama Sesuai NOP" placeholder="Nama Pemilik" value={form.atas_nama_nop} onChange={e => setForm({ ...form, atas_nama_nop: e.target.value })} />
                     <Input label="Penggunaan Tanah" placeholder="Pekarangan / Sawah" value={form.penggunaan_tanah} onChange={e => setForm({ ...form, penggunaan_tanah: e.target.value })} />
 

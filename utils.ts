@@ -90,6 +90,19 @@ export const formatDateIndo = (dateStr: string): string => {
   return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
 };
 
+export const formatDateStrip = (dateStr: string): string => {
+  if (!dateStr || dateStr === 'SEUMUR HIDUP') return "";
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return "";
+
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0'); // Ditambah 1 karena bulan mulai dari 0
+  const year = date.getFullYear();
+
+  return `${day}-${month}-${year}`;
+};
+
+
 export const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
 };
@@ -99,4 +112,27 @@ export const generateUUID = () => {
     const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
+};
+
+export const formatBatasTanah = (val: string): string => {
+  if (!val) return '';
+
+  // Daftar kata kunci Fasum (tidak ditambah "Tanah Milik")
+  const fasumKeywords: string[] = [
+    'JALAN', 'GANG', 'SUNGAI', 'SOLOKAN', 'PARIT', 'DRAINASE', 
+    'TANAH NEGARA', 'MAKAM', 'KALI', 'EMBUNG', 'SALI', 'IRIGASI', 'JALAN DESA',
+    'SALURAN'
+  ];
+
+  const upperVal: string = val.toUpperCase().trim();
+
+  // Cek apakah input mengandung salah satu kata kunci Fasum
+  const isFasum: boolean = fasumKeywords.some(keyword => upperVal.includes(keyword));
+
+  if (isFasum) {
+    return upperVal;
+  } else {
+    // Pastikan tidak double jika user sudah ngetik manual
+    return upperVal.startsWith('TANAH MILIK') ? upperVal : `TANAH MILIK ${upperVal}`;
+  }
 };
