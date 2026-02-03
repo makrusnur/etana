@@ -436,23 +436,104 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess }: FormTamba
                 <h4 className="flex items-center gap-2 text-zinc-900 font-black text-xs uppercase tracking-widest"><Layers size={16}/> Rincian Persil</h4>
                 <button onClick={() => setRows([...rows, { nomor_persil: '', jenis_tanah: 'Tanah Kering', klas_desa: '', luas_meter: 0, asal_usul: '' }])} className="text-[10px] font-black text-zinc-900 bg-zinc-100 px-5 py-2.5 rounded-xl uppercase hover:bg-zinc-200 transition-all">+ Tambah</button>
               </div>
-              
-              <div className="space-y-3">
-                {rows.map((row, i) => (
-                  <div key={i} className="p-4 bg-zinc-50/50 border border-zinc-100 rounded-2xl grid grid-cols-2 lg:flex lg:flex-nowrap gap-3 items-center relative">
-                    <input className="px-3 py-3 text-xs border border-zinc-200 rounded-xl outline-none bg-white font-bold" placeholder="Persil" value={row.nomor_persil} onChange={e => updateRow(i, 'nomor_persil', e.target.value)} />
-                    <select className="px-3 py-3 text-xs border border-zinc-200 rounded-xl outline-none bg-white font-bold" value={row.jenis_tanah} onChange={e => updateRow(i, 'jenis_tanah', e.target.value)}>
-                      <option>Tanah Kering</option><option>Sawah</option>
-                    </select>
-                    <input className="px-3 py-3 text-xs border border-zinc-200 rounded-xl outline-none bg-white font-bold" placeholder="Klas" value={row.klas_desa} onChange={e => updateRow(i, 'klas_desa', e.target.value)} />
-                    <input className="px-3 py-3 text-xs border border-zinc-200 rounded-xl outline-none bg-white font-bold" placeholder="Luas" type="number" value={row.luas_meter} onChange={e => updateRow(i, 'luas_meter', parseFloat(e.target.value))} />
-                    <input className="col-span-2 lg:flex-1 px-4 py-3 text-xs border border-zinc-200 rounded-xl outline-none bg-white font-medium" placeholder="Asal-Usul..." value={row.asal_usul} onChange={e => updateRow(i, 'asal_usul', e.target.value)} />
-                    {rows.length > 1 && (
-                      <button onClick={() => setRows(rows.filter((_, idx) => idx !== i))} className="absolute lg:static top-2 right-2 p-2 text-zinc-300 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>
-                    )}
+                {/* CONTAINER LIST PERSIL */}
+                <div className="mt-8 space-y-4">
+                          
+                  <div className="hidden lg:flex px-2 pb-2 gap-3 items-center border-b border-zinc-200">
+                    <div className="w-[15%]">
+                      <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Nomor Persil</label>
+                    </div>
+                    <div className="w-[20%]">
+                      <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Jenis Tanah</label>
+                    </div>
+                    <div className="w-[12%] text-center">
+                      <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Klas</label>
+                    </div>
+                    <div className="w-[15%]">
+                      <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Luas (M²)</label>
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Asal-Usul / Keterangan</label>
+                    </div>
+                    {rows.length > 1 && <div className="w-10"></div>}
                   </div>
-                ))}
-              </div>
+
+                  <div className="space-y-3">
+                    {rows.map((row, i) => (
+                      <div key={i} className="group p-2 lg:p-0 flex flex-wrap lg:flex-nowrap gap-3 items-center relative">
+                        
+                        {/* Nomor Persil - 15% */}
+                        <div className="w-[48%] lg:w-[15%]">
+                          <input 
+                            className="w-full px-4 py-3 text-xs border border-zinc-200 rounded-xl outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/5 bg-white font-bold transition-all" 
+                            placeholder="Persil" 
+                            value={row.nomor_persil} 
+                            onChange={e => updateRow(i, 'nomor_persil', e.target.value)} 
+                          />
+                        </div>
+
+                        {/* Jenis Tanah - 20% */}
+                        <div className="w-[48%] lg:w-[20%] relative">
+                          <select 
+                            className="w-full px-4 py-3 text-xs border border-zinc-200 rounded-xl outline-none focus:border-emerald-500 bg-white font-bold appearance-none cursor-pointer" 
+                            value={row.jenis_tanah} 
+                            onChange={e => updateRow(i, 'jenis_tanah', e.target.value)}
+                          >
+                            <option value="Tanah Kering">Tanah Kering</option>
+                            <option value="Sawah">Sawah</option>
+                          </select>
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
+                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path d="M19 9l-7 7-7-7"/></svg>
+                          </div>
+                        </div>
+
+                        {/* Klas - 12% */}
+                        <div className="w-[30%] lg:w-[12%]">
+                          <input 
+                            className="w-full px-4 py-3 text-xs border border-zinc-200 rounded-xl outline-none focus:border-emerald-500 bg-white font-bold text-center uppercase" 
+                            placeholder="D.I" 
+                            value={row.klas_desa} 
+                            onChange={e => updateRow(i, 'klas_desa', e.target.value)} 
+                          />
+                        </div>
+
+                        {/* Luas - 15% */}
+                        <div className="w-[30%] lg:w-[15%]">
+                          <input 
+                            className="w-full px-4 py-3 text-xs border border-zinc-200 rounded-xl outline-none focus:border-emerald-500 bg-white font-bold" 
+                            placeholder="0" 
+                            type="number" 
+                            value={row.luas_meter === 0 ? '' : row.luas_meter} 
+                            onChange={e => {
+                              const val = e.target.value;
+                              updateRow(i, 'luas_meter', val === '' ? 0 : parseFloat(val));
+                            }} 
+                          />
+                        </div>
+
+                        {/* Asal Usul - Sisa Ruang (flex-1) */}
+                        <div className="w-full lg:flex-1">
+                          <input 
+                            className="w-full px-4 py-3 text-xs border border-zinc-200 rounded-xl outline-none focus:border-emerald-500 bg-white font-medium" 
+                            placeholder="Asal-Usul..." 
+                            value={row.asal_usul} 
+                            onChange={e => updateRow(i, 'asal_usul', e.target.value)} 
+                          />
+                        </div>
+
+                        {/* Tombol Hapus */}
+                        {rows.length > 1 && (
+                          <button 
+                            onClick={() => setRows(rows.filter((_, idx) => idx !== i))} 
+                            className="p-2 text-zinc-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                          >
+                            <Trash2 size={18}/>
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
             </div>
           </div>
         </div>

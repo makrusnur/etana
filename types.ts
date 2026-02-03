@@ -230,15 +230,21 @@ export interface Relation {
 }
 
 export interface PbbRecord {
-  id?: string;
-  created_at?: string;
-  desa_id: string;
-  identitas_id: string;
-  data_tanah_id: string;
+  id?: string;               // UUID (opsional saat insert)
+  tahun_pajak: string;       // <--- Tambahkan ini
+  tgl_rekam: string;         // <--- Tambahkan ini
   tipe_layanan: string;
-  nop_asal: string;
   status_subjek: string;
   jenis_subjek: string;
+  pekerjaan: string;
+  nop_asal: string;
+  nop_bersama: string;
+  identitas_id: string | null; // UUID boleh null
+  data_tanah_id: string;       // UUID wajib
+  manual_nik: string;
+  manual_nama: string;
+  manual_alamat: string;
+  desa_id: string;
 }
 
 // Isi file src/types.ts

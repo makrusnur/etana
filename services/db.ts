@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { Identity, LandData, FileRecord, Relation, PtslVillage,PbbRecord } from '../types';
+import { Identity, LandData, FileRecord, Relation, PtslVillage, PbbRecord } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -104,6 +104,14 @@ export const db = {
       if (error) handleError(error, "Gagal mengambil data tanah");
       return data as LandData;
     },
+    getByNop: async (nop: string) => {
+      const { data } = await supabase
+        .from('lands')
+        .select('*')
+        .eq('nop', nop)
+        .maybeSingle();
+      return data;
+    },
     add: async (item: LandData) => {
       const { error } = await supabase.from('lands').insert([item]);
       if (error) handleError(error, "Gagal menambah data tanah");
@@ -203,32 +211,84 @@ export const db = {
     }
   },
 
-  pbb: {
-    getAll: async () => {
-      const { data, error } = await supabase
-        .from('pbb_records')
-        .select(`
-          *,
-          identities!identitas_id (nama, nik),
-          lands!data_tanah_id (nop, alamat, luas_seluruhnya)
-        `);
-      
-      if (error) {
-        console.error("Supabase Error Detail:", error.message);
-        // Jika join gagal, ambil data mentahnya saja agar aplikasi tidak crash
-        const { data: rawData } = await supabase.from('pbb_records').select('*');
-        return rawData || [];
-      }
-      return data || [];
-    },
-    add: async (item: PbbRecord) => {
-      // Kita pastikan data yang dikirim bersih
-      const { error } = await supabase.from('pbb_records').insert([item]);
-      if (error) handleError(error, "Gagal simpan data PBB");
-    },
-    delete: async (id: string) => {
-      const { error } = await supabase.from('pbb_records').delete().eq('id', id);
-      if (error) handleError(error, "Gagal hapus data PBB");
+  // Ganti bagian pbb di db.ts menjadi seperti ini:
+pbb_records: {
+  getAll: async () => {
+    const { data, error } = await supabase
+      .from('pbb_records')
+      .select(`*, lands!data_tanah_id(nop, alamat), identities(nama, nik)`)
+      .order('tgl_rekam', { ascending: false });
+    
+    if (error) {
+      console.error("Gagal memuat PBB:", error);
+      return [];
     }
+    return data || [];
+  },
+  
+getByNop: async (nop: string) => {
+  const { data, error } = await supabase
+    .from('pbb_records')
+    .select(`
+      *,
+      lands!inner (*),
+      identities (*)
+    `)
+    .eq('lands.nop', nop) // Filter NOP yang ada di dalam tabel lands
+    .order('tgl_rekam', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Gagal cari relasi PBB:", error);
+    return null;
   }
+  
+  // Kita kembalikan strukturnya supaya land & identity ada di level atas 
+  // agar setLinkedOP dan setLinkedWP Bapak tidak error
+  if (data) {
+    return {
+      ...data.lands,       // Data Tanah
+      identities: data.identities, // Data Pemilik
+      last_pbb: data       // Data PBB terakhirnya
+    };
+  }
+  
+  return null;
+},
+  getRelationByNop: async (nop: string) => {
+    // Kita cari di pbb_records yang punya NOP spesifik di tabel lands
+    const { data, error } = await supabase
+      .from('pbb_records')
+      .select(`
+        *,
+        lands!data_tanah_id!inner (*), 
+        identities (*)
+      `)
+      .eq('lands.nop', nop) // Kunci di NOP yang diinput
+      .order('tgl_rekam', { ascending: false }) // Ambil rekam terbaru
+      .limit(1)
+      .maybeSingle();
+
+    if (error) return null;
+    return data;
+  },
+
+  add: async (item: Partial<PbbRecord>) => { 
+      const { error } = await supabase.from('pbb_records').insert([item]);
+      return !error;
+    },
+
+  update: async (id: string, item: any) => {
+    const { error } = await supabase.from('pbb_records').update(item).eq('id', id);
+    if (error) console.error("Gagal update PBB:", error);
+    return !error;
+  },
+
+  delete: async (id: string) => {
+    const { error } = await supabase.from('pbb_records').delete().eq('id', id);
+    if (error) console.error("Gagal hapus PBB:", error);
+    return !error;
+  }
+},
 };

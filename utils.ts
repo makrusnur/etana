@@ -136,3 +136,20 @@ export const formatBatasTanah = (val: string): string => {
     return upperVal.startsWith('TANAH MILIK') ? upperVal : `TANAH MILIK ${upperVal}`;
   }
 };
+
+export const formatNOP = (val: string | number): string => {
+  if (!val) return '';
+  
+  // Pastikan input adalah string dan ambil hanya angkanya saja
+  const clean = String(val).replace(/\D/g, ''); 
+  
+  // Format: 2.2.3.3.3.4.1
+  const match = clean.match(/^(\d{2})(\d{2})(\d{3})(\d{3})(\d{3})(\d{4})(\d{1})$/);
+  
+  if (match) {
+    return `${match[1]}.${match[2]}.${match[3]}.${match[4]}.${match[5]}.${match[6]}.${match[7]}`;
+  }
+  
+  // Jika angka belum lengkap (sedang diketik), tetap tampilkan angka bersihnya
+  return clean;
+};

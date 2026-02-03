@@ -1,37 +1,82 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, ArrowLeft, Trash2, Plus, X, 
-  ChevronRight, Edit3, Database, User, MapPin, Building2, Filter, Calendar, Info
+  ChevronRight, Edit3, Database, User, MapPin, Building2,  Calendar, Info
 } from 'lucide-react';
 import { db } from '../services/db';
-import { LandData, Identity } from '../types';
+import { LandData, Identity, PbbRecord } from '../types';
+import { formatNOP } from '../utils';
 
 // --- KOMPONEN PENCARIAN NOP KOTAK (REAL-TIME) ---
-const NopSearchBox = ({ value, onChange }: { value: string, onChange: (val: string) => void }) => {
+const NopSearchBox = ({ 
+  value, 
+  onChange, 
+  onSearch 
+}: { 
+  value: string, 
+  onChange: (val: string) => void,
+  onSearch: (nop: string) => void // Fungsi baru untuk cari detail ke DB
+}) => {
   const pattern = [2, 2, 3, 3, 3, 4, 1];
   const totalCells = 18;
   const inputsRef = useRef<(HTMLInputElement | null)[]>([]);
+  
+  // Memastikan value selalu 18 karakter agar mapping tidak meleset
   const chars = value.padEnd(totalCells, " ").split("");
 
   const handleInput = (char: string, index: number) => {
+    // Hanya izinkan angka
+    const digit = char.replace(/[^0-9]/g, '');
+    if (!digit && char !== "") return; // Abaikan jika input bukan angka
+
     const newChars = [...chars];
-    newChars[index] = char.toUpperCase().replace(/[^0-9]/g, '');
+    newChars[index] = digit;
     const newValue = newChars.join("").trimEnd();
+    
     onChange(newValue);
-    if (char && index < totalCells - 1) inputsRef.current[index + 1]?.focus();
+
+    // Auto focus ke depan jika mengisi angka
+    if (digit && index < totalCells - 1) {
+      inputsRef.current[index + 1]?.focus();
+    }
+
+    // Jika sudah 18 digit, otomatis trigger pencarian detail
+    if (newValue.length === 18) {
+      onSearch(newValue);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
-    if (e.key === "Backspace" && !chars[index] && index > 0) inputsRef.current[index - 1]?.focus();
+    if (e.key === "Backspace") {
+      // Jika kotak sekarang kosong, pindah ke belakang dan hapus isinya
+      if (!chars[index] || chars[index] === " ") {
+        if (index > 0) {
+          const newChars = [...chars];
+          newChars[index - 1] = " ";
+          onChange(newChars.join("").trimEnd());
+          inputsRef.current[index - 1]?.focus();
+        }
+      }
+    } else if (e.key === "Enter" && value.length === 18) {
+      onSearch(value); // Cari saat tekan Enter
+    }
   };
 
   let currentIndex = 0;
   return (
     <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm mb-8 animate-in slide-in-from-top duration-500">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="p-2 bg-slate-900 text-white rounded-lg"><Filter size={16}/></div>
-        <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Pencarian NOP Real-time</h3>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-slate-900 text-white rounded-lg"><Search size={16}/></div>
+          <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Pencarian NOP Objek Pajak</h3>
+        </div>
+        {value.length === 18 && (
+          <span className="text-[10px] bg-green-100 text-green-700 px-3 py-1 rounded-full font-bold animate-pulse">
+            NOP LENGKAP
+          </span>
+        )}
       </div>
+
       <div className="flex flex-wrap gap-2">
         {pattern.map((count, gIdx) => (
           <div key={gIdx} className="flex gap-1 bg-slate-50 p-1 rounded-lg border border-slate-100">
@@ -43,20 +88,29 @@ const NopSearchBox = ({ value, onChange }: { value: string, onChange: (val: stri
                   ref={(el) => { inputsRef.current[i] = el; }}
                   value={chars[i] === " " ? "" : chars[i]}
                   maxLength={1}
+                  inputMode="numeric"
                   onChange={e => handleInput(e.target.value, i)}
                   onKeyDown={e => handleKeyDown(e, i)}
-                  className="w-8 h-10 text-center font-bold text-slate-900 bg-white border border-slate-200 rounded-md focus:border-slate-900 outline-none transition-all text-sm"
+                  className={`w-8 h-10 text-center font-bold rounded-md outline-none transition-all text-sm
+                    ${chars[i] !== " " ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-900 border-slate-200'}
+                    focus:ring-2 focus:ring-slate-400 focus:border-slate-900`}
                   placeholder="0"
                 />
               );
             })}
           </div>
         ))}
-        <button onClick={() => onChange("")} className="px-4 text-[10px] font-bold text-red-500 hover:bg-red-50 rounded-xl transition-all">RESET</button>
+        <button 
+          onClick={() => { onChange(""); inputsRef.current[0]?.focus(); }} 
+          className="px-4 text-[10px] font-bold text-red-500 hover:bg-red-50 rounded-xl transition-all"
+        >
+          RESET
+        </button>
       </div>
     </div>
   );
 };
+
 
 // --- KOMPONEN INPUT FORM MODAL (NOP & NIK) ---
 const CustomBlockInput = ({ label, value, pattern, onChange, readonly = false }: any) => {
@@ -71,6 +125,7 @@ const CustomBlockInput = ({ label, value, pattern, onChange, readonly = false }:
     onChange(newChars.join("").trimEnd());
     if (char && index < totalCells - 1) inputsRef.current[index + 1]?.focus();
   };
+  
 
   let currentIndex = 0;
   return (
@@ -129,9 +184,128 @@ export const PbbPage: React.FC = () => {
   useEffect(() => { loadAll(); }, []);
 
   const loadAll = async () => {
-    const [l, i, p] = await Promise.all([db.lands.getAll(), db.identities.getAll(), db.pbb.getAll()]);
-    setAllLands(l || []); setIdentities(i || []); setPbbRecords(p || []);
+    try {
+      const [resL, resI, resP] = await Promise.all([
+        db.lands.getAll(),
+        db.identities.getAll(),
+        db.pbb_records.getAll()
+      ]);
+
+      // Gaya relations: langsung masukkan hasilnya
+      setAllLands(resL || []);
+      setIdentities(resI || []);
+      setPbbRecords(resP || []);
+    } catch (err) {
+      console.error("Gagal memuat data:", err);
+    }
   };
+  
+  const handleSave = async () => {
+    if (!linkedOP?.id) {
+      alert("Pilih Objek Pajak (NOP) yang valid dari database!");
+      return;
+    }
+
+    const payload: PbbRecord = { 
+      tahun_pajak: formData.tahun_pajak,
+      tgl_rekam: formData.tgl_rekam,
+      tipe_layanan: formData.tipe_layanan,
+      status_subjek: formData.status_subjek,
+      jenis_subjek: formData.jenis_subjek,
+      pekerjaan: formData.pekerjaan,
+      nop_asal: formData.nop_asal,
+      nop_bersama: formData.nop_bersama,
+      identitas_id: linkedWP?.id || null, // Pastikan null jika tidak ada
+      data_tanah_id: linkedOP.id, 
+      manual_nik: formData.manual_nik,
+      manual_nama: formData.manual_nama,
+      manual_alamat: formData.manual_alamat,
+      desa_id: selectedLocation?.desa.toUpperCase() || "" 
+    };
+
+    // UBAH CARA CEK HASILNYA DI SINI
+    const isSuccess = await db.pbb_records.add(payload);
+    
+    if (isSuccess) {
+      alert("Data SPOP Berhasil Disimpan!");
+      setIsModalOpen(false);
+      loadAll(); // Refresh
+    } else {
+      alert("Gagal menyimpan data ke database. Cek koneksi atau data!");
+    }
+  };
+  // 1. Fungsi Hapus
+const handleDelete = async (id: string) => {
+  if (!confirm("Yakin ingin menghapus data PBB ini?")) return;
+  
+  const success = await db.pbb_records.delete(id);
+  if (success) {
+    alert("Data berhasil dihapus");
+    loadAll(); // Refresh tabel
+  } else {
+    alert("Gagal menghapus data");
+  }
+};
+
+// 2. Fungsi Edit (Melempar data ke Form/Modal)
+const handleEdit = (record: any) => {
+  setFormData({
+    tahun_pajak: record.tahun_pajak,
+    tgl_rekam: record.tgl_rekam,
+    tipe_layanan: record.tipe_layanan,
+    status_subjek: record.status_subjek,
+    jenis_subjek: record.jenis_subjek,
+    pekerjaan: record.pekerjaan,
+    nop_asal: record.nop_asal,
+    nop_bersama: record.nop_bersama,
+    manual_nik: record.manual_nik,
+    manual_nama: record.manual_nama,
+    manual_alamat: record.manual_alamat
+  });
+  setLinkedOP(record.lands);
+  setLinkedWP(record.identities);
+  setIsModalOpen(true);
+};
+
+  const handleSearchNop = async (nop: string) => {
+  // Hanya proses jika sudah 18 digit (lengkap)
+  if (nop.length < 18) return;
+
+  const result = await db.pbb_records.getRelationByNop(nop);
+
+  if (result) {
+    // 1. Tampilkan detail tanah & pemilik yang saling terkait
+    setLinkedOP(result.lands);
+    setLinkedWP(result.identities);
+
+    // 2. Isi form otomatis dengan data dari relasi tersebut
+    setFormData((prev: any) => ({
+      ...prev,
+      tahun_pajak: result.tahun_pajak,
+      tipe_layanan: result.tipe_layanan,
+      manual_nama: result.identities?.nama || '',
+      manual_nik: result.identities?.nik || ''
+    }));
+
+    // 3. Set lokasi agar dropdown sinkron
+    setSelectedLocation({
+      kec: result.lands.kecamatan?.toUpperCase() || "",
+      desa: result.lands.desa?.toUpperCase() || ""
+    });
+
+    console.log("Relasi SPPT ditemukan secara detail!");
+  } else {
+    // Jika tidak ada di riwayat PBB, baru cek apakah NOP-nya ada di database tanah
+    const rawLand = await db.lands.getByNop(nop);
+    if (rawLand) {
+      setLinkedOP(rawLand);
+      setLinkedWP(null); // Kosongkan pemilik karena belum ada relasi PBB
+      alert("NOP terdaftar, tapi belum memiliki riwayat relasi PBB.");
+    } else {
+      alert("NOP tidak ditemukan di database manapun!");
+    }
+  }
+};
 
   const filteredLands = allLands.filter(l => {
     const matchDesa = l.desa?.toUpperCase().includes(searchTerm.toUpperCase());
@@ -173,19 +347,40 @@ export const PbbPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {pbbRecords.filter(r => r.desa_id?.toUpperCase() === selectedLocation.desa.toUpperCase()).map((r) => (
-                    <tr key={r.id} className="hover:bg-slate-50/30 transition-all">
-                      <td className="px-10 py-6 font-bold text-sm uppercase">{r.identities?.nama || r.manual_nama}</td>
-                      <td className="px-10 py-6 font-mono text-xs text-slate-500">{r.lands?.nop}</td>
-                      <td className="px-10 py-6"><span className="text-[9px] font-black border-2 border-slate-100 px-3 py-1 rounded-full">{r.tipe_layanan}</span></td>
-                      <td className="px-10 py-6 text-right">
+                  {pbbRecords
+                    .filter(r => r.desa_id?.toUpperCase() === selectedLocation?.desa.toUpperCase())
+                    .map((r) => (
+                      <tr key={r.id} className="hover:bg-slate-50/30 transition-all">
+                        <td className="px-10 py-6 font-bold text-sm uppercase">
+                          {r.identities?.nama || r.manual_nama}
+                        </td>
+                        <td className="px-10 py-6 font-mono text-xs text-slate-500">
+                          {/* PAKAI FORMAT NOP DI SINI */}
+                          {formatNOP(r.lands?.nop || "")}
+                        </td>
+                        <td className="px-10 py-6">
+                          <span className="text-[9px] font-black border-2 border-slate-100 px-3 py-1 rounded-full">
+                            {r.tipe_layanan}
+                          </span>
+                        </td>
+                        <td className="px-10 py-6 text-right">
                           <div className="flex justify-end gap-3 text-slate-300">
-                              <Edit3 size={16} className="hover:text-slate-900 cursor-pointer"/>
-                              <Trash2 size={16} className="hover:text-red-500 cursor-pointer"/>
+                            {/* TOMBOL EDIT */}
+                            <Edit3 
+                              size={16} 
+                              className="hover:text-slate-900 cursor-pointer transition-colors"
+                              onClick={() => handleEdit(r)}
+                            />
+                            {/* TOMBOL HAPUS */}
+                            <Trash2 
+                              size={16} 
+                              className="hover:text-red-500 cursor-pointer transition-colors"
+                              onClick={() => handleDelete(r.id)}
+                            />
                           </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -205,7 +400,7 @@ export const PbbPage: React.FC = () => {
                 <input type="text" placeholder="CARI DESA..." className="w-full p-4 pl-12 bg-white border-2 border-slate-100 rounded-[1.2rem] outline-none focus:border-slate-900 text-xs font-bold" onChange={(e) => setSearchTerm(e.target.value)} />
               </div>
             </div>
-            <NopSearchBox value={searchNop} onChange={setSearchNop} />
+            <NopSearchBox value={searchNop} onChange={setSearchNop} onSearch={handleSearchNop}/>
           </div>
 
           <div className="flex-1 overflow-y-auto px-10 pb-20">
@@ -260,23 +455,74 @@ export const PbbPage: React.FC = () => {
                     </div>
                  </div>
                  <div className="md:col-span-2 grid grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Cari Wajib Pajak (Database)</label>
-                      <select className="w-full p-4 bg-white border-2 border-slate-100 rounded-2xl text-xs font-bold outline-none focus:border-slate-900" onChange={(e) => setLinkedWP(identities.find(i => i.id === e.target.value) || null)}>
-                        <option value="">-- PILIH DATA IDENTITAS --</option>
-                        {identities.map(i => <option key={i.id} value={i.id}>{i.nama} [{i.nik}]</option>)}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Pilih Objek (NOP)</label>
-                      <select className="w-full p-4 bg-white border-2 border-slate-100 rounded-2xl text-xs font-bold outline-none focus:border-slate-900" onChange={(e) => setLinkedOP(allLands.find(l => l.id === e.target.value) || null)}>
-                        <option value="">-- PILIH NOP / LOKASI --</option>
-                        {allLands.filter(l => l.desa?.toUpperCase() === selectedLocation?.desa.toUpperCase()).map(l => (
-                          <option key={l.id} value={l.id}>{l.nop} - {l.alamat.slice(0, 20)}...</option>
+                  {/* 1. PENCARIAN IDENTITAS (NAMA / NIK) */}
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                      Cari Wajib Pajak (Nama / NIK)
+                    </label>
+                    <div className="relative">
+                      <input 
+                        type="text"
+                        list="list-identitas"
+                        placeholder="Ketik Nama atau NIK..."
+                        className="w-full p-4 bg-white border-2 border-slate-100 rounded-2xl text-xs font-bold outline-none focus:border-slate-900 transition-all"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          // Cari apakah input cocok dengan Nama atau NIK di database
+                          const found = identities.find(i => i.nama === val || i.nik === val);
+                          if (found) setLinkedWP(found);
+                        }}
+                      />
+                      <datalist id="list-identitas">
+                        {identities.map(i => (
+                          // Value diisi Nama, NIK ditaruh di dalam label/teks pendukung
+                          <option key={i.id} value={i.nama}>{i.nik}</option>
                         ))}
-                      </select>
+                      </datalist>
                     </div>
-                 </div>
+                  </div>
+
+                  {/* 2. PENCARIAN OBJEK PAJAK (NOP) */}
+                  {/* 2. PENCARIAN OBJEK PAJAK (NOP) */}
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                      Pilih Objek (NOP)
+                    </label>
+                    <div className="relative">
+                      <input 
+                        type="text"
+                        list="list-nop"
+                        placeholder="xx.xx.xxx.xxx.xxx.xxxx.x"
+                        value={formatNOP(linkedOP?.nop || '')} 
+                        className="w-full p-4 bg-white border-2 border-slate-100 rounded-2xl text-xs font-bold outline-none focus:border-slate-900 transition-all"
+                        onChange={(e) => {
+                          // --- TARO KODE NOMOR 2 DI SINI ---
+                          const raw = e.target.value.replace(/\D/g, '').slice(0, 18);
+                          
+                          // Cari data tanah berdasarkan angka murni NOP (kita bersihkan juga data dari DB untuk jaga-jaga)
+                          const found = allLands.find(l => l.nop.replace(/\D/g, '') === raw);
+                          
+                          if (found) {
+                            setLinkedOP(found);
+                          } else {
+                            // Tetap simpan angka yang diketik di state agar input bisa terus diketik
+                            setLinkedOP({ nop: raw } as any);
+                          }
+                          // --------------------------------
+                        }}
+                      />
+                      <datalist id="list-nop">
+                        {allLands
+                          .filter(l => l.desa?.toUpperCase() === selectedLocation?.desa.toUpperCase())
+                          .map(l => (
+                            <option key={l.id} value={formatNOP(l.nop)}>
+                              {l.alamat.slice(0, 25)}...
+                            </option>
+                          ))}
+                      </datalist>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {linkedOP && (
@@ -341,7 +587,7 @@ export const PbbPage: React.FC = () => {
                                  <div>
                                     <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Pekerjaan</label>
                                     <select className="w-full border-b-2 border-slate-100 font-bold text-xs outline-none pb-2" value={formData.pekerjaan} onChange={e => setFormData({...formData, pekerjaan: e.target.value})}>
-                                       <option>PNS</option><option>ABRI</option><option>PENSIUNAN</option><option>SWASTA</option><option>NELAYAN</option>
+                                       <option>PNS</option><option>ABRI</option><option>PENSIUNAN</option><option>SWASTA</option><option>LAINNYA</option>
                                     </select>
                                  </div>
                               </div>
@@ -387,8 +633,8 @@ export const PbbPage: React.FC = () => {
                      </div>
                   </div>
 
-                  <button className="w-full py-8 bg-slate-900 text-white rounded-[2.5rem] font-black text-sm uppercase tracking-[0.5em] hover:bg-black hover:scale-[1.01] active:scale-95 transition-all shadow-2xl flex items-center justify-center gap-4 group">
-                    <Database size={20} className="group-hover:rotate-12 transition-transform"/> Simpan Perekaman SPOP
+                  <button onClick={handleSave} className="w-full py-8 bg-slate-900 text-white rounded-[2.5rem] font-black text-sm uppercase tracking-[0.5em] hover:bg-black hover:scale-[1.01] active:scale-95 transition-all shadow-2xl flex items-center justify-center gap-4 group">
+                   <Database size={20} className="group-hover:rotate-12 transition-transform"/> Simpan Perekaman SPOP
                   </button>
                 </div>
               )}

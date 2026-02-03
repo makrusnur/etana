@@ -4,7 +4,7 @@ import { db } from '../services/db';
 import { LandData, LandType, LandHistory, BuildingDetail } from '../types';
 import { Button, Input, Card, DateInput, Select } from '../components/UI';
 import { Edit2, Trash2, Plus, Search, MapPin, FileStack,  AlignLeft, Layers, Maximize, Crosshair,   Receipt,  X, CheckCircle, Home } from 'lucide-react';
-import { generateId, terbilang, spellDateIndo, generateUUID} from '../utils';
+import { generateId, terbilang, spellDateIndo, generateUUID, formatNOP} from '../utils';
 import LandMap from '../components/LandMap';
 import { useSearchParams } from 'react-router-dom';
 
@@ -541,16 +541,54 @@ const removeSuratHak = (index: number) => {
                         <div className="p-5 bg-blue-50/50 rounded-3xl border border-blue-100">
                           <p className="text-[9px] font-black text-blue-400 uppercase mb-3">Objek Bumi</p>
                           <div className="space-y-3">
-                            <Input label="Luas (M²)" type="number" value={form.pajak_bumi_luas} onChange={e => setForm({ ...form, pajak_bumi_luas: parseFloat(e.target.value) || 0 })} />
-                            <Input label="NJOP (Rp)" type="number" value={form.pajak_bumi_njop} onChange={e => setForm({ ...form, pajak_bumi_njop: parseFloat(e.target.value) || 0 })} />
+                            <Input 
+                              label="Luas (M²)" 
+                              type="number" 
+                              placeholder="Masukkan Luas Bumi"
+                              value={form.pajak_bumi_luas || ''} 
+                              onChange={e => {
+                                const val = e.target.value;
+                                setForm({ ...form, pajak_bumi_luas: val === '' ? 0 : parseFloat(val) });
+                              }} 
+                            />
+                            <Input 
+                              label="NJOP (Rp)" 
+                              type="number" 
+                              placeholder="Masukkan NJOP Bumi"
+                              value={form.pajak_bumi_njop || ''} 
+                              onChange={e => {
+                                const val = e.target.value;
+                                setForm({ ...form, pajak_bumi_njop: val === '' ? 0 : parseFloat(val) });
+                              }}
+                            />
                           </div>
                         </div>
                         <div className="p-5 bg-emerald-50/50 rounded-3xl border border-emerald-100">
                           <p className="text-[9px] font-black text-emerald-400 uppercase mb-3">Objek Bangunan</p>
                           <div className="space-y-3">
-                            <Input label="Luas (M²)" type="number" value={form.pajak_bangunan_luas} onChange={e => setForm({ ...form, pajak_bangunan_luas: parseFloat(e.target.value) || 0 })} />
-                            <Input label="NJOP (Rp)" type="number" value={form.pajak_bangunan_njop} onChange={e => setForm({ ...form, pajak_bangunan_njop: parseFloat(e.target.value) || 0 })} />
-                          </div>
+                            <Input 
+                              label="Luas (M²)" 
+                              type="number" 
+                              placeholder="Masukkan luas..."
+                              // Jika nilai 0, ubah jadi string kosong agar placeholder muncul
+                              value={form.pajak_bangunan_luas === 0 ? '' : form.pajak_bangunan_luas} 
+                              onChange={e => {
+                                const val = e.target.value;
+                                setForm({ ...form, pajak_bangunan_luas: val === '' ? 0 : parseFloat(val) });
+                              }} 
+                            />
+                            <Input 
+                                label="NJOP (Rp)" 
+                                type="number" 
+                                placeholder="Masukkan NJOP..."
+                                // Logika yang sama: jika 0 tampilkan kosong
+                                value={form.pajak_bangunan_njop === 0 ? '' : form.pajak_bangunan_njop} 
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  setForm({ ...form, pajak_bangunan_njop: val === '' ? 0 : parseFloat(val) });
+                                }} 
+                              />                        
+                         </div>
                         </div>
                       </div>
                       
@@ -726,8 +764,19 @@ const removeSuratHak = (index: number) => {
                 </div>
                 <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100">
                   <label className="block text-[10px] font-black text-emerald-600 uppercase mb-2">Luas Seluruhnya (m²)</label>
-                  <input type="number" className="w-full px-4 py-3 bg-white border border-emerald-200 rounded-lg text-2xl font-black text-emerald-700 outline-none" value={form.luas_seluruhnya} onChange={e => updateLuas('luas_seluruhnya', parseFloat(e.target.value) || 0)} />
-                  <p className="mt-2 text-[10px] font-bold text-emerald-500 italic lowercase tracking-tight">terbilang: {form.ejaan_luas_seluruhnya || 'nol meter persegi'}</p>
+                    <input 
+                      type="number" 
+                      className="w-full px-4 py-3 bg-white border border-emerald-200 rounded-lg text-2xl font-black text-emerald-700 outline-none" 
+                      placeholder="0"
+                      // Jika nilai di state adalah 0, tampilkan string kosong agar placeholder muncul
+                      value={form.luas_seluruhnya === 0 ? '' : form.luas_seluruhnya} 
+                      onChange={e => {
+                        const val = e.target.value;
+                        // Jika input dikosongkan (backspace), kirim 0 ke fungsi updateLuas
+                        updateLuas('luas_seluruhnya', val === '' ? 0 : parseFloat(val));
+                      }} 
+                    />
+                    <p className="mt-2 text-[10px] font-bold text-emerald-500 italic lowercase tracking-tight">terbilang: {form.ejaan_luas_seluruhnya || 'nol meter persegi'}</p>
                   <div className="grid grid-cols-2 gap-2 mt-4">
                     <Input label="Utara" value={form.batas_utara_seluruhnya} onChange={e => setForm({ ...form, batas_utara_seluruhnya: e.target.value })} />
                     <Input label="Timur" value={form.batas_timur_seluruhnya} onChange={e => setForm({ ...form, batas_timur_seluruhnya: e.target.value })} />
@@ -738,7 +787,13 @@ const removeSuratHak = (index: number) => {
                 {isPartial && (
                   <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 animate-in fade-in slide-in-from-top-2">
                     <label className="block text-[10px] font-black text-blue-600 uppercase mb-2">Luas Dimohon (m²)</label>
-                    <input type="number" className="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg text-2xl font-black text-blue-700 outline-none" value={form.luas_dimohon} onChange={e => updateLuas('luas_dimohon', parseFloat(e.target.value) || 0)} />
+                    <input type="number" 
+                      className="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg text-2xl font-black text-blue-700 outline-none" 
+                      placeholder="0"
+                      value={form.luas_dimohon=== 0 ? '' : form.luas_dimohon}
+                      onChange={e =>{ 
+                        const val = e.target.value;
+                      updateLuas('luas_dimohon', val === '' ? 0 : parseFloat(val))}} />
                     <p className="mt-2 text-[10px] font-bold text-blue-500 italic">terbilang: {form.ejaan_luas_dimohon || 'nol meter persegi'}</p>
                     <div className="grid grid-cols-2 gap-2 mt-4">
                       <Input label="Utara" value={form.batas_utara_dimohon} onChange={e => setForm({ ...form, batas_utara_dimohon: e.target.value })} />
@@ -1030,7 +1085,7 @@ const removeSuratHak = (index: number) => {
                   </td>
                   <td className="p-4">
                     <div className="font-black text-slate-800 uppercase">{item.atas_nama_nop}</div>
-                    <div className="text-[10px] text-slate-400 font-mono mt-0.5 tracking-tighter">{item.nop}</div>
+                    <div className="text-[10px] text-slate-400 font-mono mt-0.5 tracking-tighter">{formatNOP(item.nop)}</div>
                   </td>
                   <td className="p-4">
                     <div className="text-xs font-bold text-slate-600 truncate max-w-[200px]">{item.alamat}</div>
