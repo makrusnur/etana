@@ -19,7 +19,7 @@ import {
   ShieldCheck,  
   UserCheck 
 } from 'lucide-react';
-import { spellDateIndo , toTitleCase} from '../utils';
+import { spellDateIndo , toTitleCase, formatNIK, parseRawNIK} from '../utils';
 import SignatureCanvas from 'react-signature-canvas';
 
 export const Identities: React.FC = () => {
@@ -59,7 +59,8 @@ export const Identities: React.FC = () => {
     pekerjaan: '', 
     kewarganegaraan: '',
     ktp_berlaku: '',
-    ejaan_tanggal_ktp_berlaku: '', 
+    ejaan_tanggal_ktp_berlaku: '',
+    ktp_masa_ejaan: '', 
     juncto:'',
     foto_ktp: '', 
     foto_verifikasi: '',
@@ -355,21 +356,13 @@ export const Identities: React.FC = () => {
                     </Select>
                     <Input 
                       label="NIK" 
-                      value={
-                        form.nik
-                          .replace(/\D/g, '') // Bersihkan dari karakter non-angka
-                          .replace(/^(\d{6})(\d{6})(\d{4}).*/, '$1.$2.$3') // Format titik 6.6.4
-                          .replace(/^(\d{6})(\d{1,6})/, '$1.$2') // Format titik saat baru mencapai 7-12 digit
-                          .replace(/^(\d{6}\.\d{6})(\d{1,4})/, '$1.$2') // Format titik saat baru mencapai 13-16 digit
-                      } 
-                      maxLength={19} // NIK 16 digit + 3 titik pemisah
+                      value={formatNIK(form.nik)} // Panggil fungsi formatter
+                      maxLength={18} // 16 digit + 2 titik
                       placeholder="Contoh: 320101.121290.0001"
                       onChange={e => {
-                        // Ambil nilai mentah (hanya angka) untuk disimpan ke state database
-                        const rawValue = e.target.value.replace(/\D/g, '');
-                        if (rawValue.length <= 16) {
-                          setForm({...form, nik: rawValue});
-                        }
+                        // Ambil angka mentahnya saja untuk disimpan ke state/database
+                        const rawValue = parseRawNIK(e.target.value);
+                        setForm({...form, nik: rawValue});
                       }} 
                     />
                     <Input label="Nama Lengkap" className="text-blue-600 font-bold" value={form.nama} onChange={e => setForm({...form, nama: e.target.value})} />

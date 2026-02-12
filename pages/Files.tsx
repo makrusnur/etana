@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../services/db';
-import { FileRecord, Relation, Identity, LandData, RelationRole } from '../types';
+import { supabase } from '../services/db';
+import { FileRecord, Relation, Identity, LandData, RelationRole, HubunganPersetujuan, Persetujuan } from '../types';
 import { Button, Input, Card, DateInput } from '../components/UI';
 import LandMap from '../components/LandMap';
-import { 
-  Plus, Trash2, Search, FileText, Edit2, Calendar, Save, X, Clock, 
-  ShieldAlert, MapPin, CheckCircle, ChevronDown, ChevronUp, AlertCircle, Info
+import {
+  Plus, Trash2, Search, FileText, Edit2, Calendar, Save, X, Clock,
+  ShieldAlert, MapPin, CheckCircle, ChevronDown, ChevronUp, AlertCircle, 
+  Info, HeartHandshake, Users
 } from 'lucide-react';
-import { formatDateIndo, getDayNameIndo, toTitleCase, spellDateIndo, generateUUID } from '../utils';
+import { formatDateIndo, formatNOP, getDayNameIndo, toTitleCase,  generateUUID, spellDateIndo, formatDateStrip, terbilang  } from '../utils';
 
 export const FilesPage: React.FC = () => {
   const [files, setFiles] = useState<FileRecord[]>([]);
@@ -20,31 +21,47 @@ export const FilesPage: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [searchWP, setSearchWP] = useState(''); // Untuk cari Subjek
-  const [searchLand, setSearchLand] = useState(''); // Untuk cari Tanah
-
+  const [searchWP, setSearchWP] = useState('');
+  const [searchLand, setSearchLand] = useState('');
+  const [searchPersetujuan, setSearchPersetujuan] = useState('');
+  
+  
   // STATE UNTUK PETA
   const [showMapPicker, setShowMapPicker] = useState(false);
-  const [selectedCoords, setSelectedCoords] = useState<{lat: number, lng: number}>({ 
-    lat: -7.6448, 
-    lng: 112.9061 
+  const [selectedCoords, setSelectedCoords] = useState<{lat: number, lng: number}>({
+    lat: -7.6448,
+    lng: 112.9061
   });
   const [hasSelectedLocation, setHasSelectedLocation] = useState(false);
-
+  
   // STATE BARU: TANAH DI LEVEL DOKUMEN
   const [selectedLandIds, setSelectedLandIds] = useState<string[]>([]);
   const [isDocumentLocked, setIsDocumentLocked] = useState(false);
   const [showRelations, setShowRelations] = useState(true);
+  const [persetujuans, setPersetujuans] = useState<Persetujuan[]>([]);
+  const [showModalTambahPersetujuan, setShowModalTambahPersetujuan] = useState(false);
+  const [selectedIdentitasId, setSelectedIdentitasId] = useState<string>('');
+  const [identitasList, setIdentitasList] = useState<any[]>([]); 
+  const [selectedHubungan, setSelectedHubungan] = useState<HubunganPersetujuan>('ISTRI');
+  // STATE UNTUK FORM PERSETUJUAN
+  const [newPersetujuan, setNewPersetujuan] = useState({
+    identityId: '',
+    pihak1Id: '',
+    hubungan: 'ISTRI' as HubunganPersetujuan,
+    keterangan: ''
+  });
 
   const initialFileState: Partial<FileRecord> = { 
     tanggal: new Date().toISOString().split('T')[0],
     hari: getDayNameIndo(new Date().toISOString().split('T')[0]),
+    menurut_keterangan: 'STANDAR',
     nomor_berkas: '',
     nomor_register: '',
     tanggal_register: '',
     keterangan: '',
     jenis_perolehan: '',
     tahun_perolehan: '',
+    nama_almarhum: '',
     register_waris_desa: '',
     register_waris_kecamatan: '',
     tanggal_waris: '',
@@ -67,33 +84,63 @@ export const FilesPage: React.FC = () => {
   const refreshData = async () => {
     setIsLoading(true);
     try {
-      const [f, i, l] = await Promise.all([
-        db.files.getAll(), 
-        db.identities.getAll(), 
-        db.lands.getAll()
+      const [filesRes, identitiesRes, landsRes] = await Promise.all([
+        supabase.from('files').select('*').eq('kategori', 'PPAT_NOTARIS').order('created_at', { ascending: false }),
+        supabase.from('identities').select('*'),
+        supabase.from('lands').select('*')
       ]);
-      setFiles(f || []);
-      setAllIdentities(i || []);
-      setAllLands(l || []);
+      
+      if (filesRes.error) throw filesRes.error;
+      if (identitiesRes.error) throw identitiesRes.error;
+      if (landsRes.error) throw landsRes.error;
+      
+      setFiles(filesRes.data as FileRecord[]);
+      setAllIdentities(identitiesRes.data as Identity[]);
+      setAllLands(landsRes.data as LandData[]);
     } catch (err) {
       console.error("Gagal sinkron:", err);
+      setFiles([]);
+      setAllIdentities([]);
+      setAllLands([]);
     } finally {
       setIsLoading(false);
     }
   };
+  
 
   const handleSelect = async (f: FileRecord) => {
     setActiveFile(f);
     try {
-      const fileRelations = await db.relations.getByFileId(f.id);
-      setRelations(fileRelations || []);
+      const relationsRes = await supabase
+        .from('relations')
+        .select('*')
+        .eq('berkas_id', f.id)
+        .order('created_at', { ascending: true });
+      
+      if (relationsRes.error) throw relationsRes.error;
+      
+      const persetujuansRes = await supabase
+        .from('persetujuans')
+        .select('*')
+        .eq('berkas_id', f.id)
+        .order('created_at', { ascending: true });
+      
+      if (persetujuansRes.error) throw persetujuansRes.error;
+      
+      const fileRelations = relationsRes.data as Relation[];
+      const filePersetujuans = persetujuansRes.data as Persetujuan[];
+      
+      setRelations(fileRelations);
+      setPersetujuans(filePersetujuans);
       
       // Load tanah yang terhubung dengan berkas ini
-      const landIds = fileRelations?.filter(r => r.data_tanah_id).map(r => r.data_tanah_id!) || [];
-      setSelectedLandIds([...new Set(landIds)]); // Unique tanah IDs
+      const landIds = fileRelations
+        .filter((r: Relation) => r.data_tanah_id)
+        .map((r: Relation) => r.data_tanah_id!) || [];
+      setSelectedLandIds([...new Set(landIds)]);
       
       // Set koordinat dari tanah pertama (jika ada)
-      const firstLandRel = fileRelations?.find(r => r.data_tanah_id);
+      const firstLandRel = fileRelations.find((r: Relation) => r.data_tanah_id);
       if (firstLandRel) {
         const landData = allLands.find(l => l.id === firstLandRel.data_tanah_id);
         if (landData && landData.latitude) {
@@ -102,11 +149,14 @@ export const FilesPage: React.FC = () => {
         }
       }
     } catch (err) {
+      console.error("Gagal load data berkas:", err);
       setRelations([]);
+      setPersetujuans([]);
       setSelectedLandIds([]);
     }
     setNewRel({ identityId: '', role: 'PIHAK_1' });
-    setIsDocumentLocked(relations?.length > 0); // Lock jika sudah ada relasi
+    setNewPersetujuan({ identityId: '', pihak1Id: '', hubungan: 'ISTRI', keterangan: '' });
+    setIsDocumentLocked(relations.length > 0);
   };
 
   const handleSaveFile = async () => {
@@ -128,27 +178,27 @@ export const FilesPage: React.FC = () => {
         kategori: 'PPAT_NOTARIS',
         nomor_berkas: formFile.nomor_berkas!.toUpperCase(),
         nomor_register: formFile.nomor_register?.toUpperCase() || '',
-        
+        tanggal_register: formFile.tanggal_register,
         keterangan_persetujuan: formFile.keterangan_persetujuan?.toUpperCase() || '',
-        cakupan_tanah: formFile.cakupan_tanah, // Ini biasanya sudah fix dari pilihan
+        cakupan_tanah: formFile.cakupan_tanah,
         pihak_penanggung: formFile.pihak_penanggung?.toUpperCase()|| '',
         jumlah_saksi: formFile.jumlah_saksi?.toUpperCase() || '',
-        
         latitude: selectedCoords.lat,
         longitude: selectedCoords.lng,
-        tanggal: formFile.tanggal || undefined,
-        tanggal_waris: formFile.tanggal_waris || undefined,
+        tanggal: formFile.tanggal,
+        tanggal_waris: formFile.tanggal_waris,
         hari: formFile.hari || getDayNameIndo(formFile.tanggal || ''),
         jenis_perolehan: formFile.jenis_perolehan!.toUpperCase(),
-
-        created_at: formFile.created_at || new Date().toISOString()
+        created_at: formFile.created_at || new Date().toISOString(),
+        ejaan_tanggal_waris: formFile.tanggal_waris ? spellDateIndo(formFile.tanggal_waris) : ""
       } as FileRecord;
 
-      // 1. Simpan Berkas
       if (editingId) {
-        await db.files.update(editingId, payload);
+        const { error } = await supabase.from('files').update(payload).eq('id', editingId);
+        if (error) throw error;
       } else {
-        await db.files.add(payload);
+        const { error } = await supabase.from('files').insert([payload]);
+        if (error) throw error;
       }
 
       setIsCreating(false);
@@ -176,52 +226,178 @@ export const FilesPage: React.FC = () => {
   const handleDeleteFile = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (confirm('Hapus berkas ini secara permanen?')) {
-      await db.files.delete(id);
+      const { error } = await supabase.from('files').delete().eq('id', id);
+      if (error) {
+        console.error(error);
+        alert('Gagal menghapus berkas');
+        return;
+      }
       if (activeFile?.id === id) setActiveFile(null);
       await refreshData();
     }
   };
 
-  const handleAddRel = async () => {
+    const handleAddRel = async () => {
     if (!activeFile || !newRel.identityId || selectedLandIds.length === 0) return;
 
     try {
-      // Buat relasi untuk SETIAP tanah yang dipilih
       const newRelations = selectedLandIds.map(landId => ({
         id: generateUUID(),
         berkas_id: activeFile.id,
         identitas_id: newRel.identityId,
         peran: newRel.role,
-        data_tanah_id: landId
+        data_tanah_id: landId,
+        created_at: new Date().toISOString()
       }));
 
-      // Simpan semua relasi
       for (const rel of newRelations) {
-        await db.relations.add(rel);
+        const { error } = await supabase.from('relations').insert([rel]);
+        if (error) throw error;
       }
 
-      const updatedRels = await db.relations.getByFileId(activeFile.id);
-      setRelations(updatedRels);
+      // PERBAIKAN DI SINI:
+      // Gunakan { data: namaVariabel } untuk memberikan alias pada 'data'
+      const { data: updatedRels, error: relsError } = await supabase
+        .from('relations')
+        .select('*')
+        .eq('berkas_id', activeFile.id);
+      
+      if (relsError) throw relsError;
+      
+      // Pastikan data tidak null sebelum di-set
+      setRelations((updatedRels || []) as Relation[]);
       setNewRel({ identityId: '', role: 'PIHAK_1' });
-      setIsDocumentLocked(true); // Lock setelah ada relasi
+      setIsDocumentLocked(true);
 
     } catch (err: any) {
       console.error("Gagal menambah relasi:", err);
-      alert("Database menolak format ID. Harap ubah tipe data kolom di Supabase menjadi TEXT.");
+      alert("Gagal menambah relasi: " + (err.message || "Terjadi kesalahan"));
     }
   };
 
   const deleteRel = async (id: string) => {
-    await db.relations.delete(id);
-    if (activeFile) {
-      const updatedRels = await db.relations.getByFileId(activeFile.id);
-      setRelations(updatedRels);
+    if (!confirm('Hapus relasi ini?')) return;
+    
+    try {
+      const { error } = await supabase.from('relations').delete().eq('id', id);
+      if (error) throw error;
       
-      // Unlock dokumen jika tidak ada relasi lagi
-      if (updatedRels.length === 0) {
-        setIsDocumentLocked(false);
+      if (activeFile) {
+        // PERBAIKAN: Tambahkan kata kunci 'data:' sebelum 'updatedRels'
+        const { data: updatedRels, error: relsError } = await supabase
+          .from('relations')
+          .select('*')
+          .eq('berkas_id', activeFile.id);
+        
+        if (relsError) throw relsError;
+        
+        // Gunakan updatedRels || [] untuk menghindari error jika data null
+        const finalRels = (updatedRels || []) as Relation[];
+        setRelations(finalRels);
+        
+        if (finalRels.length === 0) {
+          setIsDocumentLocked(false);
+        }
       }
+    } catch (err) {
+      console.error("Gagal menghapus relasi:", err);
+      alert("Gagal menghapus relasi");
     }
+  };
+
+  // ✅ Fungsi untuk cek apakah sudah ada PIHAK_1
+  const getPihak1List = (): Relation[] => {
+    return relations.filter(r => r.peran === 'PIHAK_1');
+  };
+
+  // ✅ Cek apakah sudah bisa tambah persetujuan (minimal 1 PIHAK_1)
+  const canAddPersetujuan = (): boolean => {
+    return getPihak1List().length > 0;
+  };
+
+  // ✅ Fungsi untuk menambah persetujuan
+ const handleAddPersetujuan = async () => {
+    if (!activeFile || !newPersetujuan.identityId || !newPersetujuan.pihak1Id) {
+      alert('Pilih PIHAK_1 dan Subjek Persetujuan terlebih dahulu!');
+      return;
+    }
+
+    try {
+      const persetujuan: Persetujuan = {
+        id: generateUUID(),
+        berkas_id: activeFile.id,
+        identitas_id: newPersetujuan.identityId,
+        pihak_1_id: newPersetujuan.pihak1Id,
+        hubungan: newPersetujuan.hubungan,
+        keterangan: newPersetujuan.keterangan || undefined,
+        created_at: new Date().toISOString()
+      };
+
+      const { error } = await supabase.from('persetujuans').insert([persetujuan]);
+      if (error) throw error;
+      
+      // PERBAIKAN DI SINI:
+      // Tambahkan 'data:' sebelum 'updatedPersetujuans'
+      const { data: updatedPersetujuans, error: persetError } = await supabase
+        .from('persetujuans')
+        .select('*')
+        .eq('berkas_id', activeFile.id);
+      
+      if (persetError) throw persetError;
+      
+      // Gunakan updatedPersetujuans || [] agar lebih aman
+      setPersetujuans((updatedPersetujuans || []) as Persetujuan[]);
+      
+      // Reset form
+      setNewPersetujuan({ identityId: '', pihak1Id: '', hubungan: 'ISTRI', keterangan: '' });
+      setSearchPersetujuan('');
+      
+      alert("Persetujuan berhasil ditambahkan!");
+
+    } catch (err: any) {
+      console.error("Gagal menambah persetujuan:", err);
+      alert("Gagal menambah persetujuan: " + (err.message || "Terjadi kesalahan"));
+    }
+  };
+
+  // ✅ Fungsi untuk hapus persetujuan
+  const deletePersetujuan = async (id: string) => {
+    if (!confirm('Hapus persetujuan ini?')) return;
+    
+    try {
+      const { error } = await supabase.from('persetujuans').delete().eq('id', id);
+      if (error) throw error;
+      
+      if (activeFile) {
+        // PERBAIKAN: Gunakan destructuring alias { data: namaVariabel }
+        const { data: updatedPersetujuans, error: persetError } = await supabase
+          .from('persetujuans')
+          .select('*')
+          .eq('berkas_id', activeFile.id);
+        
+        if (persetError) throw persetError;
+        
+        // Gunakan (data || []) untuk keamanan tipe data
+        setPersetujuans((updatedPersetujuans || []) as Persetujuan[]);
+      }
+    } catch (err) {
+      console.error("Gagal menghapus persetujuan:", err);
+      alert("Gagal menghapus persetujuan");
+    }
+  };
+
+  // ✅ Helper untuk mendapatkan label hubungan
+  const getHubunganLabel = (hubungan: HubunganPersetujuan): string => {
+    const labels: Record<HubunganPersetujuan, string> = {
+      'ISTRI': 'Istri',
+      'SUAMI': 'Suami',
+      'ANAK': 'Anak',
+      'ORANG_TUA': 'Orang Tua',
+      'SAUDARA': 'Saudara',
+      'WALI': 'Wali',
+      'LAINNYA': 'Lainnya'
+    };
+    return labels[hubungan];
   };
 
   const filteredFiles = files.filter(f => {
@@ -230,15 +406,35 @@ export const FilesPage: React.FC = () => {
                          f.jenis_perolehan.toLowerCase().includes(fileSearch.toLowerCase());
     return isKategoriCocok && isSearchCocok; 
   });
-
-  const isWaris = formFile.jenis_perolehan?.toUpperCase().includes('WARIS');
-
   // Helper: Get unique tanah dari relasi
   const getUniqueLandsFromRelations = () => {
     const landIds = relations.map(r => r.data_tanah_id).filter(Boolean) as string[];
     return [...new Set(landIds)];
   };
 
+  const susunIdentitasPersetujuan = (dataPersetujuan: Persetujuan, dataIdentitas: any) => {
+  const { nama, tempat_lahir, tanggal_lahir, pekerjaan, alamat, nik } = dataIdentitas;
+  const { hubungan } = dataPersetujuan;
+
+  // 1. Format Tanggal & Pekerjaan
+  const tglIndo = formatDateIndo(tanggal_lahir);
+  const ejaanTgl = spellDateIndo(tanggal_lahir);
+  
+  // 2. LOGIC ALAMAT (Ini Intinya!)
+  let frasaAlamat = "";
+  if (hubungan === 'ISTRI' || hubungan === 'SUAMI') {
+    // Jika Pasangan, pakai kalimat baku "Sama dengan suaminya/istrinya"
+    const kaitan = hubungan === 'ISTRI' ? 'suaminya' : 'istrinya';
+    frasaAlamat = `bertempat tinggal sama dengan ${kaitan} tersebut diatas`;
+  } else {
+    // Jika Anak, Orang Tua, dll, panggil alamat lengkapnya
+    frasaAlamat = `bertempat tinggal di ${alamat}`;
+  }
+
+  // 3. Gabungkan jadi satu Paragraf Akta
+  return `--${nama.toUpperCase()}, Warga Negara Indonesia, lahir di ${toTitleCase(tempat_lahir)}, pada tanggal ${tglIndo} (${ejaanTgl}), ${toTitleCase(pekerjaan)}, ${frasaAlamat}, pemegang Kartu Tanda Penduduk NIK : ${nik}.`;
+}
+ 
   return (
     <div className="h-[calc(100vh-2rem)] flex gap-6 overflow-hidden bg-slate-50">
       {/* SIDEBAR - BERKAS LIST */}
@@ -452,7 +648,15 @@ export const FilesPage: React.FC = () => {
                           placeholder="Cari NOP atau nama pemilik tanah..."
                           className="w-full px-4 py-2.5 border border-slate-300 rounded-md bg-white text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
                           value={searchLand}
-                          onChange={(e) => setSearchLand(e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const isNumber = /^\d/.test(val.replace(/[.\-]/g, ''));
+                            if (isNumber) {
+                              setSearchLand(formatNOP(val));
+                            } else {
+                              setSearchLand(val);
+                            }
+                          }}
                         />
                         {searchLand && (
                           <div className="absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
@@ -601,17 +805,12 @@ export const FilesPage: React.FC = () => {
                           <select 
                             className="w-full px-4 py-2.5 border border-slate-300 rounded-md bg-white text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none h-[42px]" 
                             value={newRel.role} 
-                            onChange={e => setNewRel({...newRel, role: e.target.value as any})}
+                            onChange={e => setNewRel({...newRel, role: e.target.value as RelationRole})}
                           >
-                            <option value="PIHAK_1">PIHAK 1 </option>
-                            <option value="PIHAK_2">PIHAK 2 </option>
+                            <option value="PIHAK_1">PIHAK 1</option>
+                            <option value="PIHAK_2">PIHAK 2</option>
                             <option value="SAKSI">SAKSI</option>
-                            <option value="PERSETUJUAN_ISTRI">PERSETUJUAN ISTRI KE 1</option>
-                            <option value="PERSETUJUAN_SUAMI">PERSETUJUAN SUAMI</option>
-                            <option value="PERSETUJUAN_ANAK">PERSETUJUAN ANAK</option>
-                            <option value="PERSETUJUAN_SAUDARA">PERSETUJUAN SAUDARA</option>
-                            <option value="PERSETUJUAN_ORANGTUA">PERSETUJUAN ORANG TUA</option>
-                            </select>
+                          </select>
                         </div>
                       </div>
 
@@ -629,69 +828,266 @@ export const FilesPage: React.FC = () => {
                     </div>
                   )}
 
-                  {/* === DAFTAR PIHAK YANG SUDAH DITAMBAHKAN === */}
-                  {relations.length > 0 && (
-                    <div className="mt-6 pt-5 border-t border-slate-200">
-                      <div className="mb-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-[10px] font-bold text-slate-600 uppercase">
-                            Pihak yang Terhubung
-                          </span>
-                          <span className="text-[10px] font-bold text-blue-600">
-                            {relations.length} pihak
-                          </span>
-                        </div>
-                        
-                        {/* Preview Tanah yang Terhubung */}
-                        <div className="flex flex-wrap gap-2 mb-3">
-                          {getUniqueLandsFromRelations().map(id => {
-                            const land = allLands.find(l => l.id === id);
-                            return (
-                              <span 
-                                key={id} 
-                                className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2.5 py-1 rounded"
-                              >
-                                {land?.nop}
-                              </span>
-                            );
-                          })}
-                        </div>
+                  {/* ✅ SECTION KHUSUS: TAMBAH PERSETUJUAN (Muncul setelah ada PIHAK_1) */}
+                  {canAddPersetujuan() && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-md p-5">
+                      <div className="flex items-center gap-2 mb-4">
+                        <HeartHandshake size={18} className="text-amber-600" />
+                        <h4 className="text-[10px] font-bold text-amber-700 uppercase tracking-widest">
+                          Tambah Persetujuan untuk PIHAK 1
+                        </h4>
                       </div>
                       
-                      <div className="space-y-2.5">
-                        {relations.map(r => (
-                          <div 
-                            key={r.id} 
-                            className="flex justify-between p-3 bg-white border rounded items-center hover:bg-slate-50 transition-colors"
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        {/* Pilih PIHAK_1 yang akan disetujui */}
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1.5">
+                            Pilih PIHAK 1
+                          </label>
+                          <select 
+                            className="w-full px-4 py-2.5 border border-slate-300 rounded-md bg-white text-sm font-bold focus:ring-2 focus:ring-amber-500 outline-none h-[42px]" 
+                            value={newPersetujuan.pihak1Id} 
+                            onChange={e => setNewPersetujuan({...newPersetujuan, pihak1Id: e.target.value})}
                           >
-                            <div className="flex flex-col">
-                              <span className="font-bold text-sm text-slate-800">
-                                {toTitleCase(allIdentities.find(i => i.id === r.identitas_id)?.nama || '')}
+                            <option value="">-- Pilih PIHAK 1 --</option>
+                            {getPihak1List().map(p1 => {
+                              const identity = allIdentities.find(i => i.id === p1.identitas_id);
+                              return (
+                                <option key={p1.id} value={p1.id}>
+                                  {identity?.nama} (NIK: {identity?.nik})
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+
+                        {/* Pilih Subjek untuk Persetujuan */}
+                        <div className="relative">
+                          <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1.5">
+                            Cari Subjek Persetujuan (NIK/Nama)
+                          </label>
+                          <input 
+                            type="text"
+                            placeholder="Ketik Nama/NIK..."
+                            className="w-full px-4 py-2.5 border border-slate-300 rounded-md bg-white text-sm font-bold focus:ring-2 focus:ring-amber-500 outline-none"
+                            value={searchPersetujuan}
+                            onChange={(e) => setSearchPersetujuan(e.target.value)}
+                            disabled={!newPersetujuan.pihak1Id}
+                          />
+                          {searchPersetujuan && newPersetujuan.pihak1Id && !newPersetujuan.identityId && (
+                            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                              {allIdentities
+                                .filter(i => 
+                                  i.nama.toLowerCase().includes(searchPersetujuan.toLowerCase()) || 
+                                  i.nik.includes(searchPersetujuan)
+                                )
+                                .map(i => (
+                                  <div 
+                                    key={i.id}
+                                    className="p-2.5 hover:bg-amber-50 cursor-pointer border-b border-slate-100 last:border-none"
+                                    onClick={() => {
+                                      setNewPersetujuan({...newPersetujuan, identityId: i.id});
+                                      setSearchPersetujuan(i.nama.toUpperCase());
+                                    }}
+                                  >
+                                    <p className="text-[11px] font-bold text-slate-800">{i.nama.toUpperCase()}</p>
+                                    <p className="text-[10px] text-slate-500 font-mono">{i.nik}</p>
+                                  </div>
+                                ))}
+                            </div>
+                          )}
+                          {newPersetujuan.identityId && (
+                            <button 
+                              onClick={() => {
+                                setNewPersetujuan({...newPersetujuan, identityId: ''});
+                                setSearchPersetujuan('');
+                              }}
+                              className="absolute right-3 top-2.5 text-red-600 hover:bg-red-50 rounded p-0.5"
+                            >
+                              <X size={14}/>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1.5">
+                            Hubungan dengan PIHAK 1
+                          </label>
+                          <select 
+                            className="w-full px-4 py-2.5 border border-slate-300 rounded-md bg-white text-sm font-bold focus:ring-2 focus:ring-amber-500 outline-none h-[42px]" 
+                            value={newPersetujuan.hubungan} 
+                            onChange={e => setNewPersetujuan({...newPersetujuan, hubungan: e.target.value as HubunganPersetujuan})}
+                            disabled={!newPersetujuan.identityId}
+                          >
+                            <option value="ISTRI">Istri</option>
+                            <option value="SUAMI">Suami</option>
+                            <option value="ANAK">Anak</option>
+                            <option value="ORANG_TUA">Orang Tua</option>
+                            <option value="SAUDARA">Saudara</option>
+                            <option value="WALI">Wali</option>
+                            <option value="LAINNYA">Lainnya</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1.5">
+                            Keterangan (Opsional)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Contoh: sebagai istri sah..."
+                            className="w-full px-4 py-2.5 border border-slate-300 rounded-md bg-white text-sm font-bold focus:ring-2 focus:ring-amber-500 outline-none"
+                            value={newPersetujuan.keterangan}
+                            onChange={e => setNewPersetujuan({...newPersetujuan, keterangan: e.target.value})}
+                            disabled={!newPersetujuan.identityId}
+                          />
+                        </div>
+                      </div>
+
+                      <Button 
+                        className="w-full h-11 font-bold bg-amber-600 hover:bg-amber-700 text-white mt-4"
+                        onClick={handleAddPersetujuan}
+                        disabled={!newPersetujuan.identityId || !newPersetujuan.pihak1Id}
+                      >
+                        TAMBAHKAN PERSETUJUAN
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* === DAFTAR PIHAK YANG SUDAH DITAMBAHKAN === */}
+                  {(relations.length > 0 || persetujuans.length > 0) && (
+                    <div className="mt-6 pt-5 border-t border-slate-200">
+                      {/* Daftar Pihak Biasa (PIHAK_1, PIHAK_2, SAKSI) */}
+                      {relations.length > 0 && (
+                        <>
+                          <div className="mb-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="text-[10px] font-bold text-slate-600 uppercase">
+                                Pihak yang Terhubung
                               </span>
-                              <span className="text-[10px] text-slate-500 mt-0.5">
-                                NIK: {allIdentities.find(i => i.id === r.identitas_id)?.nik}
+                              <span className="text-[10px] font-bold text-blue-600">
+                                {relations.length} pihak
                               </span>
                             </div>
-                            <div className="flex items-center gap-2.5">
-                              <span className={`text-[10px] font-bold px-2.5 py-1 rounded uppercase ${
-                                r.peran === 'PIHAK_1' ? 'bg-amber-100 text-amber-800' :
-                                r.peran === 'PIHAK_2' ? 'bg-green-100 text-green-800' :
-                                r.peran === 'SAKSI' ? 'bg-purple-100 text-purple-800' :
-                                'bg-cyan-100 text-cyan-800'
-                              }`}>
-                                {r.peran.replace('_', ' ')}
-                              </span>
-                              <button 
-                                onClick={() => deleteRel(r.id)} 
-                                className="text-red-600 hover:bg-red-50 rounded p-1.5"
-                                title="Hapus"
-                              >
-                                <Trash2 size={14} />
-                              </button>
+                            
+                            {/* Preview Tanah yang Terhubung */}
+                            <div className="flex flex-wrap gap-2 mb-3">
+                              {getUniqueLandsFromRelations().map(id => {
+                                const land = allLands.find(l => l.id === id);
+                                return (
+                                  <span 
+                                    key={id} 
+                                    className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2.5 py-1 rounded"
+                                  >
+                                    {land?.nop}
+                                  </span>
+                                );
+                              })}
                             </div>
                           </div>
-                        ))}
-                      </div>
+                          
+                          <div className="space-y-2.5 mb-6">
+                            {relations.map(r => (
+                              <div 
+                                key={r.id} 
+                                className="flex justify-between p-3 bg-white border rounded items-center hover:bg-slate-50 transition-colors"
+                              >
+                                <div className="flex flex-col">
+                                  <span className="font-bold text-sm text-slate-800">
+                                    {toTitleCase(allIdentities.find(i => i.id === r.identitas_id)?.nama || '')}
+                                  </span>
+                                  <span className="text-[10px] text-slate-500 mt-0.5">
+                                    NIK: {allIdentities.find(i => i.id === r.identitas_id)?.nik}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2.5">
+                                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded uppercase ${
+                                    r.peran === 'PIHAK_1' ? 'bg-amber-100 text-amber-800' :
+                                    r.peran === 'PIHAK_2' ? 'bg-green-100 text-green-800' :
+                                    r.peran === 'SAKSI' ? 'bg-purple-100 text-purple-800' :
+                                    'bg-cyan-100 text-cyan-800'
+                                  }`}>
+                                    {r.peran.replace('_', ' ')}
+                                  </span>
+                                  <button 
+                                    onClick={() => deleteRel(r.id)} 
+                                    className="text-red-600 hover:bg-red-50 rounded p-1.5"
+                                    title="Hapus"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+
+                      {/* ✅ Daftar Persetujuan (Section Terpisah) */}
+                      {persetujuans.length > 0 && (
+                        <>
+                          <div className="mb-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <HeartHandshake size={16} className="text-amber-600" />
+                                <span className="text-[10px] font-bold text-amber-700 uppercase">
+                                  Daftar Persetujuan
+                                </span>
+                              </div>
+                              <span className="text-[10px] font-bold text-amber-600">
+                                {persetujuans.length} persetujuan
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-500 italic">
+                              Persetujuan dari pihak yang memiliki hubungan dengan PIHAK 1
+                            </p>
+                          </div>
+                          
+                          <div className="space-y-2.5">
+                            {persetujuans.map(p => {
+                              const identity = allIdentities.find(i => i.id === p.identitas_id);
+                              const pihak1 = relations.find(r => r.id === p.pihak_1_id);
+                              const pihak1Identity = pihak1 ? allIdentities.find(i => i.id === pihak1.identitas_id) : null;
+                              
+                              return (
+                                <div 
+                                  key={p.id} 
+                                  className="flex justify-between p-3 bg-amber-50 border border-amber-200 rounded items-center hover:bg-amber-100 transition-colors"
+                                >
+                                  <div className="flex flex-col">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-sm text-amber-900">
+                                        {toTitleCase(identity?.nama || '')}
+                                      </span>
+                                      <span className="text-[10px] font-bold bg-amber-200 text-amber-800 px-2 py-0.5 rounded">
+                                        {getHubunganLabel(p.hubungan)}
+                                      </span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-600 mt-0.5">
+                                      NIK: {identity?.nik}
+                                    </span>
+                                    <span className="text-[10px] text-blue-700 font-bold mt-0.5">
+                                      ↳ Menyetujui: {pihak1Identity?.nama || 'PIHAK 1'}
+                                    </span>
+                                    {p.keterangan && (
+                                      <span className="text-[10px] text-slate-500 italic mt-0.5">
+                                        "{p.keterangan}"
+                                      </span>
+                                    )}
+                                  </div>
+                                  <button 
+                                    onClick={() => deletePersetujuan(p.id)} 
+                                    className="text-red-600 hover:bg-red-50 rounded p-1.5"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -714,271 +1110,281 @@ export const FilesPage: React.FC = () => {
       </div>
 
       {/* OVERLAY FORM PEMBUATAN/EDIT BERKAS */}
-      {isCreating && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <Card className="w-full max-w-3xl relative my-auto border-0 shadow-2xl" title={editingId ? "Edit Berkas" : "Buat Berkas Baru"}>
-            <button 
-              onClick={() => setIsCreating(false)} 
-              className="absolute top-4 right-4 p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded"
-            >
-              <X size={22} />
-            </button>
-            <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-2 custom-scrollbar">
-              
-              {/* Section: Nomor & Identitas Berkas */}
-              <div className="border-b pb-4 mb-4">
-                <h4 className="text-[11px] font-bold text-slate-600 uppercase tracking-widest mb-3">Identitas Berkas</h4>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="col-span-2">
-                    <Input 
-                      label="Nomor Berkas" 
-                      placeholder="Contoh: 123/2024" 
-                      value={formFile.nomor_berkas} 
-                      onChange={e => setFormFile({...formFile, nomor_berkas: e.target.value})} 
-                    />
-                  </div>
-                  <Input 
-                    label="Nomor Register" 
-                    placeholder="Contoh: REG-XXX" 
-                    value={formFile.nomor_register} 
-                    onChange={e => setFormFile({...formFile, nomor_register: e.target.value})} 
-                  />
-                  <DateInput 
-                    label="Tanggal Register" 
-                    value={formFile.tanggal_register} 
-                    onChange={val => setFormFile({...formFile, tanggal_register: val})} 
-                  />
+  {isCreating && (
+  <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center p-4">
+    <Card 
+      className="w-full max-w-3xl relative border-0 shadow-xl bg-white overflow-hidden flex flex-col my-auto rounded-2xl" 
+      title={editingId ? "Edit Berkas" : "Buat Berkas Baru"}
+    >
+      {/* Tombol Close */}
+      <button 
+        onClick={() => setIsCreating(false)} 
+        className="absolute top-5 right-5 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all z-10"
+      >
+        <X size={20} />
+      </button>
+
+      <div className="p-8 space-y-8 max-h-[85vh] overflow-y-auto custom-scrollbar">
+        
+        {/* SECTION 1: IDENTITAS NOMOR */}
+        <div className="grid grid-cols-2 gap-6">
+          <Input 
+            label="Nomor Berkas" 
+            placeholder="Misal: 123/2024" 
+            value={formFile.nomor_berkas} 
+            onChange={e => setFormFile({...formFile, nomor_berkas: e.target.value})} 
+          />
+          <Input 
+            label="Nomor Register" 
+            placeholder="REG-XXX" 
+            value={formFile.nomor_register} 
+            onChange={e => setFormFile({...formFile, nomor_register: e.target.value})} 
+          />
+        </div>
+
+        {/* SECTION 2: TANGGAL & REGISTER */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* TANGGAL REGISTER */}
+          <div className="space-y-1.5">
+            <DateInput 
+              label="Tanggal Register" 
+              value={formFile.tanggal_register} 
+              onChange={val => setFormFile({
+                ...formFile, 
+                tanggal_register: val, 
+                ejaan_tanggal_register: spellDateIndo(val || "")
+              })} 
+            />
+            <p className="text-[10px] text-slate-400 font-medium px-1 italic">
+               Ejaan: {formFile.ejaan_tanggal_register || '-'}
+            </p>
+          </div>
+
+          {/* TANGGAL BERKAS DENGAN HARI DI ATAS TAHUN */}
+          <div className="space-y-1.5 relative">
+             <div className="flex justify-between items-end mb-1">
+                <label className="text-[12px] font-medium text-slate-700">Tanggal Berkas</label>
+                {/* Tampilan Hari di atas kolom input */}
+                <div className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
+                  Hari: {formFile.hari || '-'}
+                </div>
+             </div>
+             <DateInput 
+                value={formFile.tanggal} 
+                onChange={val => setFormFile({
+                  ...formFile, 
+                  tanggal: val, 
+                  hari: getDayNameIndo(val || ""),
+                  ejaan_tanggal: spellDateIndo(val || "")
+                })} 
+              />
+            <p className="text-[10px] text-slate-400 font-medium px-1 italic">
+               Ejaan: {formFile.ejaan_tanggal || '-'}
+            </p>
+          </div>
+        </div>
+
+        {/* SECTION 3: KATEGORI KETERANGAN (MINIMALIST TABS) */}
+        <div className="space-y-4 pt-2">
+          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Kategori Keterangan</label>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: 'STANDAR', label: 'Biasa', icon: <FileText size={14}/> },
+              { id: 'PERSETUJUAN', label: 'Persetujuan', icon: <HeartHandshake size={14}/> },
+              { id: 'AKTA_KUASA', label: 'Akta Kuasa', icon: <ShieldAlert size={14}/> },
+              { id: 'AHLI_WARIS', label: 'Ahli Waris', icon: <Users size={14}/> }
+            ].map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setFormFile({ ...formFile, menurut_keterangan: opt.id as any })}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full border text-[11px] font-semibold transition-all ${
+                  formFile.menurut_keterangan === opt.id 
+                    ? 'border-slate-800 bg-slate-800 text-white shadow-md' 
+                    : 'border-slate-200 bg-white text-slate-500 hover:border-slate-400'
+                }`}
+              >
+                {opt.icon}
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-4 p-5 rounded-xl border border-slate-100 bg-slate-50/30 min-h-[100px]">
+            {/* AHLI WARIS */}
+            {formFile.menurut_keterangan === 'AHLI_WARIS' && (
+              <div className="grid grid-cols-2 gap-5 animate-in fade-in duration-500">
+                <div className="col-span-2">
+                  <Input label="Nama Almarhum" placeholder="Nama lengkap..." value={formFile.nama_almarhum} onChange={e => setFormFile({...formFile, nama_almarhum: e.target.value})} />
+                </div>
+                <Input label="Desa SKW" value={formFile.desa_waris} onChange={e => setFormFile({...formFile, desa_waris: e.target.value})} />
+                <Input label="Kecamatan SKW" value={formFile.kecamatan_waris} onChange={e => setFormFile({...formFile, kecamatan_waris: e.target.value})} />
+                <Input label="Reg. Desa" value={formFile.register_waris_desa} onChange={e => setFormFile({...formFile, register_waris_desa: e.target.value})} />
+                <Input label="Reg. Kecamatan" value={formFile.register_waris_kecamatan} onChange={e => setFormFile({...formFile, register_waris_kecamatan: e.target.value})} />
+                <div className="col-span-2 space-y-1.5">
+                  <DateInput label="Tanggal SKW" value={formFile.tanggal_waris} onChange={val => setFormFile({...formFile, tanggal_waris: val, ejaan_tanggal_waris: spellDateIndo(val || "")})} />
+                  <p className="text-[10px] text-slate-400 italic">Ejaan: {formFile.ejaan_tanggal_waris || '-'}</p>
                 </div>
               </div>
+            )}
 
-              {/* Section: Tanggal */}
-              <div className="border-b pb-4 mb-4">
-                <h4 className="text-[11px] font-bold text-slate-600 uppercase tracking-widest mb-3">Tanggal</h4>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="col-span-2">
-                    <DateInput 
-                      label="Tanggal Berkas" 
-                      value={formFile.tanggal} 
-                      onChange={val => setFormFile({...formFile, tanggal: val, hari: getDayNameIndo(val)})} 
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1.5">Hari</label>
-                    <div className="h-[40px] flex items-center justify-center bg-blue-600 text-white rounded text-sm font-bold uppercase">
-                      {formFile.hari || '-'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Section: Perolehan */}
-              <div className="border-b pb-4 mb-4">
-                <h4 className="text-[11px] font-bold text-slate-600 uppercase tracking-widest mb-3">Informasi Perolehan</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1.5">
-                      Jenis Perolehan
-                    </label>
-                    <input 
-                      list="perolehan-options"
-                      className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-md text-sm font-bold focus:border-blue-600 focus:ring-2 focus:ring-blue-500 outline-none uppercase h-[40px]"
-                      placeholder="Pilih/Ketik..."
-                      value={formFile.jenis_perolehan}
-                      onChange={e => setFormFile({...formFile, jenis_perolehan: e.target.value})}
-                    />
-                    <datalist id="perolehan-options">
-                      <option value="WARIS" />
-                      <option value="JUAL BELI" />
-                      <option value="HIBAH" />
-                      <option value="PEMBAGIAN HAK BERSAMA" />
-                      <option value="LELANG" />
-                    </datalist>
-                  </div>
-                  <Input 
-                    label="Tahun Perolehan" 
-                    type="number" 
-                    placeholder="Contoh: 2024" 
-                    value={formFile.tahun_perolehan} 
-                    onChange={e => setFormFile({...formFile, tahun_perolehan: e.target.value})} 
-                  />
-                </div>
-              </div>
-
-              {/* Section: Waris (Conditional) */}
-              {isWaris && (
-                <div className="border-b pb-4 mb-4 bg-amber-50 p-4 rounded">
-                  <div className="flex items-center gap-2 mb-3">
-                    <ShieldAlert size={16} className="text-amber-600" />
-                    <h4 className="text-[11px] font-bold text-amber-700 uppercase tracking-widest">Data Waris</h4>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <Input 
-                      label="Register Waris Desa" 
-                      placeholder="Nomor Register Desa..." 
-                      value={formFile.register_waris_desa} 
-                      onChange={e => setFormFile({...formFile, register_waris_desa: e.target.value})} 
-                    />
-                    <Input 
-                      label="Register Waris Kecamatan" 
-                      placeholder="Nomor Register Kecamatan..." 
-                      value={formFile.register_waris_kecamatan} 
-                      onChange={e => setFormFile({...formFile, register_waris_kecamatan: e.target.value})} 
-                    />
-                    <div className="col-span-2">
-                      <DateInput 
-                        label="Tanggal Waris" 
-                        value={formFile.tanggal_waris} 
-                        onChange={val => {
-                          setFormFile({
-                            ...formFile, 
-                            tanggal_waris: val,
-                            ejaan_tanggal_waris: val ? spellDateIndo(val) : '' 
-                          });
-                        }} 
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Section: Detail Kesepakatan & Saksi */}
-              <div className="border-b pb-4 mb-4 bg-slate-50/50 p-4 rounded-lg">
-                <h4 className="text-[11px] font-bold text-slate-600 uppercase tracking-widest mb-3">Detail Kesepakatan & Saksi</h4>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Input Keterangan Persetujuan (Manual String) */}
-                  <div className="col-span-2">
-                    <Input 
-                      label="Keterangan Persetujuan" 
-                      placeholder="Contoh: Telah disetujui oleh seluruh ahli waris..." 
-                      value={formFile.keterangan_persetujuan} 
-                      onChange={e => setFormFile({...formFile, keterangan_persetujuan: e.target.value})} 
-                    />
-                  </div>
-
-                  {/* Input Cakupan Tanah (Dropdown String) */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1.5">Cakupan Objek</label>
-                    <select 
-                      className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-md text-sm font-bold focus:border-blue-600 focus:ring-2 focus:ring-blue-500 outline-none h-[40px]"
-                      value={formFile.cakupan_tanah}
-                      onChange={e => setFormFile({...formFile, cakupan_tanah: e.target.value})}
-                    >
-                      <option value="sebidang tanah">SEBIDANG TANAH</option>
-                      <option value="sebagian atas sebidang tanah">SEBAGIAN ATAS SEBIDANG TANAH</option>
-                    </select>
-                  </div>
-
-                  {/* Input Pihak Terkait (Dropdown) */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1.5">Pihak Penanggung</label>
-                    <select 
-                      className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-md text-sm font-bold focus:border-blue-600 focus:ring-2 focus:ring-blue-500 outline-none h-[40px]"
-                      value={formFile.pihak_penanggung}
-                      onChange={e => setFormFile({...formFile, pihak_penanggung: e.target.value})}
-                    >
-                      <option value="Pihak Pertama">PIHAK PERTAMA</option>
-                      <option value="Pihak Kedua">PIHAK KEDUA</option>
-                      <option value="Pihak Pertama dan Kedua">PIHAK PERTAMA DAN KEDUA</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1.5">
-                      Alamat Persetujuan (Suami/Istri)
-                    </label>
-                    <select 
-                      className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-md text-sm font-bold focus:border-blue-600 focus:ring-2 focus:ring-blue-500 outline-none h-[40px]"
-                      value={formFile.alamat_persetujuan}
-                      onChange={e => setFormFile({...formFile, alamat_persetujuan: e.target.value})}
-                    >
-                      <option value="Sama dengan suaminya">SAMA DENGAN SUAMINYA</option>
-                      <option value="Sama dengan istrinya">SAMA DENGAN ISTRINYA</option>
-                      <option value="di">DI</option>
-                    </select>
-                  </div>
-                  {/* Input Jumlah Saksi (Manual String) */}
-                  <div className="col-span-2">
-                    <Input 
-                      label="Jumlah Saksi" 
-                      placeholder="Contoh: Dua" 
-                      value={formFile.jumlah_saksi} 
-                      onChange={e => setFormFile({...formFile, jumlah_saksi: e.target.value})} 
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Section: Keterangan */}
-              <div className="border-b pb-4 mb-4">
-                <h4 className="text-[11px] font-bold text-slate-600 uppercase tracking-widest mb-3">Keterangan Tambahan</h4>
-                <Input 
-                  label="Keterangan" 
-                  placeholder="Informasi pendukung..." 
-                  value={formFile.keterangan} 
-                  onChange={e => setFormFile({...formFile, keterangan: e.target.value})} 
-                />
-              </div>
-
-              {/* Section: Lokasi */}
-              <div className="pb-4">
-                <h4 className="text-[11px] font-bold text-slate-600 uppercase tracking-widest mb-3">Lokasi Objek Tanah</h4>
-                <div className={`p-4 rounded border ${
-                  hasSelectedLocation 
-                    ? 'bg-emerald-50 border-emerald-200' 
-                    : 'bg-rose-50 border-rose-200'
-                }`}>
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded text-white ${
-                        hasSelectedLocation ? 'bg-emerald-600' : 'bg-rose-600'
+            {/* PERSETUJUAN */}
+{formFile.menurut_keterangan === 'PERSETUJUAN' && (
+  <div className="space-y-4 animate-in fade-in duration-500">
+    <div className="flex items-center justify-between px-1">
+       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Daftar Pemberi Persetujuan</label>
+       <span className="text-[10px] text-slate-400 italic">Total: {persetujuans.length}</span>
+    </div>
+    
+          <div className="space-y-3">
+            {/* Mapping data persetujuan */}
+            {persetujuans.length > 0 ? (
+              persetujuans.map((p: Persetujuan) => (
+                <div key={p.id} className="group flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl shadow-sm hover:border-slate-300 transition-all">
+                  <div className="flex flex-col gap-1">
+                    {/* Di sini p.identitas_id biasanya perlu di-join untuk dapat nama, 
+                        sementara kita asumsikan p punya properti nama atau identitas */}
+                    <span className="text-xs font-bold text-slate-800 uppercase tracking-tight">
+                      {/* Kalau data join identitas ada */}
+                      {(p as any).identitas?.nama || "Pihak Terhubung"}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${
+                        p.hubungan === 'ISTRI' || p.hubungan === 'SUAMI' 
+                        ? 'bg-rose-50 text-rose-600' 
+                        : 'bg-blue-50 text-blue-600'
                       }`}>
-                        <MapPin size={20} />
-                      </div>
-                      <div>
-                        <span className={`text-[10px] font-bold uppercase block ${
-                          hasSelectedLocation ? 'text-emerald-700' : 'text-rose-700'
-                        }`}>
-                          {hasSelectedLocation ? 'Lokasi Sudah Ditentukan' : 'Lokasi Belum Ditentukan'}
-                        </span>
-                        <p className="text-sm font-bold text-slate-800 mt-0.5">
-                          {hasSelectedLocation 
-                            ? `${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}` 
-                            : 'Silakan tentukan lokasi pada peta'}
-                        </p>
-                      </div>
+                        {p.hubungan}
+                      </span>
+                      <span className="text-[10px] text-slate-400 italic">
+                        {p.hubungan === 'ISTRI' || p.hubungan === 'SUAMI' 
+                          ? '— Alamat Otomatis (Sama)' 
+                          : '— Alamat Memanggil Identitas'
+                        }
+                      </span>
                     </div>
-                    <Button 
-                      type="button" 
-                      variant={hasSelectedLocation ? "secondary" : "primary"}
-                      onClick={() => setShowMapPicker(true)}
-                      className="text-sm px-4 py-2"
-                    >
-                      {hasSelectedLocation ? "Ubah" : "Tentukan Lokasi"}
-                    </Button>
                   </div>
                 </div>
+              ))
+            ) : (
+              <div className="py-6 text-center border-2 border-dashed border-slate-100 rounded-2xl">
+                <p className="text-[11px] text-slate-400">Belum ada pihak persetujuan yang dihubungkan.</p>
               </div>
-              
-              <div className="flex justify-end gap-3 pt-6 border-t">
-                <Button 
-                  variant="secondary" 
-                  onClick={() => setIsCreating(false)}
-                  className="px-6 py-2.5"
-                >
-                  Batal
-                </Button>
-                <Button 
-                  onClick={handleSaveFile} 
-                  className="px-8 py-2.5 font-bold bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  <Save size={16} className="mr-2"/> 
-                  Simpan Berkas
-                </Button>
-              </div>
-            </div>
-          </Card>
+            )}
+
+            {/* Tombol untuk buka modal tambah persetujuan */}
+            <button 
+              type="button"
+              onClick={() => setShowModalTambahPersetujuan(true)}
+              className="w-full py-3 bg-slate-50 border border-slate-200 rounded-2xl text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-all flex items-center justify-center gap-2"
+            >
+              <Plus size={14} />
+              HUBUNGKAN IDENTITAS PERSETUJUAN
+            </button>
+          </div>
         </div>
       )}
+
+            {/* AKTA KUASA */}
+            {formFile.menurut_keterangan === 'AKTA_KUASA' && (
+              <div className="grid grid-cols-2 gap-5 animate-in fade-in duration-500">
+                <Input label="No. Akta Kuasa" value={formFile.nomor_akta_kuasa} onChange={e => setFormFile({...formFile, nomor_akta_kuasa: e.target.value})} />
+                <DateInput label="Tanggal Akta" value={formFile.tanggal_akta_kuasa} onChange={val => setFormFile({...formFile, tanggal_akta_kuasa: val})} />
+                <div className="col-span-2">
+                  <Input label="Nama Notaris & Kedudukan" placeholder="Misal: Budi, S.H., M.Kn. di Jakarta" value={formFile.nama_notaris_kuasa} onChange={e => setFormFile({...formFile, nama_notaris_kuasa: e.target.value})} />
+                </div>
+              </div>
+            )}
+
+            {/* STANDAR */}
+            {formFile.menurut_keterangan === 'STANDAR' && (
+              <div className="py-8 text-center text-slate-400 text-xs">
+                Informasi keterangan akan menggunakan format standar akta.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* SECTION 4: INFO PEROLEHAN & SAKSI */}
+        <div className="grid grid-cols-2 gap-8 border-t border-slate-100 pt-8">
+          <div className="space-y-5">
+            <div className="space-y-1.5">
+              <label className="text-[12px] font-medium text-slate-700">Jenis Perolehan</label>
+              <input 
+                className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm h-[42px] focus:border-slate-400 outline-none transition-all"
+                placeholder="Misal: Jual Beli"
+                value={formFile.jenis_perolehan}
+                onChange={e => setFormFile({...formFile, jenis_perolehan: e.target.value})}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[12px] font-medium text-slate-700">Cakupan Tanah</label>
+              <select 
+                className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm h-[42px] focus:border-slate-400 outline-none transition-all"
+                value={formFile.cakupan_tanah}
+                onChange={e => setFormFile({...formFile, cakupan_tanah: e.target.value})}
+              >
+                <option value="Sebidang tanah">Sebidang tanah</option>
+                <option value="Sebagian atas sebidang tanah">Sebagian atas sebidang tanah</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-5">
+            <Input 
+              label="Tahun Perolehan" 
+              type="number" 
+              value={formFile.tahun_perolehan} 
+              onChange={e => setFormFile({...formFile, tahun_perolehan: e.target.value})} 
+            />
+            <Input 
+              label="Ejaan Jumlah Saksi" 
+              placeholder="Misal: Dua" 
+              value={formFile.jumlah_saksi} 
+              onChange={e => setFormFile({...formFile, jumlah_saksi: e.target.value})} 
+            />
+          </div>
+        </div>
+
+        {/* SECTION 5: LOKASI */}
+        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+          <div className="flex items-center gap-4">
+            <div className={`w-2 h-2 rounded-full ${hasSelectedLocation ? 'bg-emerald-500' : 'bg-slate-300 animate-pulse'}`} />
+            <div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">Koordinat Objek</p>
+              <p className="text-sm font-medium text-slate-700">
+                {hasSelectedLocation ? `${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}` : 'Belum ditentukan'}
+              </p>
+            </div>
+          </div>
+          <button 
+            type="button"
+            onClick={() => setShowMapPicker(true)}
+            className="text-[11px] font-bold text-slate-600 hover:text-slate-900 underline decoration-slate-300 underline-offset-4"
+          >
+            {hasSelectedLocation ? "Ubah Lokasi" : "Tentukan Lokasi"}
+          </button>
+        </div>
+
+        {/* FOOTER ACTIONS */}
+        <div className="flex justify-end gap-3 pt-4 sticky bottom-0 bg-white">
+          <button 
+            onClick={() => setIsCreating(false)} 
+            className="px-6 py-2.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 rounded-xl transition-all"
+          >
+            Batal
+          </button>
+          <button 
+            onClick={handleSaveFile} 
+            className="px-8 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-slate-200"
+          >
+            Simpan Berkas
+          </button>
+        </div>
+      </div>
+    </Card>
+  </div>
+)}
 
       {/* MODAL POPUP UNTUK LANDMAP PICKER */}
       {showMapPicker && (
@@ -1058,6 +1464,63 @@ export const FilesPage: React.FC = () => {
           </div>
         </div>
       )}
+      {showModalTambahPersetujuan && (
+  <div className="fixed inset-0 z-[110] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 space-y-5">
+      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Hubungkan Identitas</h3>
+      
+      <div className="space-y-4">
+        {/* Dropdown Pilih Identitas */}
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-slate-400 uppercase">Pilih Orang</label>
+          <select 
+            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
+            value={selectedIdentitasId}
+            onChange={(e) => setSelectedIdentitasId(e.target.value)}
+          >
+            <option value="">-- Pilih dari Database Identitas --</option>
+            {identitasList.map((idnt: any) => ( // Tambahkan : any di sini
+              <option key={idnt.id} value={idnt.id}>{idnt.nama}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Pilih Hubungan */}
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-slate-400 uppercase">Hubungan</label>
+          <select 
+            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
+            value={selectedHubungan}
+            onChange={(e) => setSelectedHubungan(e.target.value as HubunganPersetujuan)}
+          >
+            <option value="ISTRI">ISTRI (Alamat Sama)</option>
+            <option value="SUAMI">SUAMI (Alamat Sama)</option>
+            <option value="ANAK">ANAK (Alamat Sesuai KTP)</option>
+            <option value="LAINNYA">LAINNYA</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="flex gap-2 pt-2">
+        <button 
+          onClick={() => setShowModalTambahPersetujuan(false)}
+          className="flex-1 py-3 text-xs font-bold text-slate-400 hover:text-slate-600"
+        >
+          BATAL
+        </button>
+        <button 
+          className="flex-1 py-3 bg-slate-900 text-white rounded-xl text-xs font-bold"
+          onClick={() => {
+            // Nanti di sini panggil fungsi handleTambahPersetujuan
+            setShowModalTambahPersetujuan(false);
+          }}
+        >
+          TAMBAHKAN
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };

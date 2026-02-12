@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, ArrowLeft, Trash2, Plus, X, 
-  ChevronRight, Edit3, Database, User, MapPin, Building2,  Calendar, Info
+  ChevronRight, Edit3, Database, User, MapPin, Building2,  Calendar, Info, ExternalLink
 } from 'lucide-react';
 import { db } from '../services/db';
-import { LandData, Identity, PbbRecord } from '../types';
+import { LandData, Identity } from '../types';
 import { formatNOP } from '../utils';
+import { useNavigate } from 'react-router-dom';
 
 // --- KOMPONEN PENCARIAN NOP KOTAK (REAL-TIME) ---
 const NopSearchBox = ({ 
@@ -166,6 +167,7 @@ export const PbbPage: React.FC = () => {
   
   const [linkedWP, setLinkedWP] = useState<Identity | null>(null);
   const [linkedOP, setLinkedOP] = useState<LandData | null>(null);
+  const navigate = useNavigate();
   
   const [formData, setFormData] = useState<any>({
     tahun_pajak: new Date().getFullYear().toString(),
@@ -201,39 +203,77 @@ export const PbbPage: React.FC = () => {
   };
   
   const handleSave = async () => {
-    if (!linkedOP?.id) {
-      alert("Pilih Objek Pajak (NOP) yang valid dari database!");
-      return;
-    }
+  // 1. Validasi Awal: Pastikan NOP sudah dicari
+  if (!linkedOP) {
+    alert("Silahkan cari dan pilih NOP terlebih dahulu!");
+    return;
+  }
 
-    const payload: PbbRecord = { 
+  // Debugging: Intip data di console F12
+  console.log("Data Tanah (linkedOP):", linkedOP);
+  console.log("Data Pemilik (linkedWP):", linkedWP);
+  console.log("Data Form saat ini:", formData);
+
+  try {
+    const isPribadi = formData.jenis_subjek === 'PRIBADI';
+
+    // 2. Susun Payload (Data yang akan dikirim ke Database)
+    const payload: any = {
+      // Data Header
       tahun_pajak: formData.tahun_pajak,
       tgl_rekam: formData.tgl_rekam,
       tipe_layanan: formData.tipe_layanan,
       status_subjek: formData.status_subjek,
       jenis_subjek: formData.jenis_subjek,
-      pekerjaan: formData.pekerjaan,
+      
+      // Relasi Database
+      // Jika Pribadi, hubungkan ke ID Identitas. Jika Manual, set null.
+      identitas_id: isPribadi ? (linkedWP?.id || linkedWP?.id || null) : null,
+      // Hubungkan ke ID Tanah (Gunakan .id atau .ID sesuai database Bapak)
+      data_tanah_id: linkedOP.id || linkedOP.id, 
+
+      // Data Teknis NOP
       nop_asal: formData.nop_asal,
       nop_bersama: formData.nop_bersama,
-      identitas_id: linkedWP?.id || null, // Pastikan null jika tidak ada
-      data_tanah_id: linkedOP.id, 
-      manual_nik: formData.manual_nik,
-      manual_nama: formData.manual_nama,
-      manual_alamat: formData.manual_alamat,
-      desa_id: selectedLocation?.desa.toUpperCase() || "" 
+      desa_id: selectedLocation?.desa.toUpperCase() || "",
+
+      // DATA SUBJEK (LOGIKA DINAMIS):
+      // Jika PRIBADI: Ambil dari database identitas (linkedWP)
+      // Jika BADAN/MANUAL: Ambil murni dari apa yang diketik Bapak di input form
+      manual_nik: isPribadi ? (linkedWP?.nik || '') : formData.manual_nik,
+      manual_nama: isPribadi ? (linkedWP?.nama || '') : formData.manual_nama,
+      pekerjaan: isPribadi ? (linkedWP?.pekerjaan || 'LAINNYA') : formData.pekerjaan,
+      
+      // Khusus Alamat: Gabungkan RT/RW jika dari database identitas
+      manual_alamat: isPribadi 
+        ? `${linkedWP?.alamat || ''} RT.${linkedWP?.rt || '00'}/RW.${linkedWP?.rw || '00'}`
+        : formData.manual_alamat
     };
 
-    // UBAH CARA CEK HASILNYA DI SINI
+    // 3. Eksekusi Simpan ke Database
     const isSuccess = await db.pbb_records.add(payload);
-    
+
     if (isSuccess) {
-      alert("Data SPOP Berhasil Disimpan!");
+      alert("✅ Data SPOP Berhasil Disimpan!");
+      
+      // 4. Cleanup & Close
       setIsModalOpen(false);
-      loadAll(); // Refresh
+      setLinkedOP(null);
+      setLinkedWP(null);
+      
+      // Reset Form ke default (Optional: tergantung kebutuhan Bapak)
+      // setFormData(initialFormData); 
+      
+      if (typeof loadAll === 'function') loadAll(); 
     } else {
-      alert("Gagal menyimpan data ke database. Cek koneksi atau data!");
+      throw new Error("Gagal menyimpan ke database");
     }
-  };
+
+  } catch (error) {
+    console.error("Save Error:", error);
+    alert("❌ Gagal menyimpan data. Periksa apakah semua kolom wajib sudah terisi.");
+  }
+};
   // 1. Fungsi Hapus
 const handleDelete = async (id: string) => {
   if (!confirm("Yakin ingin menghapus data PBB ini?")) return;
@@ -268,39 +308,43 @@ const handleEdit = (record: any) => {
 };
 
   const handleSearchNop = async (nop: string) => {
-  // Hanya proses jika sudah 18 digit (lengkap)
   if (nop.length < 18) return;
+
+  // Reset dulu setiap kali cari baru agar tidak rancu
+  setLinkedOP(null);
+  setLinkedWP(null);
 
   const result = await db.pbb_records.getRelationByNop(nop);
 
-  if (result) {
-    // 1. Tampilkan detail tanah & pemilik yang saling terkait
+  if (result && result.lands) {
+    // Pastikan result.lands punya ID, kalau tidak ada, kita pakai ID dari result pbb
     setLinkedOP(result.lands);
-    setLinkedWP(result.identities);
+    setLinkedWP(result.identities || null);
 
-    // 2. Isi form otomatis dengan data dari relasi tersebut
     setFormData((prev: any) => ({
       ...prev,
       tahun_pajak: result.tahun_pajak,
       tipe_layanan: result.tipe_layanan,
-      manual_nama: result.identities?.nama || '',
-      manual_nik: result.identities?.nik || ''
+      // Penting: Jika data ditemukan, set jenis_subjek ke PRIBADI otomatis
+      jenis_subjek: 'PRIBADI' 
     }));
 
-    // 3. Set lokasi agar dropdown sinkron
     setSelectedLocation({
       kec: result.lands.kecamatan?.toUpperCase() || "",
       desa: result.lands.desa?.toUpperCase() || ""
     });
-
-    console.log("Relasi SPPT ditemukan secara detail!");
   } else {
-    // Jika tidak ada di riwayat PBB, baru cek apakah NOP-nya ada di database tanah
+    // Cek database tanah mentah
     const rawLand = await db.lands.getByNop(nop);
     if (rawLand) {
+      console.log("Data tanah mentah ditemukan:", rawLand);
       setLinkedOP(rawLand);
-      setLinkedWP(null); // Kosongkan pemilik karena belum ada relasi PBB
-      alert("NOP terdaftar, tapi belum memiliki riwayat relasi PBB.");
+      setLinkedWP(null); 
+      
+      // Karena ini data baru (belum ada relasi), set mode ke BADAN/MANUAL agar user bisa input
+      setFormData((prev:any) => ({...prev, jenis_subjek: 'BADAN'}));
+      
+      alert("NOP ditemukan di Database Tanah. Silahkan lengkapi data Subjek Pajak.");
     } else {
       alert("NOP tidak ditemukan di database manapun!");
     }
@@ -526,118 +570,206 @@ const handleEdit = (record: any) => {
               </div>
 
               {linkedOP && (
-                <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4">
-                  {/* DETAIL NOP LENGKAP */}
-                  <div className="p-10 bg-slate-50 rounded-[3rem] border border-slate-100 relative">
-                    <div className="absolute top-8 right-10 flex gap-4">
-                       <div className="text-right">
-                          <span className="text-[9px] font-black text-slate-400 uppercase block">Tanggal Rekam</span>
-                          <span className="text-xs font-bold">{formData.tgl_rekam}</span>
-                       </div>
-                    </div>
-                    <CustomBlockInput label="NOP UTAMA (DARI DATABASE)" value={linkedOP.nop || ''} pattern={[2,2,3,3,3,4,1]} readonly />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mt-6">
-                      <CustomBlockInput label="NOP ASAL" value={formData.nop_asal} pattern={[2,2,3,3,3,4,1]} onChange={(v:string) => setFormData({...formData, nop_asal: v})} />
-                      <CustomBlockInput label="NOP INDUK / BERSAMA" value={formData.nop_bersama} pattern={[2,2,3,3,3,4,1]} onChange={(v:string) => setFormData({...formData, nop_bersama: v})} />
-                    </div>
-                  </div>
+  <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4">
+    {/* 1. DETAIL NOP LENGKAP (BAGIAN ATAS) */}
+    <div className="p-10 bg-slate-50 rounded-[3rem] border border-slate-100 relative">
+      <div className="absolute top-8 right-10 flex gap-4">
+        <div className="text-right">
+          <span className="text-[9px] font-black text-slate-400 uppercase block">Tanggal Rekam</span>
+          <span className="text-xs font-bold">{formData.tgl_rekam}</span>
+        </div>
+      </div>
+      <CustomBlockInput 
+        label="NOP UTAMA (DARI DATABASE)" 
+        value={linkedOP.nop || ''} 
+        pattern={[2, 2, 3, 3, 3, 4, 1]} 
+        readonly 
+      />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mt-6">
+        <CustomBlockInput 
+          label="NOP ASAL" 
+          value={formData.nop_asal} 
+          pattern={[2, 2, 3, 3, 3, 4, 1]} 
+          onChange={(v: string) => setFormData({ ...formData, nop_asal: v })} 
+        />
+        <CustomBlockInput 
+          label="NOP INDUK / BERSAMA" 
+          value={formData.nop_bersama} 
+          pattern={[2, 2, 3, 3, 3, 4, 1]} 
+          onChange={(v: string) => setFormData({ ...formData, nop_bersama: v })} 
+        />
+      </div>
+    </div>
 
-                  {/* FORM LAYANAN & SUBJEK */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                     <div className="space-y-10">
-                        <div className="space-y-6">
-                           <h3 className="text-xs font-black uppercase text-slate-900 flex items-center gap-2"><Info size={16}/> Informasi Layanan</h3>
-                           <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Jenis Layanan</label>
-                                 <select className="w-full p-4 bg-white border border-slate-200 rounded-2xl text-xs font-bold" value={formData.tipe_layanan} onChange={e => setFormData({...formData, tipe_layanan: e.target.value})}>
-                                    <option>PEREKAMAN DATA</option><option>PEMUTAKHIRAN DATA</option><option>PENGHAPUSAN DATA</option>
-                                 </select>
-                              </div>
-                              <div className="space-y-2">
-                                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Status Subjek</label>
-                                 <select className="w-full p-4 bg-white border border-slate-200 rounded-2xl text-xs font-bold" value={formData.status_subjek} onChange={e => setFormData({...formData, status_subjek: e.target.value})}>
-                                    <option>PEMILIK</option><option>PENYEWA</option><option>PENGELOLA</option><option>PEMAKAI</option>
-                                 </select>
-                              </div>
-                           </div>
-                        </div>
+    {/* 2. GRID TENGAH: SUBJEK PAJAK & RESUME OBJEK PAJAK */}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+      
+      {/* KOLOM KIRI: DETAIL SUBJEK PAJAK */}
+      <div className="space-y-10">
+        <div className="space-y-6">
+          <h3 className="text-xs font-black uppercase text-slate-900 flex items-center gap-2">
+            <Info size={16} /> Informasi Layanan
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Jenis Layanan</label>
+              <select 
+                className="w-full p-4 bg-white border border-slate-200 rounded-2xl text-xs font-bold" 
+                value={formData.tipe_layanan} 
+                onChange={e => setFormData({ ...formData, tipe_layanan: e.target.value })}
+              >
+                <option>PEREKAMAN DATA</option>
+                <option>PEMUTAKHIRAN DATA</option>
+                <option>PENGHAPUSAN DATA</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Status Subjek</label>
+              <select 
+                className="w-full p-4 bg-white border border-slate-200 rounded-2xl text-xs font-bold" 
+                value={formData.status_subjek} 
+                onChange={e => setFormData({ ...formData, status_subjek: e.target.value })}
+              >
+                <option>PEMILIK</option>
+                <option>PENYEWA</option>
+                <option>PENGELOLA</option>
+                <option>PEMAKAI</option>
+              </select>
+            </div>
+          </div>
+        </div>
 
-                        <div className="space-y-6">
-                           <h3 className="text-xs font-black uppercase text-slate-900 flex items-center gap-2"><User size={16}/> Detail Subjek Pajak</h3>
-                           <div className="p-8 bg-white border-2 border-slate-900/5 rounded-[2.5rem] space-y-6">
-                              <select className="w-full p-4 bg-slate-900 text-white rounded-2xl text-xs font-bold shadow-lg mb-4" value={formData.jenis_subjek} onChange={e => setFormData({...formData, jenis_subjek: e.target.value})}>
-                                 <option value="PRIBADI">WAJIB PAJAK PRIBADI</option>
-                                 <option value="BADAN">WAJIB PAJAK BADAN / MANUAL</option>
-                              </select>
-                              
-                              <CustomBlockInput 
-                                label="NOMOR IDENTITAS (NIK/NIB)" 
-                                value={formData.jenis_subjek === 'PRIBADI' ? (linkedWP?.nik || '') : formData.manual_nik} 
-                                pattern={[16]} 
-                                onChange={(v:string) => setFormData({...formData, manual_nik: v})} 
-                                readonly={formData.jenis_subjek === 'PRIBADI'} 
-                              />
+        <div className="space-y-6">
+          <h3 className="text-xs font-black uppercase text-slate-900 flex items-center gap-2">
+            <User size={16} /> Detail Subjek Pajak
+          </h3>
+          <div className="p-8 bg-white border-2 border-slate-900/5 rounded-[2.5rem] space-y-6 shadow-sm">
+            <select 
+              className="w-full p-4 bg-slate-900 text-white rounded-2xl text-xs font-bold shadow-lg mb-4 cursor-pointer outline-none" 
+              value={formData.jenis_subjek} 
+              onChange={e => setFormData({ ...formData, jenis_subjek: e.target.value })}
+            >
+              <option value="PRIBADI">WAJIB PAJAK PRIBADI (DATABASE)</option>
+              <option value="BADAN">WAJIB PAJAK BADAN / MANUAL</option>
+            </select>
 
-                              <div className="grid grid-cols-2 gap-4">
-                                 <div>
-                                    <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Nama Subjek</label>
-                                    <input className="w-full border-b-2 border-slate-100 font-bold text-xs uppercase outline-none pb-2 focus:border-slate-900" value={formData.jenis_subjek === 'PRIBADI' ? (linkedWP?.nama || '') : formData.manual_nama} onChange={e => setFormData({...formData, manual_nama: e.target.value})} readOnly={formData.jenis_subjek === 'PRIBADI'} placeholder="INPUT NAMA..." />
-                                 </div>
-                                 <div>
-                                    <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Pekerjaan</label>
-                                    <select className="w-full border-b-2 border-slate-100 font-bold text-xs outline-none pb-2" value={formData.pekerjaan} onChange={e => setFormData({...formData, pekerjaan: e.target.value})}>
-                                       <option>PNS</option><option>ABRI</option><option>PENSIUNAN</option><option>SWASTA</option><option>LAINNYA</option>
-                                    </select>
-                                 </div>
-                              </div>
-                              <div>
-                                 <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Alamat Domisili</label>
-                                 <textarea className="w-full border-b-2 border-slate-100 font-medium text-[11px] uppercase outline-none pb-2 h-16 resize-none" value={formData.jenis_subjek === 'PRIBADI' ? `${linkedWP?.alamat}, RT${linkedWP?.rt}/RW${linkedWP?.rw}` : formData.manual_alamat} onChange={e => setFormData({...formData, manual_alamat: e.target.value})} readOnly={formData.jenis_subjek === 'PRIBADI'} placeholder="ALAMAT LENGKAP..." />
-                              </div>
-                           </div>
-                        </div>
-                     </div>
+            <CustomBlockInput 
+              label="NOMOR IDENTITAS (NIK/NIB)" 
+              value={formData.jenis_subjek === 'PRIBADI' ? (linkedWP?.nik || '') : formData.manual_nik} 
+              pattern={[16]} 
+              onChange={(v: string) => setFormData({ ...formData, manual_nik: v })} 
+              readonly={formData.jenis_subjek === 'PRIBADI'} 
+            />
 
-                     <div className="space-y-8">
-                        <h3 className="text-xs font-black uppercase text-slate-900 flex items-center gap-2"><MapPin size={16}/> Resume Objek Pajak</h3>
-                        <div className="p-10 bg-slate-900 text-white rounded-[3.5rem] shadow-2xl relative overflow-hidden">
-                           <Building2 className="absolute right-[-30px] top-[-30px] text-white/5" size={200} />
-                           <div className="relative z-10 space-y-8">
-                              <div>
-                                 <label className="text-[9px] font-bold text-white/30 uppercase tracking-[0.2em] block mb-2">Letak Objek Pajak</label>
-                                 <div className="text-lg font-black uppercase leading-tight">{linkedOP.alamat}</div>
-                                 <div className="text-xs font-bold text-white/50 mt-1 uppercase">DESA {linkedOP.desa}, KEC. {linkedOP.kecamatan}</div>
-                              </div>
-                              <div className="grid grid-cols-2 gap-8">
-                                 <div className="bg-white/5 p-5 rounded-[2rem] border border-white/10">
-                                    <label className="text-[9px] font-bold text-white/30 uppercase block mb-1">Luas Tanah</label>
-                                    <div className="text-3xl font-black italic">{linkedOP.luas_seluruhnya} <span className="text-[10px] not-italic opacity-40">M²</span></div>
-                                 </div>
-                                 <div className="p-5">
-                                    <label className="text-[9px] font-bold text-white/30 uppercase block mb-1">Status Geografis</label>
-                                    <div className="flex items-center gap-2">
-                                       <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                                       <span className="text-[10px] font-black uppercase tracking-widest">Terpetakan</span>
-                                    </div>
-                                 </div>
-                              </div>
-                           </div>
-                        </div>
-                        <div className="p-6 border-2 border-slate-100 rounded-[2rem] flex items-center justify-between">
-                           <div className="flex items-center gap-4">
-                              <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl"><Info size={20}/></div>
-                              <div className="text-[10px] font-black uppercase text-slate-400 leading-tight">Pastikan data NOP Induk <br/>sesuai dengan arsip desa.</div>
-                           </div>
-                        </div>
-                     </div>
-                  </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 uppercase block">Nama Subjek</label>
+                <input 
+                  className="w-full border-b-2 border-slate-100 font-bold text-xs uppercase outline-none pb-2 focus:border-slate-900 bg-transparent transition-colors" 
+                  value={formData.jenis_subjek === 'PRIBADI' ? (linkedWP?.nama || '') : formData.manual_nama} 
+                  onChange={e => setFormData({ ...formData, manual_nama: e.target.value })} 
+                  readOnly={formData.jenis_subjek === 'PRIBADI'} 
+                  placeholder="NAMA..."
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 uppercase block">Pekerjaan</label>
+                <select 
+                    className="w-full border-b-2 border-slate-100 font-bold text-xs outline-none pb-2 bg-transparent" 
+                    value={formData.pekerjaan} 
+                    onChange={e => setFormData({...formData, pekerjaan: e.target.value})}
+                  >
+                  <option value="PNS">PNS</option>
+                  <option value="ABRI">ABRI</option>
+                  <option value="PENSIUNAN">PENSIUNAN</option>
+                  <option value="SWASTA">SWASTA</option>
+                  <option value="LAINNYA">LAINNYA</option>
+                </select>
+              </div>
+            </div>
 
-                  <button onClick={handleSave} className="w-full py-8 bg-slate-900 text-white rounded-[2.5rem] font-black text-sm uppercase tracking-[0.5em] hover:bg-black hover:scale-[1.01] active:scale-95 transition-all shadow-2xl flex items-center justify-center gap-4 group">
-                   <Database size={20} className="group-hover:rotate-12 transition-transform"/> Simpan Perekaman SPOP
-                  </button>
+            <div className="space-y-1">
+              <label className="text-[9px] font-black text-slate-400 uppercase block">Alamat Domisili</label>
+              <textarea 
+                className="w-full border-b-2 border-slate-100 font-medium text-[11px] uppercase outline-none pb-2 h-16 resize-none bg-transparent transition-colors" 
+                value={formData.jenis_subjek === 'PRIBADI' 
+                  ? (linkedWP ? `${linkedWP.alamat}, RT${linkedWP.rt}/RW${linkedWP.rw}` : '') 
+                  : formData.manual_alamat
+                } 
+                onChange={e => setFormData({ ...formData, manual_alamat: e.target.value })} 
+                readOnly={formData.jenis_subjek === 'PRIBADI'} 
+                placeholder="ALAMAT LENGKAP..." 
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* KOLOM KANAN: RESUME OBJEK PAJAK & NAVIGASI */}
+      <div className="space-y-8">
+        <div className="flex justify-between items-end">
+          <h3 className="text-xs font-black uppercase text-slate-900 flex items-center gap-2">
+            <MapPin size={16} /> Resume Objek Pajak
+          </h3>
+          {/* TOMBOL DETAIL TANAH DISINI */}
+          <button 
+            type="button"
+            onClick={() => navigate(`/lands?search=${linkedOP.nop}`)}
+            className="flex items-center gap-2 bg-slate-100 hover:bg-slate-900 text-slate-600 hover:text-white px-4 py-2 rounded-xl text-[9px] font-black transition-all"
+          >
+            <ExternalLink size={12}/> DETAIL DATA TANAH
+          </button>
+        </div>
+
+        <div className="p-10 bg-slate-900 text-white rounded-[3.5rem] shadow-2xl relative overflow-hidden group">
+          <Building2 className="absolute right-[-30px] top-[-30px] text-white/5 group-hover:text-white/10 transition-colors" size={200} />
+          <div className="relative z-10 space-y-8">
+            <div>
+              <label className="text-[9px] font-bold text-white/30 uppercase tracking-[0.2em] block mb-2">Letak Objek Pajak</label>
+              <div className="text-lg font-black uppercase leading-tight">{linkedOP.alamat}</div>
+              <div className="text-xs font-bold text-white/50 mt-1 uppercase">
+                DESA {linkedOP.desa}, KEC. {linkedOP.kecamatan}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-8">
+              <div className="bg-white/5 p-5 rounded-[2rem] border border-white/10">
+                <label className="text-[9px] font-bold text-white/30 uppercase block mb-1">Luas Tanah</label>
+                <div className="text-3xl font-black italic">
+                  {linkedOP.luas_seluruhnya} <span className="text-[10px] not-italic opacity-40">M²</span>
                 </div>
-              )}
+              </div>
+              <div className="p-5">
+                <label className="text-[9px] font-bold text-white/30 uppercase block mb-1">Status Geografis</label>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                  <span className="text-[10px] font-black uppercase tracking-widest">Terpetakan</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 border-2 border-slate-100 rounded-[2rem] flex items-center justify-between bg-white shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl"><Info size={20} /></div>
+            <div className="text-[10px] font-black uppercase text-slate-400 leading-tight">
+              Pastikan data NOP Induk <br /> sesuai dengan arsip desa.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* 3. TOMBOL SIMPAN (FULL WIDTH) */}
+    <button 
+      onClick={handleSave} 
+      className="w-full py-8 bg-slate-900 text-white rounded-[2.5rem] font-black text-sm uppercase tracking-[0.5em] hover:bg-black hover:shadow-2xl hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-4 group"
+    >
+      <Database size={20} className="group-hover:rotate-12 transition-transform" /> 
+      Simpan Perekaman SPOP
+    </button>
+  </div>
+)}
             </div>
           </div>
         </div>

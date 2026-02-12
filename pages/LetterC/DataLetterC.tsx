@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { 
-  Plus, MapPin, User, FolderPlus, Loader2, X, Trash2,  Search, Layers, Edit3, Camera, Image as ImageIcon
-} from 'lucide-react';
+  Plus, MapPin, User, FolderPlus, Loader2, X, Trash2, Search, Layers, Edit3, Camera, ImageIcon, } from 'lucide-react';
 import { supabase } from '../../services/db'; 
 import { processLetterC } from '../../services/ocr';
 import { Kecamatan, Desa, LetterC, LetterCPersil } from '../../types';
@@ -26,6 +25,7 @@ export const DataLetterC = () => {
   const [showModal, setShowModal] = useState(false);
   const [selectedKohir, setSelectedKohir] = useState<LetterC | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [kohirSearch, setKohirSearch] = useState('');
 
   const fetchData = async () => {
     setLoading(true);
@@ -41,6 +41,7 @@ export const DataLetterC = () => {
     const { data } = await supabase.from('letter_c')
       .select('*')
       .eq('desa_id', selectedDesaId)
+      .order('created_at', { ascending: false }) // Data terbaru di atas
       .order('nomor_c');
     if (data) setKohirList(data);
   };
@@ -49,21 +50,15 @@ export const DataLetterC = () => {
   useEffect(() => { fetchKohir(); }, [selectedDesaId]);
 
   const handleDelete = async (id: string) => {
-  if (confirm("Apakah Anda yakin ingin menghapus data Kohir ini? Semua rincian persil juga akan ikut terhapus.")) {
-    try {
-      // 1. Hapus rincian persil dulu (karena foreign key)
-      await supabase.from('letter_c_persil').delete().eq('letter_c_id', id);
-      
-      // 2. Hapus data utama Letter C
-      const { error } = await supabase.from('letter_c').delete().eq('id', id);
-      
-      if (error) throw error;
-      
-      // 3. Refresh data
-      fetchKohir();
-      alert("Data berhasil dihapus");
-    } catch (err: any) {
-      alert("Gagal menghapus: " + err.message);
+    if (confirm("Apakah Anda yakin ingin menghapus data Kohir ini? Semua rincian persil juga akan ikut terhapus.")) {
+      try {
+        await supabase.from('letter_c_persil').delete().eq('letter_c_id', id);
+        const { error } = await supabase.from('letter_c').delete().eq('id', id);
+        if (error) throw error;
+        fetchKohir();
+        alert("Data berhasil dihapus");
+      } catch (err: any) {
+        alert("Gagal menghapus: " + err.message);
       }
     }
   };
@@ -80,10 +75,13 @@ export const DataLetterC = () => {
     )
   }));
 
-  
+  const filteredKohirList = kohirList.filter(k => 
+    k.nomor_c.toLowerCase().includes(kohirSearch.toLowerCase()) ||
+    k.nama_pemilik.toLowerCase().includes(kohirSearch.toLowerCase())
+  );
 
   return (
-    <div className="flex flex-col lg:flex-row h-screen lg:h-[calc(100vh-140px)] gap-4 lg:gap-8 p-2 lg:p-4 bg-[#F8F9FA] text-zinc-900 overflow-hidden">
+    <div className="flex flex-col lg:flex-row h-screen lg:h-[calc(100vh-140px)] gap-4 lg:gap-8 p-2 lg:p-4 bg-[#F8F9FA] text-zinc-900 overflow-hidden font-sans">
       {/* SIDEBAR - Scrollable horizontal on mobile */}
       <div className="w-full lg:w-80 flex flex-col shrink-0">
         <div className="mb-4 lg:mb-6 space-y-4 px-2">
@@ -153,9 +151,20 @@ export const DataLetterC = () => {
             <p className="text-sm text-zinc-400 font-medium mt-1">Buku Pendaftaran Tanah (Letter C)</p>
           </div>
           {selectedDesaId && (
-            <button onClick={() => { setSelectedKohir(null); setShowModal(true); }} className="w-full sm:w-auto bg-zinc-900 text-white px-6 lg:px-8 py-3 lg:py-4 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 shadow-lg transition-all">
-              <Plus size={18}/> Tambah Kohir
-            </button>
+            <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-4">
+              <div className="relative flex-1 sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18}/>
+                <input 
+                  className="w-full pl-10 pr-4 py-3 bg-white border border-zinc-200 rounded-2xl text-sm outline-none focus:border-zinc-800 transition-all shadow-sm" 
+                  placeholder="Cari Kohir..."
+                  value={kohirSearch}
+                  onChange={(e) => setKohirSearch(e.target.value)}
+                />
+              </div>
+              <button onClick={() => { setSelectedKohir(null); setShowModal(true); }} className="w-full sm:w-auto bg-zinc-900 text-white px-6 lg:px-8 py-3 lg:py-4 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 shadow-lg transition-all">
+                <Plus size={18}/> Tambah Kohir
+              </button>
+            </div>
           )}
         </div>
 
@@ -177,7 +186,7 @@ export const DataLetterC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-50">
-                  {kohirList.map(k => (
+                  {filteredKohirList.map(k => (
                     <tr key={k.id} className="group hover:bg-zinc-50/50 transition-colors">
                       <td className="py-6 px-4 font-black text-zinc-900 text-lg">C.{k.nomor_c}</td>
                       <td className="py-6 font-bold text-zinc-700 text-[15px] uppercase">{k.nama_pemilik}</td>
@@ -231,7 +240,13 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess }: FormTamba
   ]);
 
   // --- STATE UNTUK CROP ---
-  const [crop, setCrop] = useState<Crop>();
+  const [crop, setCrop] = useState<Crop>({
+    unit: 'px',
+    x: 0,
+    y: 0,
+    width: 300,
+    height: 300
+  });
   const [imgRef, setImgRef] = useState<HTMLImageElement | null>(null);
   const [showCropper, setShowCropper] = useState(false);
 
@@ -255,31 +270,61 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess }: FormTamba
   // --- FUNGSI GENERATE HASIL CROP ---
   const getCroppedImg = (): Promise<File> => {
     return new Promise((resolve, reject) => {
-      if (!imgRef || !crop) return reject("No image or crop area");
-      
+      if (!imgRef || !crop) {
+        reject("Image atau crop belum siap");
+        return;
+      }
+
+      const width = Math.floor(crop.width ?? 0);
+      const height = Math.floor(crop.height ?? 0);
+
+      if (!width || !height) {
+        reject("Area crop tidak valid");
+        return;
+      }
+
       const canvas = document.createElement('canvas');
       const scaleX = imgRef.naturalWidth / imgRef.width;
       const scaleY = imgRef.naturalHeight / imgRef.height;
-      canvas.width = crop.width;
-      canvas.height = crop.height;
+
+      canvas.width = width;
+      canvas.height = height;
+
       const ctx = canvas.getContext('2d');
 
-      if (ctx) {
-        ctx.drawImage(
-          imgRef,
-          crop.x * scaleX,
-          crop.y * scaleY,
-          crop.width * scaleX,
-          crop.height * scaleY,
-          0, 0, crop.width, crop.height
-        );
+      if (!ctx) {
+        reject("Canvas context gagal dibuat");
+        return;
       }
 
-      canvas.toBlob((blob) => {
-        if (!blob) return reject("Canvas is empty");
-        const file = new File([blob], "cropped_letter.png", { type: "image/png" });
-        resolve(file);
-      }, 'image/png');
+      ctx.drawImage(
+        imgRef,
+        crop.x * scaleX,
+        crop.y * scaleY,
+        width * scaleX,
+        height * scaleY,
+        0,
+        0,
+        width,
+        height
+      );
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob || blob.size === 0) {
+            reject("Hasil crop kosong");
+            return;
+          }
+
+          const file = new File([blob], `cropped_${Date.now()}.png`, {
+            type: "image/png"
+          });
+
+          resolve(file);
+        },
+        "image/png",
+        1
+      );
     });
   };
 
@@ -296,13 +341,12 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess }: FormTamba
       }));
       if (data.persils && data.persils.length > 0) setRows(data.persils);
     } catch (err: any) {
-    // CEK JIKA ERROR 503
       if (err.message?.includes("503") || err.message?.includes("overloaded")) {
         alert("Server AI sedang sibuk (antre). Silakan klik tombol 'Scan' lagi dalam beberapa detik.");
       } else {
         alert("Gagal membaca dokumen. Pastikan koneksi internet stabil.");
       }
-    }finally {
+    } finally {
       setIsScanning(false);
     }
   };
@@ -311,7 +355,12 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess }: FormTamba
     const fileExt = file.name.split('.').pop();
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
     const filePath = `letter_c/${fileName}`;
-    const { error: uploadError } = await supabase.storage.from('archives').upload(filePath, file);
+    const { error: uploadError } = await supabase.storage
+      .from('archives')
+      .upload(filePath, file, {
+        contentType: file.type,
+        upsert: false
+      });
     if (uploadError) throw uploadError;
     const { data } = supabase.storage.from('archives').getPublicUrl(filePath);
     return data.publicUrl;
@@ -348,7 +397,9 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess }: FormTamba
 
       await supabase.from('letter_c_persil').insert(persils);
       onSuccess();
-    } catch (err: any) { alert(err.message); }
+    } catch (err: any) { 
+      alert(err.message); 
+    }
     setLoading(false);
   };
 
@@ -357,7 +408,6 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess }: FormTamba
     newRows[index] = { ...newRows[index], [field]: value };
     setRows(newRows);
   };
-
 
   return (
     <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-md z-[100] flex items-end lg:items-center justify-center p-0 lg:p-6 text-zinc-900">
@@ -414,7 +464,7 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess }: FormTamba
                           if (file) {
                             setImageFile(file); 
                             setPreviewUrl(URL.createObjectURL(file));
-                            setShowCropper(true); // Buka cropper dulu
+                            setShowCropper(true);
                           }
                         }} 
                       />
@@ -424,124 +474,157 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess }: FormTamba
               </div>
 
               <div className="space-y-4">
-                <input className="w-full px-6 py-4 bg-zinc-50 border border-zinc-100 rounded-2xl outline-none focus:bg-white font-bold text-sm" placeholder="Nomor Kohir (C)" value={form.nomor_c} onChange={e => setForm({...form, nomor_c: e.target.value})} />
-                <input className="w-full px-6 py-4 bg-zinc-50 border border-zinc-100 rounded-2xl outline-none focus:bg-white font-bold text-sm" placeholder="Nama Lengkap" value={form.nama_pemilik} onChange={e => setForm({...form, nama_pemilik: e.target.value})} />
-                <textarea className="w-full px-6 py-4 bg-zinc-50 border border-zinc-100 rounded-2xl outline-none focus:bg-white text-sm" placeholder="Alamat Singkat" rows={2} value={form.alamat_pemilik} onChange={e => setForm({...form, alamat_pemilik: e.target.value})} />
+                <input 
+                  className="w-full px-6 py-4 bg-zinc-50 border border-zinc-100 rounded-2xl outline-none focus:bg-white font-bold text-sm text-zinc-900 placeholder:text-zinc-400" 
+                  placeholder="Nomor Kohir (C)" 
+                  value={form.nomor_c} 
+                  onChange={e => setForm({...form, nomor_c: e.target.value})}
+                />
+                <input 
+                  className="w-full px-6 py-4 bg-zinc-50 border border-zinc-100 rounded-2xl outline-none focus:bg-white font-bold text-sm text-zinc-900 placeholder:text-zinc-400" 
+                  placeholder="Nama Lengkap" 
+                  value={form.nama_pemilik} 
+                  onChange={e => setForm({...form, nama_pemilik: e.target.value})}
+                />
+                <textarea 
+                  className="w-full px-6 py-4 bg-zinc-50 border border-zinc-100 rounded-2xl outline-none focus:bg-white text-sm text-zinc-900 placeholder:text-zinc-400" 
+                  placeholder="Alamat Singkat" 
+                  rows={3} 
+                  value={form.alamat_pemilik} 
+                  onChange={e => setForm({...form, alamat_pemilik: e.target.value})}
+                />
               </div>
             </div>
 
             {/* RINCIAN PERSIL */}
             <div className="lg:col-span-8 space-y-6">
               <div className="flex justify-between items-center">
-                <h4 className="flex items-center gap-2 text-zinc-900 font-black text-xs uppercase tracking-widest"><Layers size={16}/> Rincian Persil</h4>
-                <button onClick={() => setRows([...rows, { nomor_persil: '', jenis_tanah: 'Tanah Kering', klas_desa: '', luas_meter: 0, asal_usul: '' }])} className="text-[10px] font-black text-zinc-900 bg-zinc-100 px-5 py-2.5 rounded-xl uppercase hover:bg-zinc-200 transition-all">+ Tambah</button>
+                <h4 className="flex items-center gap-2 text-zinc-900 font-black text-xs uppercase tracking-widest">
+                  <Layers size={16}/> Rincian Persil
+                </h4>
+                <button 
+                  onClick={() => setRows([...rows, { nomor_persil: '', jenis_tanah: 'Tanah Kering', klas_desa: '', luas_meter: 0, asal_usul: '' }])} 
+                  className="text-[10px] font-black text-zinc-900 bg-zinc-100 px-5 py-2.5 rounded-xl uppercase hover:bg-zinc-200 transition-all"
+                >
+                  + Tambah
+                </button>
               </div>
-                {/* CONTAINER LIST PERSIL */}
-                <div className="mt-8 space-y-4">
-                          
-                  <div className="hidden lg:flex px-2 pb-2 gap-3 items-center border-b border-zinc-200">
-                    <div className="w-[15%]">
-                      <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Nomor Persil</label>
-                    </div>
-                    <div className="w-[20%]">
-                      <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Jenis Tanah</label>
-                    </div>
-                    <div className="w-[12%] text-center">
-                      <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Klas</label>
-                    </div>
-                    <div className="w-[15%]">
-                      <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Luas (M²)</label>
-                    </div>
-                    <div className="flex-1">
-                      <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Asal-Usul / Keterangan</label>
-                    </div>
-                    {rows.length > 1 && <div className="w-10"></div>}
+              
+              {/* CONTAINER LIST PERSIL */}
+              <div className="mt-8 space-y-4">
+                <div className="hidden lg:flex px-2 pb-2 gap-3 items-center border-b border-zinc-200">
+                  <div className="w-[12%]">
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Nomor Persil</label>
                   </div>
-
-                  <div className="space-y-3">
-                    {rows.map((row, i) => (
-                      <div key={i} className="group p-2 lg:p-0 flex flex-wrap lg:flex-nowrap gap-3 items-center relative">
-                        
-                        {/* Nomor Persil - 15% */}
-                        <div className="w-[48%] lg:w-[15%]">
-                          <input 
-                            className="w-full px-4 py-3 text-xs border border-zinc-200 rounded-xl outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/5 bg-white font-bold transition-all" 
-                            placeholder="Persil" 
-                            value={row.nomor_persil} 
-                            onChange={e => updateRow(i, 'nomor_persil', e.target.value)} 
-                          />
-                        </div>
-
-                        {/* Jenis Tanah - 20% */}
-                        <div className="w-[48%] lg:w-[20%] relative">
-                          <select 
-                            className="w-full px-4 py-3 text-xs border border-zinc-200 rounded-xl outline-none focus:border-emerald-500 bg-white font-bold appearance-none cursor-pointer" 
-                            value={row.jenis_tanah} 
-                            onChange={e => updateRow(i, 'jenis_tanah', e.target.value)}
-                          >
-                            <option value="Tanah Kering">Tanah Kering</option>
-                            <option value="Sawah">Sawah</option>
-                          </select>
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
-                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path d="M19 9l-7 7-7-7"/></svg>
-                          </div>
-                        </div>
-
-                        {/* Klas - 12% */}
-                        <div className="w-[30%] lg:w-[12%]">
-                          <input 
-                            className="w-full px-4 py-3 text-xs border border-zinc-200 rounded-xl outline-none focus:border-emerald-500 bg-white font-bold text-center uppercase" 
-                            placeholder="D.I" 
-                            value={row.klas_desa} 
-                            onChange={e => updateRow(i, 'klas_desa', e.target.value)} 
-                          />
-                        </div>
-
-                        {/* Luas - 15% */}
-                        <div className="w-[30%] lg:w-[15%]">
-                          <input 
-                            className="w-full px-4 py-3 text-xs border border-zinc-200 rounded-xl outline-none focus:border-emerald-500 bg-white font-bold" 
-                            placeholder="0" 
-                            type="number" 
-                            value={row.luas_meter === 0 ? '' : row.luas_meter} 
-                            onChange={e => {
-                              const val = e.target.value;
-                              updateRow(i, 'luas_meter', val === '' ? 0 : parseFloat(val));
-                            }} 
-                          />
-                        </div>
-
-                        {/* Asal Usul - Sisa Ruang (flex-1) */}
-                        <div className="w-full lg:flex-1">
-                          <input 
-                            className="w-full px-4 py-3 text-xs border border-zinc-200 rounded-xl outline-none focus:border-emerald-500 bg-white font-medium" 
-                            placeholder="Asal-Usul..." 
-                            value={row.asal_usul} 
-                            onChange={e => updateRow(i, 'asal_usul', e.target.value)} 
-                          />
-                        </div>
-
-                        {/* Tombol Hapus */}
-                        {rows.length > 1 && (
-                          <button 
-                            onClick={() => setRows(rows.filter((_, idx) => idx !== i))} 
-                            className="p-2 text-zinc-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
-                          >
-                            <Trash2 size={18}/>
-                          </button>
-                        )}
-                      </div>
-                    ))}
+                  <div className="w-[18%]">
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Jenis Tanah</label>
                   </div>
+                  <div className="w-[10%] text-center">
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Klasifikasi</label>
+                  </div>
+                  <div className="w-[12%]">
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Luas (M²)</label>
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Asal-Usul / Keterangan</label>
+                  </div>
+                  {rows.length > 1 && <div className="w-10"></div>}
                 </div>
+
+                <div className="space-y-3">
+                  {rows.map((row, i) => (
+                    <div key={i} className="group p-2 lg:p-0 flex flex-wrap lg:flex-nowrap gap-3 items-center relative">
+                      
+                      {/* Nomor Persil - 12% */}
+                      <div className="w-[48%] lg:w-[12%]">
+                        <input 
+                          className="w-full px-4 py-3 text-xs border border-zinc-200 rounded-xl outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/5 bg-white font-bold transition-all text-zinc-900" 
+                          placeholder="Nomor Persil" 
+                          value={row.nomor_persil} 
+                          onChange={e => updateRow(i, 'nomor_persil', e.target.value)} 
+                        />
+                      </div>
+
+                      {/* Jenis Tanah - 18% */}
+                      <div className="w-[48%] lg:w-[18%] relative">
+                        <select 
+                          className="w-full px-4 py-3 text-xs border border-zinc-200 rounded-xl outline-none focus:border-emerald-500 bg-white font-bold appearance-none cursor-pointer text-zinc-900" 
+                          value={row.jenis_tanah} 
+                          onChange={e => updateRow(i, 'jenis_tanah', e.target.value)}
+                        >
+                          <option value="Tanah Kering">Tanah Kering</option>
+                          <option value="Sawah">Sawah</option>
+                        </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
+                          <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path d="M19 9l-7 7-7-7"/></svg>
+                        </div>
+                      </div>
+
+                      {/* Klasifikasi - 10% */}
+                      <div className="w-[30%] lg:w-[10%]">
+                        <input 
+                          className="w-full px-4 py-3 text-xs border border-zinc-200 rounded-xl outline-none focus:border-emerald-500 bg-white font-bold text-center uppercase text-zinc-900" 
+                          placeholder="Klas" 
+                          value={row.klas_desa} 
+                          onChange={e => updateRow(i, 'klas_desa', e.target.value)} 
+                        />
+                      </div>
+
+                      {/* Luas - 12% */}
+                      <div className="w-[30%] lg:w-[12%]">
+                        <input 
+                          className="w-full px-4 py-3 text-xs border border-zinc-200 rounded-xl outline-none focus:border-emerald-500 bg-white font-bold text-zinc-900" 
+                          placeholder="0" 
+                          type="number" 
+                          value={row.luas_meter === 0 ? '' : row.luas_meter} 
+                          onChange={e => {
+                            const val = e.target.value;
+                            updateRow(i, 'luas_meter', val === '' ? 0 : parseFloat(val));
+                          }} 
+                        />
+                      </div>
+
+                      {/* Asal Usul - Sisa Ruang (flex-1) */}
+                      <div className="w-full lg:flex-1">
+                        <textarea 
+                          className="w-full px-4 py-3 text-xs border border-zinc-200 rounded-xl outline-none focus:border-emerald-500 bg-white font-medium text-zinc-900 min-h-[50px] resize-y" 
+                          placeholder="Asal-Usul / Keterangan Lengkap..." 
+                          value={row.asal_usul} 
+                          onChange={e => updateRow(i, 'asal_usul', e.target.value)} 
+                        />
+                      </div>
+
+                      {/* Tombol Hapus */}
+                      {rows.length > 1 && (
+                        <button 
+                          onClick={() => setRows(rows.filter((_, idx) => idx !== i))} 
+                          className="p-2 text-zinc-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                        >
+                          <Trash2 size={18}/>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
         {/* FOOTER */}
         <div className="p-6 lg:p-10 border-t border-zinc-50 bg-white flex shrink-0 justify-end gap-6 items-center">
-          <button type="button" onClick={onClose} className="text-xs font-black text-zinc-400 uppercase tracking-widest hover:text-zinc-600 transition-all">Batal</button>
-          <button onClick={handleSave} disabled={loading} className="w-full lg:w-auto px-12 py-4 bg-zinc-900 text-white rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-zinc-900/20 active:scale-95 transition-all flex justify-center items-center gap-2">
+          <button 
+            type="button" 
+            onClick={onClose} 
+            className="text-xs font-black text-zinc-400 uppercase tracking-widest hover:text-zinc-600 transition-all"
+          >
+            Batal
+          </button>
+          <button 
+            onClick={handleSave} 
+            disabled={loading} 
+            className="w-full lg:w-auto px-12 py-4 bg-zinc-900 text-white rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-zinc-900/20 active:scale-95 transition-all flex justify-center items-center gap-2 hover:bg-zinc-800"
+          >
             {loading ? <Loader2 className="animate-spin" size={18}/> : editData ? 'Update Kohir' : 'Simpan Data'}
           </button>
         </div>
@@ -558,14 +641,25 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess }: FormTamba
               </ReactCrop>
             </div>
             <div className="flex gap-4">
-              <button onClick={() => setShowCropper(false)} className="flex-1 py-4 text-xs font-black uppercase text-zinc-400">Batal</button>
+              <button 
+                onClick={() => setShowCropper(false)} 
+                className="flex-1 py-4 text-xs font-black uppercase text-zinc-400 hover:text-zinc-600 transition-all"
+              >
+                Batal
+              </button>
               <button 
                 onClick={async () => {
-                  const cropped = await getCroppedImg();
-                  setShowCropper(false);
-                  handleScanLetterC(cropped);
+                  try {
+                    const cropped = await getCroppedImg();
+                    setImageFile(cropped);
+                    setPreviewUrl(URL.createObjectURL(cropped));
+                    setShowCropper(false);
+                    handleScanLetterC(cropped);
+                  } catch (err: any) {
+                    alert(err);
+                  }
                 }} 
-                className="flex-1 py-4 bg-zinc-900 text-white rounded-2xl text-xs font-black uppercase shadow-lg shadow-zinc-200"
+                className="flex-1 py-4 bg-zinc-900 text-white rounded-2xl text-xs font-black uppercase shadow-lg shadow-zinc-200 hover:bg-zinc-800 transition-all"
               >
                 Proses Area Ini
               </button>

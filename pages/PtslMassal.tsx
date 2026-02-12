@@ -65,7 +65,7 @@ export const PtslHalaman = () => {
     setActiveFile(null);
     const allFiles = await db.files.getAll();
     // Filter berdasarkan village_id dan kategori
-    setFiles(allFiles.filter(f => f.village_id === v.id && f.kategori === 'PTSL'));
+    setFiles(allFiles.filter(f => (f as any).village_id === v.id && f.kategori === 'PTSL'));
   };
 
   // --- LOGIKA DESA ---

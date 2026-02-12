@@ -153,3 +153,31 @@ export const formatNOP = (val: string | number): string => {
   // Jika angka belum lengkap (sedang diketik), tetap tampilkan angka bersihnya
   return clean;
 };
+
+/**
+ * Memformat string angka menjadi format NIK: 000000.000000.0000
+ * @param value String NIK mentah (hanya angka)
+ */
+export const formatNIK = (value: string): string => {
+  // Bersihkan dari karakter non-angka
+  const numbers = value.replace(/\D/g, '');
+  
+  // Batasi maksimal 16 digit angka mentah
+  const truncated = numbers.slice(0, 16);
+
+  // Proses pemformatan
+  if (truncated.length <= 6) {
+    return truncated;
+  } else if (truncated.length <= 12) {
+    return `${truncated.slice(0, 6)}.${truncated.slice(6)}`;
+  } else {
+    return `${truncated.slice(0, 6)}.${truncated.slice(6, 12)}.${truncated.slice(12, 16)}`;
+  }
+};
+
+/**
+ * Mengambil angka saja dari string berformat (untuk simpan ke database)
+ */
+export const parseRawNIK = (value: string): string => {
+  return value.replace(/\D/g, '').slice(0, 16);
+};

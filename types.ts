@@ -26,6 +26,7 @@ export interface Identity {
   pekerjaan: string;
   kewarganegaraan?: string;
   ktp_berlaku: string;
+  ktp_masa_ejaan: string;
   is_seumur_hidup?: boolean;
   ejaan_tanggal_ktp_berlaku: string;
   juncto: string; 
@@ -169,32 +170,47 @@ export interface SuratHak {
 // 4. Berkas (Induk Relasi)
 export interface FileRecord {
   // === FIELD ASLI (JANGAN DIHAPUS/DIUBAH) ===
-  id: string;
+ id: string;
   kategori: 'PPAT_NOTARIS' | 'PTSL';
-  village_id?: string; // Menghubungkan ke PtslVillage (Untuk PTSL)
-  nomor_berkas: string; // NUB
-  nomor_register: string; 
+  nomor_berkas: string;
+  nomor_register: string;
   tanggal_register: string;
-  hari: string; 
+  ejaan_tanggal_register: string;
+  hari: string;
   tanggal: string;
+  ejaan_tanggal: string;
   keterangan: string;
   jenis_perolehan: string;
   tahun_perolehan: string;
   
-  keterangan_persetujuan: string;
-  cakupan_tanah: string;
-  pihak_penanggung: string;
-  jumlah_saksi: string;
-  alamat_persetujuan: string;
+  // LOGIKA "MENURUT KETERANGAN"
+  menurut_keterangan: 'PERSETUJUAN' | 'AKTA_KUASA' | 'AHLI_WARIS' | 'STANDAR';
+  keterangan_persetujuan: string; // "ISTRI", "SUAMI", "ANAK_1", "HARTA_BAWAAN", dll.
+  alamat_persetujuan: string; // "SAMA_DENGAN_PIHAK_1" atau alamat manual
   
-  created_at: string;
+  // FIELD KHUSUS AKTA KUASA (Opsi 2)
+  nomor_akta_kuasa?: string;
+  tanggal_akta_kuasa?: string;
+  ejaan_tanggal_akta?: string;
+  nama_notaris_kuasa?: string;
+  kedudukan_notaris?: string; // Contoh: "Kabupaten Pasuruan"
+
+  // FIELD KHUSUS AHLI WARIS (Opsi 3)
+  nama_almarhum?: string;
+  desa_waris?: string;
+  kecamatan_waris?: string;
   register_waris_desa?: string;
   register_waris_kecamatan?: string;
   tanggal_waris?: string;
   ejaan_tanggal_waris: string;
 
-  latitude?: number;  // Tambahkan ini
-  longitude?: number; // Tambahkan ini
+  // FIELD LAINNYA
+  cakupan_tanah: string;
+  pihak_penanggung: string;
+  jumlah_saksi: string;
+  created_at: string;
+  latitude?: number;
+  longitude?: number;// Tambahkan ini
   // === TAMBAHAN BARU (UNTUK 12 POIN PTSL) ===
   kasun?: string;                               // Poin 3
   jenis_tanah?: string;                         // Poin 4
@@ -218,7 +234,7 @@ export interface FileRecord {
 }
 
 // 5. Relasi (Menghubungkan Orang, Tanah, dan Berkas)
-export type RelationRole = 'PIHAK_1' | 'PIHAK_2' | 'SAKSI' | 'PERSETUJUAN_PIHAK_1';
+export type RelationRole = 'PIHAK_1' | 'PIHAK_2' | 'SAKSI' | '' ;
 
 export interface Relation {
   id: string;
@@ -226,7 +242,24 @@ export interface Relation {
   identitas_id: string;
   data_tanah_id?: string;
   peran: RelationRole;
-  persetujuan?: string;
+}
+export type HubunganPersetujuan =
+  | 'ISTRI'
+  | 'SUAMI'
+  | 'ANAK'
+  | 'ORANG_TUA'
+  | 'SAUDARA'
+  | 'WALI'
+  | 'LAINNYA';
+
+export interface Persetujuan {
+  id: string;
+  berkas_id: string;
+  identitas_id: string;
+  pihak_1_id: string;  // ← Link ke PIHAK_1 yang disetujui
+  hubungan: HubunganPersetujuan;
+  keterangan?: string;
+  created_at?: string;
 }
 
 export interface PbbRecord {
@@ -290,4 +323,7 @@ export interface Mutasi {
   luas_mutasi: number;
   jenis_mutasi: string;
   tanggal_mutasi: string;
+  persil?: string; 
+  jenis_tanah?: string;
+  keterangan?: string;
 }
