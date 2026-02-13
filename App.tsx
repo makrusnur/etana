@@ -18,7 +18,7 @@ import { LetterCMain } from './pages/LetterC';
 import { MutasiC } from './pages/LetterC/MutasiC';
 
 // --- MODUL PBB (Satu Pintu ke PbbManager) ---
-import { PbbManager } from './pages/PbbModul/PbbManager'; 
+import { PbbManager } from './pages/PbbModul/PbbManager';
 
 const AppContent: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
   const location = useLocation();
