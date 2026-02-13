@@ -6,7 +6,7 @@ import {
 import { supabase } from '../../services/db';
 // Mengambil semua logika dari "Satu Pintu" types
 import { PBB_OPTIONS, sanitizePbbPayload, PbbRecord } from '../../types';
-
+// Tambahkan baris komentar ini untuk memancing Git
 export const PbbManager = () => {
   const [loading, setLoading] = useState(false);
   const [kecamatans, setKecamatans] = useState<any[]>([]);
