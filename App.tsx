@@ -11,26 +11,35 @@ import { TemplatesPage } from './pages/Templates';
 import { Login } from './pages/Login';
 import { MapMonitoring } from './pages/MapMonitoring';
 import { PtslHalaman } from './pages/PtslMassal';
-import { PbbPage } from './pages/Pbb';
 import { LetterCMain } from './pages/LetterC';
 import { MutasiC } from './pages/LetterC/MutasiC';
+import { PbbMainPage } from './pages/Pbb';
 
 const AppContent: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
   const location = useLocation();
+  
+  // Deteksi halaman yang butuh layout Full Screen (Tanpa padding besar/Max-Width)
   const isMapPage = location.pathname === '/map-monitoring';
+  const isPbbPage = location.pathname.startsWith('/pbb');
+  const isLetterCPage = location.pathname.startsWith('/letter-c');
+  
+  // Gunakan layout luas untuk modul-modul teknis
+  const isFullLayout = isMapPage || isPbbPage || isLetterCPage;
 
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900">
+      {/* Sidebar tetap di kiri */}
       <Sidebar onLogout={onLogout} />
       
+      {/* Main Content Area */}
       <main className={`w-full transition-all duration-500 ease-in-out ${
-        isMapPage 
-          ? 'lg:pl-[20rem] h-screen overflow-hidden' 
-          : 'lg:pl-[20rem] lg:pr-8 pt-20 lg:pt-8 pb-8'
+        isFullLayout 
+          ? 'lg:pl-64 h-screen overflow-hidden' // 64 sesuai lebar sidebar
+          : 'lg:pl-64 lg:pr-8 pt-20 lg:pt-8 pb-8'
       }`}>
         
         <div className={`h-full ${
-          isMapPage 
+          isFullLayout 
             ? 'w-full px-0 max-w-none' 
             : 'max-w-7xl mx-auto px-4 lg:px-0'
         }`}>
@@ -42,10 +51,15 @@ const AppContent: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/map-monitoring" element={<MapMonitoring />} />
             <Route path="/ptsl" element={<PtslHalaman />} />
-            <Route path="/pbb" element={<PbbPage />} />
-            {/* ROUTE BARU KHUSUS LETTER C */}
+            
+            {/* MODUL PBB (Data Center & Master) */}
+            <Route path="/pbb/*" element={<PbbMainPage />} />
+            
+            {/* MODUL LETTER C */}
             <Route path="/letter-c/mutasi" element={<MutasiC />} />
             <Route path="/letter-c/*" element={<LetterCMain/>} />
+            
+            {/* REDIRECT JIKA RUTE TIDAK ADA */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
@@ -59,7 +73,11 @@ const App: React.FC = () => {
     localStorage.getItem('ethana_auth') !== null
   );
 
-  const handleLogin = () => setIsAuthenticated(true);
+  const handleLogin = () => {
+    localStorage.setItem('ethana_auth', 'true'); // Pastikan tersimpan di storage
+    setIsAuthenticated(true);
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('ethana_auth');
     setIsAuthenticated(false);

@@ -512,22 +512,13 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess }: FormTamba
               
               {/* CONTAINER LIST PERSIL */}
               <div className="mt-8 space-y-4">
+                {/* HEADER TABEL - Hanya muncul di Desktop (lg) */}
                 <div className="hidden lg:flex px-2 pb-2 gap-3 items-center border-b border-zinc-200">
-                  <div className="w-[12%]">
-                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Nomor Persil</label>
-                  </div>
-                  <div className="w-[18%]">
-                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Jenis Tanah</label>
-                  </div>
-                  <div className="w-[10%] text-center">
-                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Klasifikasi</label>
-                  </div>
-                  <div className="w-[12%]">
-                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Luas (M²)</label>
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Asal-Usul / Keterangan</label>
-                  </div>
+                  <div className="w-[12%]"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">No. Persil</label></div>
+                  <div className="w-[18%]"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Jenis</label></div>
+                  <div className="w-[10%] text-center"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Klas</label></div>
+                  <div className="w-[12%]"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Luas (M²)</label></div>
+                  <div className="flex-1"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Asal-Usul / Keterangan</label></div>
                   {rows.length > 1 && <div className="w-10"></div>}
                 </div>
 

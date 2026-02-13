@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Loader2, Search, Layers, ChevronRight, Hash, Building2 } from 'lucide-react';
+import { MapPin, Loader2, Search, Layers, ChevronRight, Hash, Building2, Ruler } from 'lucide-react';
 import { supabase } from '../../services/db';
 import { Kecamatan, Desa, LetterCPersil } from '../../types';
 
-// Interface diperketat
+// Interface yang sudah diperketat untuk relasi Owner
 interface PersilWithOwner extends LetterCPersil {
   letter_c: {
     nomor_c: string;
@@ -13,6 +13,7 @@ interface PersilWithOwner extends LetterCPersil {
 }
 
 export const Persil = () => {
+  // --- States ---
   const [loading, setLoading] = useState(false);
   const [kecamatans, setKecamatans] = useState<Kecamatan[]>([]);
   const [desas, setDesas] = useState<Desa[]>([]);
@@ -25,25 +26,25 @@ export const Persil = () => {
   const [searchTerm, setSearchTerm] = useState(''); 
   const [filterJenis, setFilterJenis] = useState('Semua');
 
-  // 1. Fetch data wilayah (Kecamatan & Desa)
+  // --- 1. Fetch Data Wilayah ---
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchRegions = async () => {
       const { data: kec } = await supabase.from('kecamatan').select('*').order('nama');
       const { data: des } = await supabase.from('desa').select('*').order('nama');
       if (kec) setKecamatans(kec);
       if (des) setDesas(des);
     };
-    fetchData();
+    fetchRegions();
   }, []);
 
-  // 2. Fetch data Persil (Strategi Manual untuk menghindari Error PGRST201)
+  // --- 2. Fetch Data Persil (Manual Fetch to avoid PGRST201) ---
   useEffect(() => {
     const fetchPersils = async () => {
       if (!selectedDesaId) return;
       setLoading(true);
       
       try {
-        // STEP A: Cari semua ID Letter C yang ada di desa terpilih
+        // Ambil ID Letter C yang ada di desa terpilih
         const { data: owners, error: ownerError } = await supabase
           .from('letter_c')
           .select('id')
@@ -54,13 +55,12 @@ export const Persil = () => {
         if (owners && owners.length > 0) {
           const ownerIds = owners.map(o => o.id);
 
-          // STEP B: Ambil persil yang letter_c_id nya ada di list ownerIds
-          // Kita pakai alias 'letter_c' agar sesuai dengan Interface
+          // Ambil persil dengan join manual via foreign key
           const { data: persils, error: persilError } = await supabase
             .from('letter_c_persil')
             .select(`
               *,
-              letter_c:letter_c_persil_letter_c_id_fkey (
+              letter_c:letter_c_id (
                 nomor_c, 
                 nama_pemilik, 
                 desa_id
@@ -72,7 +72,6 @@ export const Persil = () => {
           if (persilError) throw persilError;
 
           if (persils) {
-            // Normalisasi: Pastikan letter_c bukan array
             const normalized = persils.map((item: any) => ({
               ...item,
               letter_c: Array.isArray(item.letter_c) ? item.letter_c[0] : item.letter_c
@@ -80,10 +79,10 @@ export const Persil = () => {
             setPersilList(normalized);
           }
         } else {
-          setPersilList([]); // Jika tidak ada pemilik di desa itu
+          setPersilList([]);
         }
       } catch (err: any) {
-        console.error("Gagal memuat data:", err.message);
+        console.error("Error fetching data:", err.message);
         setPersilList([]);
       } finally {
         setLoading(false);
@@ -93,7 +92,7 @@ export const Persil = () => {
     fetchPersils();
   }, [selectedDesaId]);
 
-  // 3. Logika Filter Sidebar
+  // --- 3. Filter Logic ---
   const filteredKecamatans = kecamatans.map(kec => ({
     ...kec,
     desas: desas.filter(d => 
@@ -102,22 +101,22 @@ export const Persil = () => {
     )
   })).filter(kec => kec.desas.length > 0);
 
-  // 4. Logika Filter Tabel
   const filteredPersils = persilList.filter(p => {
     const noPersil = String(p.nomor_persil || "").toLowerCase();
     const namaPemilik = (p.letter_c?.nama_pemilik || "").toLowerCase();
+    const noKohir = (p.letter_c?.nomor_c || "").toLowerCase();
     const cari = searchTerm.toLowerCase();
 
-    const matchesSearch = noPersil.includes(cari) || namaPemilik.includes(cari);
+    const matchesSearch = noPersil.includes(cari) || namaPemilik.includes(cari) || noKohir.includes(cari);
     const matchesFilter = filterJenis === 'Semua' || p.jenis_tanah === filterJenis;
     
     return matchesSearch && matchesFilter;
   });
 
   return (
-    <div className="flex h-[calc(100vh-140px)] gap-8 p-4 bg-[#F8F9FA] text-zinc-900">
+    <div className="flex h-[calc(100vh-140px)] gap-8 p-4 bg-[#F8F9FA] text-zinc-900 font-sans">
       
-      {/* SIDEBAR WILAYAH */}
+      {/* --- SIDEBAR WILAYAH --- */}
       <div className="w-80 flex flex-col overflow-hidden bg-white/50 rounded-[2rem] border border-zinc-100 p-4">
         <div className="px-2 mb-4">
           <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 mb-4">Pilih Wilayah</h3>
@@ -132,7 +131,7 @@ export const Persil = () => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-2 space-y-6">
+        <div className="flex-1 overflow-y-auto px-2 space-y-6 scrollbar-hide">
           {filteredKecamatans.map(k => (
             <div key={k.id} className="space-y-1">
               <div className="flex items-center gap-2 px-2 mb-2">
@@ -147,7 +146,10 @@ export const Persil = () => {
                     selectedDesaId === d.id ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-500 hover:bg-white'
                   }`}
                 >
-                  <span className="flex items-center gap-3"><MapPin size={14} className={selectedDesaId === d.id ? 'text-white' : 'text-zinc-300'}/> {d.nama}</span>
+                  <span className="flex items-center gap-3">
+                    <MapPin size={14} className={selectedDesaId === d.id ? 'text-white' : 'text-zinc-300'}/> 
+                    {d.nama}
+                  </span>
                   {selectedDesaId === d.id && <ChevronRight size={14}/>}
                 </button>
               ))}
@@ -156,15 +158,19 @@ export const Persil = () => {
         </div>
       </div>
 
-      {/* MAIN CONTENT AREA */}
+      {/* --- MAIN CONTENT AREA --- */}
       <div className="flex-1 bg-white rounded-[2.5rem] border border-zinc-100 flex flex-col overflow-hidden shadow-sm">
-        <div className="p-8 border-b border-zinc-50 flex justify-between items-end">
+        
+        {/* Header Content */}
+        <div className="p-8 border-b border-zinc-50 flex justify-between items-end bg-white/50 backdrop-blur-sm">
           <div>
             <h2 className="text-3xl font-black tracking-tight">
               {selectedDesaId ? desas.find(d => d.id === selectedDesaId)?.nama : "Data Persil"}
             </h2>
             <p className="text-sm text-zinc-400 font-medium mt-1 uppercase tracking-wider">Arsip Rincian Tanah Desa</p>
           </div>
+          
+          {/* Tab Filter Jenis Tanah */}
           <div className="flex gap-2 bg-zinc-100 p-1.5 rounded-2xl">
             {['Semua', 'Sawah', 'Tanah Kering'].map(j => (
               <button 
@@ -180,12 +186,13 @@ export const Persil = () => {
           </div>
         </div>
 
+        {/* Search & Table Area */}
         <div className="p-8 flex-1 overflow-y-auto">
           <div className="relative mb-8">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={20}/>
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-400" size={20}/>
             <input 
-              className="w-full pl-14 pr-6 py-5 bg-zinc-50/50 border border-zinc-100 rounded-[1.5rem] text-sm outline-none focus:bg-white focus:border-zinc-900 transition-all shadow-inner font-medium" 
-              placeholder="Cari No. Persil atau Nama Pemilik..."
+              className="w-full pl-16 pr-6 py-5 bg-zinc-50/50 border border-zinc-100 rounded-[1.5rem] text-sm outline-none focus:bg-white focus:border-zinc-900 transition-all shadow-inner font-medium placeholder:text-zinc-300" 
+              placeholder="Cari No. Persil, No. Kohir, atau Nama Pemilik..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -203,48 +210,74 @@ export const Persil = () => {
              </div>
           ) : filteredPersils.length === 0 ? (
             <div className="text-center p-20 text-zinc-300 font-bold uppercase text-[10px] tracking-widest">
-              Data tidak ditemukan di desa ini
+              Data tidak ditemukan
             </div>
           ) : (
-            <table className="w-full text-left border-separate border-spacing-y-2">
-              <thead>
-                <tr className="text-[11px] font-black text-zinc-300 uppercase tracking-[0.2em]">
-                  <th className="pb-4 px-6">No. Persil</th>
-                  <th className="pb-4">Nama Pemilik / Kohir</th>
-                  <th className="pb-4">Jenis & Klas</th>
-                  <th className="pb-4 text-right px-6">Luas Tanah</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredPersils.map(p => (
-                  <tr key={p.id} className="group">
-                    <td className="py-6 px-6 bg-zinc-50/50 rounded-l-[1.5rem] font-black text-xl text-zinc-900 group-hover:bg-zinc-900 group-hover:text-white transition-all">
-                      {p.nomor_persil}
-                    </td>
-                    <td className="py-6 bg-zinc-50/50 group-hover:bg-zinc-50">
-                      <div className="font-black text-zinc-800 uppercase tracking-tight text-base leading-none mb-1">
-                        {p.letter_c?.nama_pemilik || "Tanpa Nama"}
-                      </div>
-                      <div className="text-[10px] text-zinc-400 font-bold uppercase flex items-center gap-1">
-                        <Hash size={10}/> Kohir C.{p.letter_c?.nomor_c || '-'}
-                      </div>
-                    </td>
-                    <td className="py-6 bg-zinc-50/50 group-hover:bg-zinc-50">
-                      <span className={`text-[10px] font-black px-2 py-1 rounded-lg uppercase ${
-                        p.jenis_tanah === 'Sawah' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'
-                      }`}>
-                        {p.jenis_tanah}
-                      </span>
-                      <span className="ml-2 text-sm font-bold text-zinc-400">{p.klas_desa}</span>
-                    </td>
-                    <td className="py-6 px-6 bg-zinc-50/50 rounded-r-[1.5rem] text-right group-hover:bg-zinc-50">
-                      <span className="font-black text-xl text-zinc-900">{p.luas_meter?.toLocaleString('id-ID')}</span>
-                      <span className="text-[10px] font-bold text-zinc-400 ml-1 uppercase">m²</span>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-separate border-spacing-y-2">
+                <thead>
+                  <tr className="text-[11px] font-black text-zinc-300 uppercase tracking-[0.2em]">
+                    <th className="pb-4 px-6">No. Persil</th>
+                    <th className="pb-4">No. Kohir</th>
+                    <th className="pb-4">Nama Pemilik</th>
+                    <th className="pb-4">Jenis & Klas</th>
+                    <th className="pb-4 text-right px-6">Luas Tanah</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filteredPersils.map(p => (
+                    <tr key={p.id} className="group transition-all">
+                      {/* Kolom No. Persil */}
+                      <td className="py-6 px-6 bg-zinc-50/50 rounded-l-[1.5rem] font-black text-xl text-zinc-900 group-hover:bg-zinc-900 group-hover:text-white transition-all">
+                        {p.nomor_persil}
+                      </td>
+
+                      {/* Kolom No. Kohir (C) */}
+                      <td className="py-6 bg-zinc-50/50 group-hover:bg-zinc-50 transition-colors">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-lg bg-zinc-200 flex items-center justify-center group-hover:bg-zinc-300">
+                             <Hash size={12} className="text-zinc-500"/>
+                          </div>
+                          <span className="font-black text-lg text-zinc-800">C.{p.letter_c?.nomor_c || '-'}</span>
+                        </div>
+                      </td>
+
+                      {/* Kolom Nama Pemilik */}
+                      <td className="py-6 bg-zinc-50/50 group-hover:bg-zinc-50 transition-colors">
+                        <div className="font-black text-zinc-800 uppercase tracking-tight text-base leading-none">
+                          {p.letter_c?.nama_pemilik || "Tanpa Nama"}
+                        </div>
+                        <div className="text-[10px] text-zinc-400 font-bold uppercase mt-1">
+                          Pemilik Terdaftar
+                        </div>
+                      </td>
+
+                      {/* Kolom Jenis & Klas */}
+                      <td className="py-6 bg-zinc-50/50 group-hover:bg-zinc-50 transition-colors">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[9px] font-black px-2 py-1 rounded-md uppercase ${
+                            p.jenis_tanah === 'Sawah' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'
+                          }`}>
+                            {p.jenis_tanah}
+                          </span>
+                          <span className="text-sm font-bold text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded-md">
+                            {p.klas_desa}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Kolom Luas */}
+                      <td className="py-6 px-6 bg-zinc-50/50 rounded-r-[1.5rem] text-right group-hover:bg-zinc-50 transition-colors">
+                        <div className="flex items-center justify-end gap-2">
+                          <span className="font-black text-xl text-zinc-900">{p.luas_meter?.toLocaleString('id-ID')}</span>
+                          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">m²</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>

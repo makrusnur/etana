@@ -262,25 +262,126 @@ export interface Persetujuan {
   created_at?: string;
 }
 
+// ============================================
+// 6. TYPES KHUSUS PBB (PAJAK BUMI & BANGUNAN)
+// ============================================
+
+// ==========================================================
+// 1. DEFINISI TIPE (TYPES & INTERFACES)
+// ==========================================================
+export type PbbServiceType = 'PEREKAMAN_DATA' | 'PEMUTAKHIRAN_DATA' | 'PENGHAPUSAN_DATA';
+export type PbbSubjectStatus = 'PEMILIK' | 'PENYEWA' | 'PEMAKAI' | 'PENGELOLA' | 'PEMILIK_BERSAMA';
+
 export interface PbbRecord {
-  id?: string;               // UUID (opsional saat insert)
-  tahun_pajak: string;       // <--- Tambahkan ini
-  tgl_rekam: string;         // <--- Tambahkan ini
-  tipe_layanan: string;
-  status_subjek: string;
-  jenis_subjek: string;
-  pekerjaan: string;
-  nop_asal: string;
-  nop_bersama: string;
-  identitas_id: string | null; // UUID boleh null
-  data_tanah_id: string;       // UUID wajib
-  manual_nik: string;
-  manual_nama: string;
-  manual_alamat: string;
+  id?: string;
   desa_id: string;
+  kecamatan_id: string;
+  tahun_pajak: string;
+  tgl_rekam: string;
+  
+  // Identitas & Subjek (SPOP)
+  nop: string;
+  nama_wp: string;
+  nik: string;
+  npwp?: string;
+  pekerjaan: string;
+  status_wp: PbbSubjectStatus;
+  
+  // Letak Objek Pajak
+  jalan_op: string;
+  blok_op: string;
+  rt_op: string;
+  rw_op: string;
+
+  // Alamat Subjek Pajak
+  jalan_wp: string;
+  rt_wp: string;
+  rw_wp: string;
+  kel_wp: string;
+  kab_wp: string;
+
+  // Data Bumi
+  luas_bumi: number;
+  znt: string;
+  jenis_tanah: string;
+
+  // Data Bangunan (LSPOP)
+  luas_bng: number;
+  jumlah_lantai: number;
+  tahun_dibangun: string;
+  tahun_renovasi?: string;
+  kondisi_umum: string;
+  daya_listrik: number;
+
+  // Material Konstruksi
+  m_lantai: string;
+  m_dinding: string;
+  m_langit: string;
+  m_atap: string;
+
+  // Fasilitas (Sangat Rinci)
+  f_ac_split: number;
+  f_ac_window: number;
+  f_ac_central: number;
+  f_kolam_luas: number;
+  f_kolam_finishing: string;
+  f_pagar_panjang: number;
+  f_pagar_bahan: string;
+  f_paving_luas: number;
+  f_lift_penumpang: number;
+  f_lift_barang: number;
+  
+  // Fitur Keamanan (Boolean)
+  f_pemadam_hydrant: boolean;
+  f_pemadam_sprinkler: boolean;
+  f_pemadam_alarm: boolean;
 }
 
-// Isi file src/types.ts
+// ==========================================================
+// 2. OPSI DROPDOWN (CONSTANTS)
+// ==========================================================
+export const PBB_OPTIONS = {
+  PEKERJAAN: ['PNS', 'TNI/POLRI', 'SWASTA', 'WIRASWASTA', 'PETANI', 'NELAYAN', 'PENSIUNAN', 'LAINNYA'],
+  STATUS_WP: ['PEMILIK', 'PENYEWA', 'PEMAKAI', 'PENGELOLA', 'PEMILIK_BERSAMA'],
+  JENIS_TANAH: ['TANAH DARAT', 'SAWAH', 'TAMBAK', 'KEBUN', 'HUTAN', 'TANAH KOSONG'],
+  KONDISI_BNG: ['SANGAT BAIK', 'BAIK', 'SEDANG', 'JELEK'],
+  MATERIAL_ATAP: ['GENTENG KERAMIK', 'GENTENG BETON', 'GENTENG TANAH', 'ASBES', 'SENG', 'SIRAP'],
+  MATERIAL_DINDING: ['TEMBOK BATA', 'BETON PRECAST', 'KAYU', 'KACA', 'SENG'],
+  MATERIAL_LANTAI: ['MARMER', 'GRANIT', 'KERAMIK', 'TERASO', 'UBIN PC', 'SEMEN', 'KAYU'],
+  MATERIAL_LANGIT: ['GYPSUM', 'AKUSTIK', 'TRIPLEK/ETERNIT', 'TANPA PLAFON'],
+  KOLAM_FINISH: ['DIPLESTER', 'DENGAN PELAPIS', 'TANPA PELAPIS'],
+  PAGAR_BAHAN: ['BATA/BATAKO', 'BESI/BATA', 'BAJA/BESI', 'KAYU'],
+};
+
+// ==========================================================
+// 3. FUNGSI SANITASI (UTILS)
+// ==========================================================
+export const sanitizePbbPayload = (formData: any): Partial<PbbRecord> => {
+  const numericFields = [
+    'luas_bumi', 'luas_bng', 'jumlah_lantai', 'daya_listrik',
+    'f_ac_split', 'f_ac_window', 'f_ac_central', 'f_kolam_luas',
+    'f_pagar_panjang', 'f_paving_luas', 'f_lift_penumpang', 'f_lift_barang'
+  ];
+
+  const sanitized = { ...formData };
+
+  // 1. Paksa string kosong jadi 0 untuk kolom angka
+  numericFields.forEach(field => {
+    if (sanitized[field] === '' || sanitized[field] === null || sanitized[field] === undefined) {
+      sanitized[field] = 0;
+    } else {
+      sanitized[field] = Number(sanitized[field]);
+    }
+  });
+
+  // 2. Paksa teks tertentu jadi HURUF KAPITAL
+  const upperFields = ['nama_wp', 'jalan_op', 'blok_op', 'jalan_wp', 'kel_wp', 'kab_wp', 'znt'];
+  upperFields.forEach(field => {
+    if (sanitized[field]) sanitized[field] = sanitized[field].toUpperCase();
+  });
+
+  return sanitized;
+};// Isi file src/types.ts
 export interface Kecamatan {
   id: string;
   nama: string;

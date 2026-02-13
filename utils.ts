@@ -181,3 +181,39 @@ export const formatNIK = (value: string): string => {
 export const parseRawNIK = (value: string): string => {
   return value.replace(/\D/g, '').slice(0, 16);
 };
+export const cleanNOP = (nop: string): string => {
+  return nop.replace(/\./g, '');
+};
+
+/**
+ * Validasi format NOP (harus 18 digit angka)
+ */
+export const isValidNOP = (nop: string): boolean => {
+  const clean = cleanNOP(nop);
+  return /^\d{18}$/.test(clean);
+};
+
+/**
+ * Format Rupiah (IDR)
+ */
+export const formatRupiah = (amount: number): string => {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount);
+};
+
+/**
+ * Format tanggal ISO ke format Indonesia
+ */
+export const formatTanggalID = (isoDate: string): string => {
+  const date = new Date(isoDate);
+  const options: Intl.DateTimeFormatOptions = {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  };
+  return date.toLocaleDateString('id-ID', options);
+};
