@@ -64,18 +64,67 @@ export const LandDataPage: React.FC = () => {
     created_at: ''
   };
   
+  // 1. STATE - Menggunakan nama 'landList' agar tidak bentrok dengan 'data'
   const [form, setForm] = useState<LandData>(emptyForm);
+  const [isOpen, setIsOpen] = useState(false);
+  const [isEdit, setIsEdit] = useState(false);
+  const [landList, setLandList] = useState<LandData[]>([]); // Nama diganti jadi landList
 
+  // 2. FUNGSI LOAD DATA
+  const loadData = async () => {
+    try {
+      const res = await db.lands.getAll();
+      setLandList(res || []); // Mengisi landList
+    } catch (err) {
+      console.error("Gagal load data:", err);
+    }
+  };
+
+  // 3. EFFECT UNTUK LOAD DATA & AUTO-EDIT
+  useEffect(() => {
+    const initializePage = async () => {
+      // Jalankan load data list
+      await loadData();
+
+      // Cek apakah ada parameter edit di URL
+      const hashParts = window.location.hash.split('?');
+      if (hashParts.length > 1) {
+        const params = new URLSearchParams(hashParts[1]);
+        const editId = params.get('edit');
+
+        if (editId) {
+          const { data: fetchResult, error } = await supabase
+            .from('lands')
+            .select('*')
+            .eq('id', editId)
+            .single();
+
+          if (fetchResult && !error) {
+            setForm({
+              ...fetchResult,
+              latitude: fetchResult.latitude?.toString() || '',
+              longitude: fetchResult.longitude?.toString() || ''
+            });
+            setIsEdit(true);
+            setIsOpen(true);
+            
+            // Bersihkan URL tanpa refresh halaman
+            window.history.replaceState(null, '', hashParts[0]);
+          }
+        }
+      }
+    };
+
+    initializePage();
+  }, [window.location.hash]);
+
+  // 4. EFFECT KALKULASI PAJAK
   useEffect(() => {
     const totalBumi = (Number(form.pajak_bumi_luas) || 0) * (Number(form.pajak_bumi_njop) || 0);
     const totalBangunan = (Number(form.pajak_bangunan_luas) || 0) * (Number(form.pajak_bangunan_njop) || 0);
     const grandTotal = totalBumi + totalBangunan;
 
-    if (
-      form.pajak_bumi_total !== totalBumi || 
-      form.pajak_bangunan_total !== totalBangunan || 
-      form.pajak_grand_total !== grandTotal
-    ) {
+    if (form.pajak_grand_total !== grandTotal) {
       setForm(prev => ({
         ...prev,
         pajak_bumi_total: totalBumi,
@@ -84,20 +133,7 @@ export const LandDataPage: React.FC = () => {
       }));
     }
   }, [form.pajak_bumi_luas, form.pajak_bumi_njop, form.pajak_bangunan_luas, form.pajak_bangunan_njop]);
-
-  useEffect(() => {
-    loadData();
-  }, [view]);
-
-  const loadData = async () => {
-    try {
-      const res = await db.lands.getAll();
-      setData(res || []);
-    } catch (err) {
-      console.error("Gagal memuat data tanah:", err);
-    }
- }; 
-
+  
   const addSuratHak = () => {
     setForm(prev => ({
       ...prev,
@@ -354,7 +390,7 @@ const removeSuratHak = (index: number) => {
   };
   
 
-  const filteredData = data.filter(item => 
+  const filteredData = landList.filter(item => 
     item.atas_nama_nop.toLowerCase().includes(search.toLowerCase()) || item.nop.includes(search)
   );
 

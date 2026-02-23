@@ -102,12 +102,16 @@ export const Persil = () => {
   })).filter(kec => kec.desas.length > 0);
 
   const filteredPersils = persilList.filter(p => {
+    // 1. Ambil data nomor persil dan ubah ke string agar bisa dicari
     const noPersil = String(p.nomor_persil || "").toLowerCase();
-    const namaPemilik = (p.letter_c?.nama_pemilik || "").toLowerCase();
-    const noKohir = (p.letter_c?.nomor_c || "").toLowerCase();
+    
+    // 2. Ambil kata kunci pencarian
     const cari = searchTerm.toLowerCase();
 
-    const matchesSearch = noPersil.includes(cari) || namaPemilik.includes(cari) || noKohir.includes(cari);
+    // 3. LOGIC UTAMA: Hanya cek apakah No. Persil mengandung kata kunci
+    const matchesSearch = noPersil.includes(cari);
+    
+    // 4. Tetap jalankan filter Jenis Tanah (Sawah/Kering)
     const matchesFilter = filterJenis === 'Semua' || p.jenis_tanah === filterJenis;
     
     return matchesSearch && matchesFilter;

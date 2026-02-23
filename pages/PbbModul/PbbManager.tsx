@@ -36,18 +36,75 @@ export const PbbManager = () => {
     latitude: '',longitude: ''
   };
 
+
+  const [isEdit, setIsEdit] = useState(false); // Tambahkan ini
   const [formData, setFormData] = useState(initialForm);
 
   useEffect(() => {
     const fetchWilayah = async () => {
-      const { data: kec } = await supabase.from('kecamatan').select('*').order('nama');
-      const { data: des } = await supabase.from('desa').select('*').order('nama');
-      setKecamatans(kec || []);
-      setDesas(des || []);
+      try {
+        const { data: kec } = await supabase.from('kecamatan').select('*').order('nama');
+        const { data: des } = await supabase.from('desa').select('*').order('nama');
+        setKecamatans(kec || []);
+        setDesas(des || []);
+      } catch (error) {
+        console.error("Error load wilayah:", error);
+      }
     };
     fetchWilayah();
   }, []);
 
+  useEffect(() => {
+    // Ambil ID dari URL (Contoh: #/pbb?edit=12)
+    const hashParts = window.location.hash.split('?');
+    const params = new URLSearchParams(hashParts.length > 1 ? hashParts[1] : '');
+    const editId = params.get('edit');
+  
+    // Jika tidak ada ID yang mau diedit, jangan lakukan apa-apa
+    if (!editId) return;
+  
+    const initiateEdit = async () => {
+      try {
+        // 1. Cari dulu di data yang sudah ter-load (pbbRecords)
+        let target = pbbRecords.find(r => String(r.id) === String(editId));
+  
+        // 2. Kalau tidak ada (karena beda desa), tarik paksa langsung ke database
+        if (!target) {
+          const { data, error } = await supabase
+            .from('pbb_records')
+            .select('*')
+            .eq('id', editId)
+            .single();
+          
+          if (error) throw error;
+          target = data;
+        }
+  
+        // 3. Masukkan ke Form jika data ditemukan
+        if (target) {
+          setFormData({
+            ...initialForm, // Template field lengkap
+            ...target,      // Timpa dengan data dari DB
+            latitude: target.latitude?.toString() || '',
+            longitude: target.longitude?.toString() || ''
+          });
+  
+          // Nyalakan semua trigger untuk buka modal
+          setEditingId(editId);
+          setIsEdit(true);
+          setIsModalOpen(true);
+  
+          // Bersihkan URL agar tidak looping saat refresh
+          window.history.replaceState(null, '', '#/pbb');
+        }
+      } catch (err) {
+        console.error("Gagal melakukan Global Edit:", err);
+      }
+    };
+  
+    initiateEdit();
+  }, [pbbRecords, window.location.hash]); // Pantau perubahan data dan URL
+    
   const fetchRecords = async (desaId: string) => {
     setLoading(true);
     const { data } = await supabase.from('pbb_records').select('*').eq('desa_id', desaId).order('created_at', { ascending: false });
