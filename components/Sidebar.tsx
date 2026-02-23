@@ -1,11 +1,9 @@
-// src/components/Sidebar.tsx
 import React, { useState } from 'react';
 import * as ReactRouterDOM from 'react-router-dom';
 const { NavLink, useLocation, useNavigate } = ReactRouterDOM;
 import { 
   Users, FileText, Map, Home, Settings, LogOut, ChevronLeft, ChevronRight, 
-  Menu, X, Navigation, Milestone, Landmark, Book, Repeat, Printer, 
-  LayoutDashboard, ArrowLeftCircle, Database, Building2, FilePlus, ChevronDown, ChevronUp
+  Menu, X, Navigation, Landmark, Book, Repeat, LayoutDashboard, ArrowLeftCircle, Database, ChevronDown, ChevronUp
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -15,7 +13,7 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [isPbbExpanded, setIsPbbExpanded] = useState(true); // Default true agar user langsung lihat opsinya
+  const [isPbbExpanded, setIsPbbExpanded] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -62,7 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
                 <MobileNavLink to="/letter-c/persil" icon={<Landmark size={20}/>} label="Persil" onClick={() => setIsMobileOpen(false)} />
                 <MobileNavLink to="/letter-c/mutasi" icon={<Repeat size={20}/>} label="Mutasi" onClick={() => setIsMobileOpen(false)} />
                 <div className="pt-4 mt-4 border-t border-white/10">
-                  <MobileNavLink to="/" icon={<ArrowLeftCircle size={20}/>} label="Kembali ke Utama" onClick={() => { navigate('/'); setIsMobileOpen(false); }} />
+                  <MobileNavLink to="/" icon={<ArrowLeftCircle size={20}/>} label="Kembali Utama" onClick={() => { navigate('/'); setIsMobileOpen(false); }} />
                 </div>
               </>
             ) : (
@@ -71,7 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
                 <MobileNavLink to="/identities" icon={<Users size={20}/>} label="Data Subjek" onClick={() => setIsMobileOpen(false)} />
                 <MobileNavLink to="/lands" icon={<Map size={20}/>} label="Data Objek" onClick={() => setIsMobileOpen(false)} />
                 
-                {/* MOBILE: PBB SUBMENU RINGKAS */}
+                {/* MENU PBB MOBILE - DISINKRONKAN */}
                 <button
                   onClick={() => setIsPbbExpanded(!isPbbExpanded)}
                   className={`flex items-center gap-4 w-full p-4 text-left rounded-xl font-semibold transition-all ${isPbbActive ? 'text-blue-400 bg-white/5' : 'text-slate-500'}`}
@@ -84,11 +82,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
                 {isPbbExpanded && (
                   <div className="ml-4 space-y-1 bg-white/[0.02] rounded-xl p-2">
                     <MobileNavLink to="/pbb" icon={<Database size={18}/>} label="PBB Data Center" onClick={() => setIsMobileOpen(false)} />
-                    <MobileNavLink to="/pbb/master" icon={<Settings size={18}/>} label="Master Wilayah" onClick={() => setIsMobileOpen(false)} />
-                  </div>
+                    <MobileNavLink to="/pbb/masterdata" icon={<Settings size={18}/>} label="Master Data" onClick={() => setIsMobileOpen(false)} />
+                   </div>
                 )}
                 
                 <MobileNavLink to="/map-monitoring" icon={<Navigation size={20}/>} label="Map Monitoring" onClick={() => setIsMobileOpen(false)} />
+                <MobileNavLink to="/ptsl" icon={<Book size={20}/>} label="Ptsl Massal" onClick={() => setIsMobileOpen(false)} />
                 <MobileNavLink to="/letter-c" icon={<Book size={20}/>} label="Buku C Desa" onClick={() => setIsMobileOpen(false)} />
               </>
             )}
@@ -106,10 +105,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
           {!isCollapsed ? (
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                 <h1 className="text-sm font-black tracking-[0.3em] text-white uppercase">ETANA</h1>
               </div>
-              {isLetterCMode && <span className="text-[9px] text-blue-400 font-bold mt-1 tracking-widest uppercase">Modul Letter C</span>}
             </div>
           ) : (
             <div className="w-2 h-2 rounded-full bg-blue-500 mx-auto"></div>
@@ -127,8 +125,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
                 )}
               </div>
               <NavItem to="/letter-c" icon={<LayoutDashboard size={18} />} label="Dashboard C" collapsed={isCollapsed} navClass={navClass} />
-              <NavItem to="/letter-c/data" icon={<Book size={18} />} label="Data Letter C" collapsed={isCollapsed} navClass={navClass} />
-              <NavItem to="/letter-c/persil" icon={<Landmark size={18} />} label="Data Persil" collapsed={isCollapsed} navClass={navClass} />
+              <NavItem to="/letter-c/data" icon={<Book size={18} />} label="Kohir" collapsed={isCollapsed} navClass={navClass} />
+              <NavItem to="/letter-c/persil" icon={<Landmark size={18} />} label="Persil" collapsed={isCollapsed} navClass={navClass} />
               <NavItem to="/letter-c/mutasi" icon={<Repeat size={18} />} label="Mutasi" collapsed={isCollapsed} navClass={navClass} />
             </>
           ) : (
@@ -136,9 +134,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
               <NavItem to="/" icon={<Home size={18} />} label="Dashboard" collapsed={isCollapsed} navClass={navClass} />
               <NavItem to="/identities" icon={<Users size={18} />} label="Data Subjek" collapsed={isCollapsed} navClass={navClass} />
               <NavItem to="/lands" icon={<Map size={18} />} label="Data Objek" collapsed={isCollapsed} navClass={navClass} />
-              <NavItem to="/files" icon={<FileText size={18} />} label="Berkas & Relasi" collapsed={isCollapsed} navClass={navClass} />
-              
-              {/* DESKTOP: MENU PBB RINGKAS */}
+              <NavItem to="/files" icon={<FileText size={18} />} label="Berkas" collapsed={isCollapsed} navClass={navClass} />
+                
+              {/* MENU PBB DESKTOP - DISINKRONKAN DENGAN PbbManager */}
               {!isCollapsed ? (
                 <div className="group">
                   <button
@@ -151,23 +149,41 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
                       {isPbbExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                     </div>
                   </button>
-                  
                   {isPbbExpanded && (
-                    <div className="ml-6 mt-1 space-y-1 border-l border-white/5">
-                      <SubNavItem to="/pbb" icon={<Database size={14} />} label="Data Center" isActive={location.pathname === '/pbb'} />
-                      <SubNavItem to="/pbb/master" icon={<Settings size={14} />} label="Master Wilayah" isActive={location.pathname === '/pbb/master'} />
-                    </div>
-                  )}
+                  <div className="ml-6 mt-1 space-y-1 border-l border-white/5">
+                    {/* Tombol 1: Data Center (index) */}
+                    <SubNavItem 
+                      to="/pbb" 
+                      icon={<Database size={14} />} 
+                      label="Data Center" 
+                      isActive={location.pathname === '/pbb'} 
+                    />
+
+                    {/* Tombol 2: Master Data (mengarah ke path "masterdata") */}
+                    <SubNavItem 
+                      to="/pbb/masterdata" 
+                      icon={<Settings size={14} />} 
+                      label="Master Data" 
+                      isActive={location.pathname === '/pbb/masterdata'} 
+                    />
+
+                    {/* Tombol 3: Master Wilayah (mengarah ke path "masterwilayah") */}
+                    
+                  </div>
+                )}
                 </div>
               ) : (
                 <NavItem to="/pbb" icon={<Landmark size={18} />} label="PBB Center" collapsed={isCollapsed} navClass={navClass} />
               )}
               
               <NavItem to="/map-monitoring" icon={<Navigation size={18} />} label="Map Monitoring" collapsed={isCollapsed} navClass={navClass} />
+              <NavItem to="/ptsl" icon={<FileText size={18} />} label="Ptsl Massal" collapsed={isCollapsed} navClass={navClass} />
               <div className="pt-4 mt-4 border-t border-white/5">
                 <NavItem to="/letter-c" icon={<Book size={18} />} label="Buku C Desa" collapsed={isCollapsed} navClass={navClass} />
               </div>
+            
             </>
+              
           )}
         </nav>
         
@@ -185,14 +201,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
   );
 };
 
-// Komponen Pembantu
+// --- HELPER COMPONENTS ---
+
 const NavItem = ({ to, icon, label, collapsed, navClass }: any) => {
   const isEnd = to === '/' || to === '/letter-c' || to === '/pbb';
   return (
     <NavLink to={to} end={isEnd} className={navClass}>
       {({ isActive }) => (
         <>
-          {isActive && <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]"></div>}
+          {isActive && <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-blue-500"></div>}
           <span className={`shrink-0 ${isActive ? 'text-blue-400' : 'text-inherit'}`}>{icon}</span>
           {!collapsed && <span className="truncate tracking-tight font-medium">{label}</span>}
         </>
@@ -204,6 +221,7 @@ const NavItem = ({ to, icon, label, collapsed, navClass }: any) => {
 const SubNavItem = ({ to, icon, label, isActive }: any) => (
   <NavLink 
     to={to} 
+    end
     className={({ isActive: active }) => 
       `flex items-center gap-3 px-4 py-2 text-[12px] font-medium transition-all ${
         active || isActive ? 'text-blue-400 bg-blue-500/5' : 'text-slate-500 hover:text-slate-300'

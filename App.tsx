@@ -18,7 +18,7 @@ import { LetterCMain } from './pages/LetterC';
 import { MutasiC } from './pages/LetterC/MutasiC';
 
 // --- MODUL PBB (Satu Pintu ke PbbManager) ---
-import { PbbManager } from './pages/PbbModul/PbbManager';
+import { PbbMainPage } from './pages/PbbModul';
 
 const AppContent: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
   const location = useLocation();
@@ -57,7 +57,7 @@ const AppContent: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             <Route path="/ptsl" element={<PtslHalaman />} />
             
             {/* RUTE MODUL PBB BARU */}
-            <Route path="/pbb/*" element={<PbbManager />} />
+            <Route path="/pbb/*" element={<PbbMainPage />} />
             
             {/* RUTE MODUL LETTER C */}
             <Route path="/letter-c/mutasi" element={<MutasiC />} />

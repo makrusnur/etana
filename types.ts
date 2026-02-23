@@ -335,6 +335,9 @@ export interface PbbRecord {
   f_pemadam_hydrant: boolean;
   f_pemadam_sprinkler: boolean;
   f_pemadam_alarm: boolean;
+
+  latitude?: number;
+  longitude?: number;  
 }
 
 // ==========================================================
@@ -360,7 +363,8 @@ export const sanitizePbbPayload = (formData: any): Partial<PbbRecord> => {
   const numericFields = [
     'luas_bumi', 'luas_bng', 'jumlah_lantai', 'daya_listrik',
     'f_ac_split', 'f_ac_window', 'f_ac_central', 'f_kolam_luas',
-    'f_pagar_panjang', 'f_paving_luas', 'f_lift_penumpang', 'f_lift_barang'
+    'f_pagar_panjang', 'f_paving_luas', 'f_lift_penumpang', 'f_lift_barang',
+    'latitude', 'longitude'
   ];
 
   const sanitized = { ...formData };
