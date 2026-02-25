@@ -3,7 +3,10 @@ import * as ReactRouterDOM from 'react-router-dom';
 const { NavLink, useLocation, useNavigate } = ReactRouterDOM;
 import { 
   Users, FileText, Map, Home, Settings, LogOut, ChevronLeft, ChevronRight, 
-  Menu, X, Navigation, Landmark, Book, Repeat, LayoutDashboard, ArrowLeftCircle, Database, ChevronDown, ChevronUp
+  Menu, X, Navigation, Landmark, Book, Repeat, LayoutDashboard, ArrowLeftCircle, Database, ChevronDown, ChevronUp,
+  Printer,
+  BookAIcon,
+  Files
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -68,6 +71,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
                 <MobileNavLink to="/" icon={<Home size={20}/>} label="Dashboard" onClick={() => setIsMobileOpen(false)} />
                 <MobileNavLink to="/identities" icon={<Users size={20}/>} label="Data Subjek" onClick={() => setIsMobileOpen(false)} />
                 <MobileNavLink to="/lands" icon={<Map size={20}/>} label="Data Objek" onClick={() => setIsMobileOpen(false)} />
+                <MobileNavLink to="/files" icon={<BookAIcon size={20}/>} label="Berkas" onClick={() => setIsMobileOpen(false)} />
+                <MobileNavLink to="/templates" icon={<Printer size={20}/>} label="Automation" onClick={() => setIsMobileOpen(false)} />
                 
                 {/* MENU PBB MOBILE - DISINKRONKAN */}
                 <button
@@ -87,7 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
                 )}
                 
                 <MobileNavLink to="/map-monitoring" icon={<Navigation size={20}/>} label="Map Monitoring" onClick={() => setIsMobileOpen(false)} />
-                <MobileNavLink to="/ptsl" icon={<Book size={20}/>} label="Ptsl Massal" onClick={() => setIsMobileOpen(false)} />
+                <MobileNavLink to="/ptsl" icon={<FileText size={20}/>} label="Ptsl Massal" onClick={() => setIsMobileOpen(false)} />
                 <MobileNavLink to="/letter-c" icon={<Book size={20}/>} label="Buku C Desa" onClick={() => setIsMobileOpen(false)} />
               </>
             )}
@@ -135,7 +140,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
               <NavItem to="/identities" icon={<Users size={18} />} label="Data Subjek" collapsed={isCollapsed} navClass={navClass} />
               <NavItem to="/lands" icon={<Map size={18} />} label="Data Objek" collapsed={isCollapsed} navClass={navClass} />
               <NavItem to="/files" icon={<FileText size={18} />} label="Berkas" collapsed={isCollapsed} navClass={navClass} />
-                
+              <NavItem to="/templates" icon={<Printer size={18} />} label="Automation" collapsed={isCollapsed} navClass={navClass} />
+                 
               {/* MENU PBB DESKTOP - DISINKRONKAN DENGAN PbbManager */}
               {!isCollapsed ? (
                 <div className="group">
