@@ -3,7 +3,7 @@ import {
   Edit2,Printer, Map as MapIcon, Table as TableIcon,
   Search, Plus, Save, X, LayoutDashboard, 
   ChevronRight, Building2, Map, Users, Settings2,
-  Trash2, Loader2, Home, FileText, Globe
+  Trash2, Loader2, Home, FileText, Globe, TrendingUp
 } from 'lucide-react';
 import { supabase } from '../../services/db';
 import { PBB_OPTIONS, sanitizePbbPayload } from '../../types';
@@ -13,6 +13,11 @@ export const PbbManager = () => {
   const [loading, setLoading] = useState(false);
   const [kecamatans, setKecamatans] = useState<any[]>([]);
   const [desas, setDesas] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    totalNop: 0,
+    avgLuas: 0,
+    desaAktif: 0
+  });
   const [selectedDesa, setSelectedDesa] = useState<any>(null);
   const [pbbRecords, setPbbRecords] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -40,19 +45,42 @@ export const PbbManager = () => {
   const [isEdit, setIsEdit] = useState(false); // Tambahkan ini
   const [formData, setFormData] = useState(initialForm);
 
-  useEffect(() => {
-    const fetchWilayah = async () => {
-      try {
-        const { data: kec } = await supabase.from('kecamatan').select('*').order('nama');
-        const { data: des } = await supabase.from('desa').select('*').order('nama');
-        setKecamatans(kec || []);
-        setDesas(des || []);
-      } catch (error) {
-        console.error("Error load wilayah:", error);
-      }
-    };
-    fetchWilayah();
-  }, []);
+  // Fungsi ini tetap menggunakan nama aslinya agar tidak error di bagian lain
+const fetchWilayah = async () => {
+  try {
+    // A. Ambil Data Wilayah (Tetap seperti kode awal Bapak)
+    const { data: kec } = await supabase.from('kecamatan').select('*').order('nama');
+    const { data: des } = await supabase.from('desa').select('*').order('nama');
+    setKecamatans(kec || []);
+    setDesas(des || []);
+
+    // B. Hitung Statistik Real (Hanya ambil kolom yg perlu saja agar ringan)
+    const { data: records } = await supabase
+      .from('pbb_records')
+      .select('luas_bumi, desa_id');
+
+    if (records) {
+      const total = records.length;
+      const totalLuas = records.reduce((acc, curr) => acc + (Number(curr.luas_bumi) || 0), 0);
+      
+      // Menggunakan Set untuk menghitung desa mana saja yang sudah ada datanya (Unique)
+      const uniqueDesas = new Set(records.map(r => r.desa_id)).size;
+
+      setStats({
+        totalNop: total,
+        avgLuas: total > 0 ? Math.round(totalLuas / total) : 0,
+        desaAktif: uniqueDesas
+      });
+    }
+  } catch (error) {
+    console.error("Gagal sinkronisasi data:", error);
+  }
+};
+
+// Pemanggilan saat halaman pertama kali dibuka
+useEffect(() => {
+  fetchWilayah();
+}, []);
 
   useEffect(() => {
     // Ambil ID dari URL (Contoh: #/pbb?edit=12)
@@ -264,15 +292,75 @@ export const PbbManager = () => {
         </div>
       </aside>
 
-      {/* MAIN CONTENT: CLEAN CANVAS */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {!selectedDesa ? (
-          <div className="flex-1 flex flex-col items-center justify-center bg-white m-4 rounded-3xl border border-slate-100 shadow-sm">
-            <div className="w-24 h-24 bg-slate-50 rounded-3xl flex items-center justify-center mb-6 border border-slate-100">
-              <Home size={40} className="text-slate-300" />
+          /* ============================================================
+            DASHBOARD RINGKASAN (Tampil jika belum pilih desa)
+            ============================================================ */
+          <div className="flex-1 overflow-y-auto p-10 space-y-10 bg-[#F8FAFC]">
+            <header>
+              <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Manajemen Pajak Daerah</h2>
+              <p className="text-slate-400 text-sm mt-1 font-medium">Data real-time dari database PBB-P2.</p>
+            </header>
+
+            {/* 3 KARTU UTAMA DENGAN DATA REAL */}
+            <div className="grid grid-cols-3 gap-8">
+              {/* Kartu 01: Total NOP */}
+              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6">
+                <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center"><FileText size={28}/></div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Total NOP Terekam</p>
+                  <p className="text-3xl font-black text-slate-900">{stats.totalNop.toLocaleString('id-ID')}</p>
+                </div>
+              </div>
+
+              {/* Kartu 02: Desa Aktif */}
+              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6">
+                <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center"><Globe size={28}/></div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Wilayah Terdata</p>
+                  <p className="text-3xl font-black text-slate-900">{stats.desaAktif} <span className="text-sm font-bold text-slate-300">Desa</span></p>
+                </div>
+              </div>
+
+              {/* Kartu 03: Rata-rata Luas */}
+              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6">
+                <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-3xl flex items-center justify-center"><MapIcon size={28}/></div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Rerata Luas Bumi</p>
+                  <p className="text-3xl font-black text-slate-900">{stats.avgLuas} <span className="text-sm font-bold text-slate-300">m²</span></p>
+                </div>
+              </div>
             </div>
-            <h2 className="text-2xl font-bold text-slate-800">Manajemen Pajak Daerah</h2>
-            <p className="text-slate-400 text-sm mt-2 font-medium">Silahkan pilih wilayah untuk mulai mengelola data.</p>
+
+            {/* BAR CHART (GRAFIK) DAN LIST DESA */}
+            <div className="grid grid-cols-5 gap-8">
+              <div className="col-span-3 bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
+                <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-10 flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-indigo-500"></div> Grafik Aktivitas Input
+                </h3>
+                <div className="h-56 flex items-end gap-5">
+                  {/* Ini nanti bisa kita buat real juga grafiknya */}
+                  {[30, 45, 25, 60, 75, 50, 40, 90, 100, 85].map((h, i) => (
+                    <div key={i} className="flex-1 bg-slate-50 rounded-t-2xl relative group cursor-help">
+                      <div className="absolute bottom-0 left-0 right-0 bg-indigo-500/20 group-hover:bg-indigo-600 rounded-t-2xl transition-all" style={{ height: `${h}%` }}></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="col-span-2 bg-slate-900 p-10 rounded-[3rem] text-white">
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-8">Daftar Desa</h3>
+                <div className="space-y-4">
+                  {desas.slice(0, 6).map((d) => (
+                    <div key={d.id} className="flex items-center justify-between py-2 border-b border-white/5">
+                      <span className="text-sm font-bold uppercase">{d.nama}</span>
+                      <ChevronRight size={14} className="text-slate-600" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="flex-1 flex flex-col p-8">
