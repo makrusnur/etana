@@ -1,8 +1,10 @@
 // src/pages/TemplatesPage.tsx
 // ============================================
 // TEMPLATES PAGE - GENERATE DOKUMEN PERTANAHAN
-// Sporadik: khusus Letter C (dengan riwayat & BAK sebagai array)
-// Akta: Jual Beli (Letter C atau SHM) dengan loop penjual/pembeli/saksi
+// Sporadik: khusus Letter C (dengan riwayat & BAK)
+// Akta: semua jenis (Jual Beli, Hibah, Waris, IJB, KJ, dll)
+// Data tanah SATU VERSI (tidak dibedakan prefix)
+// Jika data tidak ada, hasilnya string kosong ""
 // ============================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -15,7 +17,7 @@ import {
   Printer, X, Database, Copy, ClipboardCheck, UserCheck, 
   FileSpreadsheet, MapPin, FileText, Search, Users, ShieldCheck, Landmark,
   AlertCircle, CheckCircle2, Loader2, Download, Eye, Upload, History,
-  BookOpen, Layers, Repeat, Activity
+  BookOpen, Layers, Repeat, Activity, FileSignature, ScrollText
 } from 'lucide-react';
 
 // Components & Services
@@ -42,10 +44,8 @@ interface TemplateData {
   relations: Relation[];
   
   // ========================================
-  // DATA UNTUK SPORADIK (flat dengan underscore)
+  // DATA PEMOHON (untuk Sporadik) - dari Identity (PIHAK_1 pertama)
   // ========================================
-  
-  // PEMOHON
   pemohon_nama?: string;
   pemohon_nik?: string;
   pemohon_agama?: string;
@@ -57,8 +57,19 @@ interface TemplateData {
   pemohon_desa?: string;
   pemohon_kecamatan?: string;
   pemohon_kota?: string;
+  pemohon_provinsi?: string;
+  pemohon_tempat_lahir?: string;
+  pemohon_tanggal_lahir?: string;
+  pemohon_ejaan_lahir?: string;
+  pemohon_status_kawin?: string;
+  pemohon_nama_ibu?: string;
+  pemohon_nama_bapak?: string;
   
-  // TANAH - LOKASI
+  // ========================================
+  // DATA TANAH - SATU VERSI UNTUK SEMUA
+  // ========================================
+  
+  // LOKASI (dari LandData)
   tanah_alamat?: string;
   tanah_rt?: string;
   tanah_rw?: string;
@@ -66,119 +77,155 @@ interface TemplateData {
   tanah_kecamatan?: string;
   tanah_kabupaten?: string;
   tanah_provinsi?: string;
-  tanah_nib?: string;
+  tanah_tipe_wilayah?: string;
   
-  // TANAH - LETTER C
-  tanah_nomor_c?: string;
-  tanah_persil?: string;
-  tanah_klas?: string;
-  tanah_atas_nama_c?: string;
-  tanah_berasal_dari?: string;
+  // LETTER C (dari LandData)
+  nomor_c?: string;
+  persil?: string;
+  klas?: string;
+  atas_nama_c?: string;
+  berasal_dari?: string;
+  tahun_perolehan_alas_hak?: string;
   
-  // TANAH - BATAS
+  // SHM ANALOG (untuk Akta)
+  no_shm?: string;
+  atas_nama_shm?: string;
+  nib?: string;
+  no_su?: string;
+  tanggal_su?: string;
+  ejaan_tanggal_su?: string;
+  tanggal_shm?: string;
+  ejaan_tanggal_shm?: string;
+  
+  // SHM ELEKTRONIK (untuk Akta)
+  atas_nama_shm_el?: string;
+  kode_sertifikat?: string;
+  nibel?: string;
+  
+  // NOP & PAJAK
+  nop?: string;
+  sppt_tahun?: string;
+  pajak_bumi_total?: number;
+  pajak_bangunan_total?: number;
+  pajak_grand_total?: number;
+  
+  // BATAS (seluruhnya)
   batas_utara?: string;
   batas_timur?: string;
   batas_selatan?: string;
   batas_barat?: string;
   
-  // TANAH - LUAS
-  tanah_luas?: number;
-  tanah_luas_text?: string;
+  // LUAS
+  luas_seluruhnya?: number;
+  ejaan_luas_seluruhnya?: string;
+  luas_dimohon?: number;
+  ejaan_luas_dimohon?: string;
   
-  // TANAH - PEROLEHAN
-  tanah_tahun_kuasai?: string;
-  perolehan_dari?: string;
-  perolehan_tahun?: string;
-  perolehan_sebab?: string;
+  // HARGA TRANSAKSI
+  harga_transaksi?: string;        // sudah diformat Rp
+  ejaan_harga_transaksi?: string;
   
-  // TANAH - PAJAK
-  tanah_nop?: string;
-  tanah_sppt_tahun?: string;
+  // RIWAYAT TANAH (array untuk loop)
+  riwayat_tanah?: LandHistory[];
   
-  // SAKSI UNTUK SPORADIK (umum)
+  // BAK (array of strings)
+  bak_list?: string[];
+  bak_0?: string;
+  bak_1?: string;
+  bak_2?: string;
+  bak_3?: string;
+  bak_4?: string;
+  
+  // ========================================
+  // DATA SAKSI (untuk Sporadik) - dari Identity dengan peran SAKSI
+  // ========================================
   saksi_0_nama?: string;
   saksi_0_nik?: string;
   saksi_0_umur?: number;
   saksi_0_pekerjaan?: string;
   saksi_0_alamat?: string;
-  
+  saksi_0_agama?: string;
+
   saksi_1_nama?: string;
   saksi_1_nik?: string;
   saksi_1_umur?: number;
   saksi_1_pekerjaan?: string;
   saksi_1_alamat?: string;
+  saksi_1_agama?: string;
   
   saksi_2_nama?: string;
   saksi_2_nik?: string;
   saksi_2_umur?: number;
   saksi_2_pekerjaan?: string;
   saksi_2_alamat?: string;
+  saksi_2_agama?: string;
   
   // ========================================
-  // DATA UNTUK BAK (ARRAY OF STRINGS) - bagian dari SPORADIK
+  // DATA UNTUK AKTA (LOOP)
   // ========================================
-  bak?: string;                    // Single string BAK
-  bak_list?: string[];             // Array of strings BAK
-  bak_0?: string;                   // Baris pertama BAK (akses langsung)
-  bak_1?: string;                   // Baris kedua BAK
-  bak_2?: string;                   // Baris ketiga BAK
-  bak_3?: string;                   // Baris keempat BAK
-  bak_4?: string;                   // Baris kelima BAK
+  penjual?: any[];        // PIHAK_1
+  pembeli?: any[];        // PIHAK_2
+  saksi_akta?: any[];     // SAKSI
+  persetujuan?: any[];    // PERSETUJUAN (dari relasi khusus)
   
   // ========================================
-  // DATA UNTUK RIWAYAT TANAH (LOOP) - bagian dari SPORADIK
-  // ========================================
-  riwayat_tanah?: LandHistory[];
-  
-  // ========================================
-  // DATA UNTUK AKTA (dengan prefix T_)
-  // ========================================
-  penjual?: any[];
-  pembeli?: any[];
-  saksi_akta?: any[];
-  persetujuan?: any[];
-  
-  T_Jenis?: string;                    // "Letter C" atau "SHM"
-  T_C_No?: string;
-  T_C_Persil?: string;
-  T_C_Klas?: string;
-  T_C_AN?: string;
-  T_SHM_No?: string;
-  T_SHM_AN?: string;
-  T_Luas_M?: number;
-  T_Luas_E?: string;
-  T_Batas_U?: string;
-  T_Batas_T?: string;
-  T_Batas_S?: string;
-  T_Batas_B?: string;
-  T_NOP?: string;
-  T_Sppt_Thn?: string;
-  T_Kec?: string;
-  T_Desa?: string;
-  T_Alamat?: string;
-  T_RT?: string;
-  T_RW?: string;
-  T_Harga?: string;
-  T_Harga_E?: string;
-  
-  // ========================================
-  // DATA BERKAS / ADMINISTRASI
+  // DATA BERKAS / ADMINISTRASI (dari FileRecord)
   // ========================================
   No_Berkas?: string;
   No_Reg?: string;
   Hari?: string;
-  Tgl_Surat?: string;
-  Tgl_Surat_Indo?: string;
+  Tgl_Surat?: string;          // format Indonesia
   Tgl_Ejaan?: string;
-  Cak_Tanah?: string;
+  Cakupan_Tanah?: string;
   Pihak_Penanggung?: string;
-  Jum_Saksi?: number;
+  Jumlah_Saksi?: number;
+  
+  // KHUSUS WARIS
+  isWaris?: boolean;
+  nama_almarhum?: string;
+  desa_waris?: string;
+  kecamatan_waris?: string;
+  register_waris_desa?: string;
+  register_waris_kecamatan?: string;
+  tanggal_waris?: string;
+  ejaan_tanggal_waris?: string;
+  
+  // KHUSUS AKTA KUASA
+  nomor_akta_kuasa?: string;
+  tanggal_akta_kuasa?: string;
+  ejaan_tanggal_akta?: string;
+  nama_notaris_kuasa?: string;
+  kedudukan_notaris?: string;
+  
+  // KETERANGAN PERSETUJUAN
+  keterangan_persetujuan?: string;
+  alamat_persetujuan?: string;
   
   // ========================================
-  // DATA KEPALA DESA / LURAH
+  // DATA KEPALA DESA / LURAH (dari LandData)
   // ========================================
   kepala_desa?: string;
-  kepala_desa_tipe?: string;         // "Kepala Desa" atau "Lurah"
+  jenis_kades?: string;   // "Kepala Desa" atau "Lurah"
+  
+  // ========================================
+  // CONDITIONAL FLAGS
+  // ========================================
+  
+  // Jenis perolehan (dari FileRecord)
+  isJualBeli?: boolean;
+  isHibah?: boolean;
+  isWarisFlag?: boolean;
+  isTukarMenukar?: boolean;
+  
+  // Jenis tanah (dari LandData)
+  isLetterC?: boolean;
+  isSHM?: boolean;
+  isSHMElektronik?: boolean;
+  
+  // Ada persetujuan?
+  isPersetujuan?: boolean;
+  isIstri?: boolean;
+  isSuami?: boolean;
   
   // ========================================
   // DATA COUNTER
@@ -189,18 +236,6 @@ interface TemplateData {
   _countSetuju?: number;
   _countRiwayat?: number;
   _countBak?: number;
-  
-  // ========================================
-  // CONDITIONAL FLAGS
-  // ========================================
-  isWaris?: boolean;
-  isJualBeli?: boolean;
-  isHibah?: boolean;
-  isSertifikat?: boolean;
-  isLetterC?: boolean;
-  isPersetujuan?: boolean;
-  Ket_Setuju?: string;
-  Setuju1?: any;
 }
 
 interface GenerateOptions {
@@ -213,6 +248,23 @@ interface GenerateResult {
   error?: string;
   blob?: Blob;
 }
+
+// ============================================
+// HELPER: KONVERSI NILAI KE STRING KOSONG JIKA TIDAK ADA
+// ============================================
+const toEmptyString = (value: any): string => {
+  if (value === null || value === undefined || value === '________________' || value === '____') {
+    return '';
+  }
+  return String(value);
+};
+
+const toEmptyNumber = (value: any): number => {
+  if (value === null || value === undefined || value === 0) {
+    return 0;
+  }
+  return Number(value);
+};
 
 // ============================================
 // MAIN COMPONENT
@@ -388,8 +440,7 @@ export const TemplatesPage: React.FC = () => {
       }
       if (p.desa) parts.push(`Desa ${p.desa}`);
       if (p.kecamatan) parts.push(`Kec. ${p.kecamatan}`);
-      if (p.kota_kabupaten) parts.push(p.kota_kabupaten);
-      return parts.join(', ') || '-';
+      return parts.join(', ') || '';
     };
 
     const formatDateStrip = (dateString: string): string => {
@@ -456,6 +507,7 @@ export const TemplatesPage: React.FC = () => {
       Desa: p.desa || "",
       Kec: p.kecamatan || "",
       Kota: p.kota_kabupaten || "",
+      Provinsi: p.provinsi || "",
       Ktp_Masa_Berlaku: p.ktp_berlaku_indo || "",
       Ktp_Masa_Ejaan: p.ejaan_berlaku || "",
     }));
@@ -478,13 +530,14 @@ export const TemplatesPage: React.FC = () => {
       Desa: p.desa || "",
       Kec: p.kecamatan || "",
       Kota: p.kota_kabupaten || "",
+      Provinsi: p.provinsi || "",
     }));
 
     // ========================================
     // DATA UTAMA
     // ========================================
     
-    // Data Pemohon (Pihak 1 pertama)
+    // Data Pemohon (Pihak 1 pertama) untuk Sporadik
     const pemohon = p1Raw.length > 0 ? p1Raw[0] : null;
     
     // Data Saksi (ambil 3 saksi pertama untuk sporadik)
@@ -497,18 +550,31 @@ export const TemplatesPage: React.FC = () => {
     if (land?.bak_list && Array.isArray(land.bak_list)) {
       bakList = land.bak_list;
     } else if (land?.bak) {
-      // Jika bak adalah string, jadikan array dengan 1 elemen
       bakList = [land.bak];
     }
 
-    // Buat akses langsung bak_0, bak_1, dll
+    // Buat akses langsung bak_0, bak_1, dll (string kosong jika tidak ada)
     const bakAccess: Record<string, string> = {};
     bakList.forEach((item, index) => {
-      bakAccess[`bak_${index}`] = item || '________________';
+      bakAccess[`bak_${index}`] = item || '';
     });
 
     // ========================================
-    // RETURN DATA LENGKAP
+    // TENTUKAN JENIS PEROLEHAN DAN FLAGS
+    // ========================================
+    const jenisPerolehan = (file.jenis_perolehan || '').toUpperCase();
+    const isJualBeli = jenisPerolehan === 'JUAL_BELI' || file.sebab_perolehan === 'JUAL BELI';
+    const isHibah = jenisPerolehan === 'HIBAH' || file.sebab_perolehan === 'HIBAH';
+    const isWaris = jenisPerolehan === 'WARIS' || file.sebab_perolehan === 'WARIS';
+    const isTukarMenukar = jenisPerolehan === 'TUKAR_MENUKAR' || file.sebab_perolehan === 'TUKAR MENUKAR';
+    
+    // Tentukan jenis tanah
+    const isLetterC = land?.jenis_dasar_surat === 'LETTER_C';
+    const isSHM = land?.jenis_dasar_surat === 'SHM_ANALOG';
+    const isSHMElektronik = land?.jenis_dasar_surat === 'SHM_ELEKTRONIK';
+
+    // ========================================
+    // RETURN DATA LENGKAP - SEMUA STRING KOSONG JIKA TIDAK ADA DATA
     // ========================================
     
     return {
@@ -519,167 +585,199 @@ export const TemplatesPage: React.FC = () => {
       relations,
       
       // ========================================
-      // DATA PEMOHON (untuk Sporadik)
+      // DATA PEMOHON - string kosong jika tidak ada
       // ========================================
-      pemohon_nama: pemohon?.nama || '________________',
-      pemohon_nik: formatNIK(pemohon?.nik || '________________'),
-      pemohon_agama: pemohon?.agama || '________________',
+      pemohon_nama: pemohon?.nama || '',
+      pemohon_nik: formatNIK(pemohon?.nik || ''),
+      pemohon_agama: pemohon?.agama || '',
       pemohon_umur: pemohon ? calculateAge(pemohon.tanggal_lahir) : 0,
-      pemohon_pekerjaan: pemohon?.pekerjaan || '________________',
-      pemohon_alamat: pemohon ? formatAlamat(pemohon) : '________________',
-      pemohon_rt: pemohon?.rt || '____',
-      pemohon_rw: pemohon?.rw || '____',
-      pemohon_desa: pemohon?.desa || '________________',
-      pemohon_kecamatan: pemohon?.kecamatan || '________________',
-      pemohon_kota: pemohon?.kota_kabupaten || '________________',
+      pemohon_pekerjaan: pemohon?.pekerjaan || '',
+      pemohon_alamat: pemohon ? formatAlamat(pemohon) : '',
+      pemohon_rt: pemohon?.rt || '',
+      pemohon_rw: pemohon?.rw || '',
+      pemohon_desa: pemohon?.desa || '',
+      pemohon_kecamatan: pemohon?.kecamatan || '',
+      pemohon_kota: pemohon?.kota_kabupaten || '',
+      pemohon_provinsi: pemohon?.provinsi || '',
+      pemohon_tempat_lahir: pemohon?.tempat_lahir || '',
+      pemohon_tanggal_lahir: pemohon?.tanggal_lahir ? formatDateIndo(pemohon.tanggal_lahir) : '',
+      pemohon_ejaan_lahir: pemohon?.ejaan_tanggal_lahir || '',
+      pemohon_status_kawin: pemohon?.status_perkawinan || '',
+      pemohon_nama_ibu: pemohon?.nama_ibuk_kandung || '',
+      pemohon_nama_bapak: pemohon?.nama_bapak_kandung || '',
       
       // ========================================
       // DATA TANAH - LOKASI
       // ========================================
-      tanah_alamat: land?.alamat || '________________',
-      tanah_rt: land?.rt || '____',
-      tanah_rw: land?.rw || '____',
-      tanah_desa: land?.desa || '________________',
-      tanah_kecamatan: land?.kecamatan || '________________',
+      tanah_alamat: land?.alamat || '',
+      tanah_rt: land?.rt || '',
+      tanah_rw: land?.rw || '',
+      tanah_desa: land?.desa || '',
+      tanah_kecamatan: land?.kecamatan || '',
       tanah_kabupaten: land?.kabupaten_kota || 'Pasuruan',
       tanah_provinsi: 'Jawa Timur',
-      tanah_nib: land?.nib || '________________',
+      tanah_tipe_wilayah: land?.tipe_wilayah || '',
       
       // ========================================
       // DATA TANAH - LETTER C
       // ========================================
-      tanah_nomor_c: land?.kohir || '________________',
-      tanah_persil: land?.persil || '________________',
-      tanah_klas: land?.klas || '________________',
-      tanah_atas_nama_c: land?.atas_nama_letter_c || '________________',
-      tanah_berasal_dari: land?.berasal_dari_an || '________________',
+      nomor_c: land?.kohir || '',
+      persil: land?.persil || '',
+      klas: land?.klas || '',
+      atas_nama_c: land?.atas_nama_letter_c || '',
+      berasal_dari: land?.berasal_dari_an || '',
+      tahun_perolehan_alas_hak: land?.tahun_perolehan_alas_hak || '',
       
       // ========================================
-      // DATA TANAH - BATAS
+      // DATA TANAH - SHM ANALOG (untuk Akta)
       // ========================================
-      batas_utara: land?.batas_utara_seluruhnya || '________________',
-      batas_timur: land?.batas_timur_seluruhnya || '________________',
-      batas_selatan: land?.batas_selatan_seluruhnya || '________________',
-      batas_barat: land?.batas_barat_seluruhnya || '________________',
+      no_shm: land?.no_shm || '',
+      atas_nama_shm: land?.atas_nama_shm || '',
+      nib: land?.nib || '',
+      no_su: land?.no_su || '',
+      tanggal_su: land?.tanggal_su ? formatDateIndo(land.tanggal_su) : '',
+      ejaan_tanggal_su: land?.ejaan_tanggal_su || '',
+      tanggal_shm: land?.tanggal_shm ? formatDateIndo(land.tanggal_shm) : '',
+      ejaan_tanggal_shm: land?.ejaan_tanggal_shm || '',
       
       // ========================================
-      // DATA TANAH - LUAS
+      // DATA TANAH - SHM ELEKTRONIK (untuk Akta)
       // ========================================
-      tanah_luas: land?.luas_seluruhnya || 0,
-      tanah_luas_text: land?.ejaan_luas_seluruhnya || '________________',
+      atas_nama_shm_el: land?.atas_nama_shm_el || '',
+      kode_sertifikat: land?.kode_sertifikat || '',
+      nibel: land?.nibel || '',
       
       // ========================================
-      // DATA TANAH - PEROLEHAN
+      // DATA NOP & PAJAK
       // ========================================
-      tanah_tahun_kuasai: file.tahun_pemohon || '____',
-      perolehan_dari: file.asal_perolehan || '________________',
-      perolehan_tahun: file.tahun_perolehan || '____',
-      perolehan_sebab: file.sebab_perolehan || '________________',
+      nop: land?.nop || file.nop || '',
+      sppt_tahun: land?.sppt_tahun || '',
+      pajak_bumi_total: land?.pajak_bumi_total || 0,
+      pajak_bangunan_total: land?.pajak_bangunan_total || 0,
+      pajak_grand_total: land?.pajak_grand_total || 0,
       
       // ========================================
-      // DATA TANAH - PAJAK
+      // BATAS TANAH
       // ========================================
-      tanah_nop: land?.nop || '________________',
-      tanah_sppt_tahun: land?.sppt_tahun || '____',
+      batas_utara: land?.batas_utara_seluruhnya || '',
+      batas_timur: land?.batas_timur_seluruhnya || '',
+      batas_selatan: land?.batas_selatan_seluruhnya || '',
+      batas_barat: land?.batas_barat_seluruhnya || '',
       
       // ========================================
-      // DATA SAKSI UNTUK SPORADIK (umum)
+      // LUAS
       // ========================================
-      saksi_0_nama: saksiList[0]?.nama || '________________',
-      saksi_0_nik: formatNIK(saksiList[0]?.nik || '________________'),
-      saksi_0_umur: saksiList[0] ? calculateAge(saksiList[0].tanggal_lahir) : 0,
-      saksi_0_pekerjaan: saksiList[0]?.pekerjaan || '________________',
-      saksi_0_alamat: saksiList[0] ? formatAlamat(saksiList[0]) : '________________',
-      saksi_0_agama: saksiList[0]?.agama ||'________________',
-
-      saksi_1_nama: saksiList[1]?.nama || '________________',
-      saksi_1_nik: formatNIK(saksiList[1]?.nik || '________________'),
-      saksi_1_umur: saksiList[1] ? calculateAge(saksiList[1].tanggal_lahir) : 0,
-      saksi_1_pekerjaan: saksiList[1]?.pekerjaan || '________________',
-      saksi_1_alamat: saksiList[1] ? formatAlamat(saksiList[1]) : '________________',
-      saksi_1_agama: saksiList[1]?.agama ||'________________',
-      
-      saksi_2_nama: saksiList[2]?.nama || '________________',
-      saksi_2_nik: formatNIK(saksiList[2]?.nik || '________________'),
-      saksi_2_umur: saksiList[2] ? calculateAge(saksiList[2].tanggal_lahir) : 0,
-      saksi_2_pekerjaan: saksiList[2]?.pekerjaan || '________________',
-      saksi_2_alamat: saksiList[2] ? formatAlamat(saksiList[2]) : '________________',
-      saksi_2_agama: saksiList[2]?.agama ||'________________',
-
-      // ========================================
-      // DATA UNTUK BAK (ARRAY OF STRINGS) - bagian dari SPORADIK
-      // ========================================
-      bak: land?.bak || '________________',
-      bak_list: bakList,
-      ...bakAccess,  // Spread bak_0, bak_1, dll
+      luas_seluruhnya: land?.luas_seluruhnya || 0,
+      ejaan_luas_seluruhnya: land?.ejaan_luas_seluruhnya || '',
+      luas_dimohon: land?.luas_dimohon || 0,
+      ejaan_luas_dimohon: land?.ejaan_luas_dimohon || '',
       
       // ========================================
-      // DATA UNTUK RIWAYAT TANAH (LOOP) - bagian dari SPORADIK
+      // HARGA TRANSAKSI
+      // ========================================
+      harga_transaksi: (land?.harga_transaksi || 0).toLocaleString('id-ID'),
+      ejaan_harga_transaksi: land?.ejaan_harga_transaksi || '',
+      
+      // ========================================
+      // RIWAYAT TANAH
       // ========================================
       riwayat_tanah: land?.riwayat_tanah || [],
       
       // ========================================
-      // DATA UNTUK AKTA (LOOP)
+      // BAK
+      // ========================================
+      bak_list: bakList,
+      ...bakAccess,
+      
+      // ========================================
+      // DATA SAKSI (untuk Sporadik)
+      // ========================================
+      saksi_0_nama: saksiList[0]?.nama || '',
+      saksi_0_nik: formatNIK(saksiList[0]?.nik || ''),
+      saksi_0_umur: saksiList[0] ? calculateAge(saksiList[0].tanggal_lahir) : 0,
+      saksi_0_pekerjaan: saksiList[0]?.pekerjaan || '',
+      saksi_0_alamat: saksiList[0] ? formatAlamat(saksiList[0]) : '',
+      saksi_0_agama: saksiList[0]?.agama || '',
+            
+      saksi_1_nama: saksiList[1]?.nama || '',
+      saksi_1_nik: formatNIK(saksiList[1]?.nik || ''),
+      saksi_1_umur: saksiList[1] ? calculateAge(saksiList[1].tanggal_lahir) : 0,
+      saksi_1_pekerjaan: saksiList[1]?.pekerjaan || '',
+      saksi_1_alamat: saksiList[1] ? formatAlamat(saksiList[1]) : '',
+      saksi_1_agama: saksiList[1]?.agama || '',
+      
+      saksi_2_nama: saksiList[2]?.nama || '',
+      saksi_2_nik: formatNIK(saksiList[2]?.nik || ''),
+      saksi_2_umur: saksiList[2] ? calculateAge(saksiList[2].tanggal_lahir) : 0,
+      saksi_2_pekerjaan: saksiList[2]?.pekerjaan || '',
+      saksi_2_alamat: saksiList[2] ? formatAlamat(saksiList[2]) : '',
+      saksi_2_agama: saksiList[2]?.agama || '',
+      
+      // ========================================
+      // DATA AKTA (LOOP)
       // ========================================
       penjual: mapToArray(p1Raw),
       pembeli: mapToArray(p2Raw),
       saksi_akta: mapToArray(saksiRaw),
       persetujuan: mapSetuju(setujuRaw),
       
-      isPersetujuan: setujuRaw.length > 0,
-      Ket_Setuju: file.keterangan_persetujuan === "ISTRI" ? "dengan persetujuan isterinya" :
-                  file.keterangan_persetujuan === "SUAMI" ? "dengan persetujuan suaminya" :
-                  file.keterangan_persetujuan || "dengan persetujuan",
-      
-      Setuju1: setujuRaw.length > 0 ? mapSetuju([setujuRaw[0]])[0] : null,
-      
-      // ========================================
-      // DATA TANAH UNTUK AKTA (prefix T_)
-      // ========================================
-      T_Jenis: land?.jenis_dasar_surat === 'LETTER_C' ? 'Letter C' : 'SHM',
-      T_C_No: land?.kohir || '________________',
-      T_C_Persil: land?.persil || '________________',
-      T_C_Klas: land?.klas || '________________',
-      T_C_AN: land?.atas_nama_letter_c || '________________',
-      T_SHM_No: land?.no_shm || '________________',
-      T_SHM_AN: land?.atas_nama_shm || '________________',
-      T_Luas_M: land?.luas_seluruhnya || 0,
-      T_Luas_E: land?.ejaan_luas_seluruhnya || '________________',
-      T_Batas_U: land?.batas_utara_seluruhnya || '________________',
-      T_Batas_T: land?.batas_timur_seluruhnya || '________________',
-      T_Batas_S: land?.batas_selatan_seluruhnya || '________________',
-      T_Batas_B: land?.batas_barat_seluruhnya || '________________',
-      T_NOP: land?.nop || '________________',
-      T_Sppt_Thn: land?.sppt_tahun || '____',
-      T_Kec: land?.kecamatan || '________________',
-      T_Desa: land?.desa || '________________',
-      T_Alamat: land?.alamat || '________________',
-      T_RT: land?.rt || '____',
-      T_RW: land?.rw || '____',
-      T_Harga: (land?.harga_transaksi || 0).toLocaleString("id-ID"),
-      T_Harga_E: land?.ejaan_harga_transaksi || '________________',
-      
       // ========================================
       // DATA BERKAS
       // ========================================
-      No_Berkas: file.nomor_berkas || '________________',
-      No_Reg: file.nomor_register || '________________',
-      Hari: file.hari || '________________',
-      Tgl_Surat: file.tanggal ? formatDateIndo(file.tanggal) : '________________',
-      Tgl_Surat_Indo: file.tanggal ? formatDateIndo(file.tanggal) : '________________',
-      Tgl_Ejaan: file.ejaan_tanggal || '________________',
-      Cak_Tanah: file.cakupan_tanah || '',
-      Pihak_Penanggung: file.pihak_penanggung || 'Pihak Kedua',
-      Jum_Saksi: saksiRaw.length,
+      No_Berkas: file.nomor_berkas || '',
+      No_Reg: file.nomor_register || '',
+      Hari: file.hari || '',
+      Tgl_Surat: file.tanggal ? formatDateIndo(file.tanggal) : '',
+      Tgl_Ejaan: file.ejaan_tanggal || '',
+      Cakupan_Tanah: file.cakupan_tanah || '',
+      Pihak_Penanggung: file.pihak_penanggung || '',
+      Jumlah_Saksi: parseInt(file.jumlah_saksi || '0') || saksiRaw.length,
+      
+      // KHUSUS WARIS
+      isWaris,
+      nama_almarhum: file.nama_almarhum || '',
+      desa_waris: file.desa_waris || '',
+      kecamatan_waris: file.kecamatan_waris || '',
+      register_waris_desa: file.register_waris_desa || '',
+      register_waris_kecamatan: file.register_waris_kecamatan || '',
+      tanggal_waris: file.tanggal_waris ? formatDateIndo(file.tanggal_waris) : '',
+      ejaan_tanggal_waris: file.ejaan_tanggal_waris || '',
+      
+      // KHUSUS AKTA KUASA
+      nomor_akta_kuasa: file.nomor_akta_kuasa || '',
+      tanggal_akta_kuasa: file.tanggal_akta_kuasa ? formatDateIndo(file.tanggal_akta_kuasa) : '',
+      ejaan_tanggal_akta: file.ejaan_tanggal_akta || '',
+      nama_notaris_kuasa: file.nama_notaris_kuasa || '',
+      kedudukan_notaris: file.kedudukan_notaris || '',
+      
+      // KETERANGAN PERSETUJUAN
+      keterangan_persetujuan: file.keterangan_persetujuan || '',
+      alamat_persetujuan: file.alamat_persetujuan || '',
       
       // ========================================
       // DATA KEPALA DESA
       // ========================================
-      kepala_desa: land?.nama_kepala_desa || '________________',
-      kepala_desa_tipe: land?.jenis_kades || 'Kepala Desa',
+      kepala_desa: land?.nama_kepala_desa || '',
+      jenis_kades: land?.jenis_kades || '',
       
       // ========================================
-      // DATA COUNTER
+      // CONDITIONAL FLAGS
+      // ========================================
+      isJualBeli,
+      isHibah,
+      isWarisFlag: isWaris,
+      isTukarMenukar,
+      
+      isLetterC,
+      isSHM,
+      isSHMElektronik,
+      
+      isPersetujuan: setujuRaw.length > 0,
+      isIstri: file.keterangan_persetujuan === "ISTRI",
+      isSuami: file.keterangan_persetujuan === "SUAMI",
+      
+      // ========================================
+      // COUNTER
       // ========================================
       _countP1: p1Raw.length,
       _countP2: p2Raw.length,
@@ -687,20 +785,11 @@ export const TemplatesPage: React.FC = () => {
       _countSetuju: setujuRaw.length,
       _countRiwayat: land?.riwayat_tanah?.length || 0,
       _countBak: bakList.length,
-      
-      // ========================================
-      // CONDITIONAL FLAGS
-      // ========================================
-      isWaris: file.jenis_perolehan === 'WARIS' || file.sebab_perolehan === 'WARIS',
-      isJualBeli: file.jenis_perolehan === 'JUAL_BELI' || file.sebab_perolehan === 'JUAL BELI',
-      isHibah: file.jenis_perolehan === 'HIBAH' || file.sebab_perolehan === 'HIBAH',
-      isSertifikat: land?.jenis_dasar_surat === 'SHM_ANALOG' || land?.jenis_dasar_surat === 'SHM_ELEKTRONIK',
-      isLetterC: land?.jenis_dasar_surat === 'LETTER_C'
     };
   };
 
   // ========================================
-  // COPY TO CLIPBOARD (FIXED)
+  // COPY TO CLIPBOARD
   // ========================================
   
   const copyToClipboard = (text: string) => {
@@ -753,180 +842,21 @@ export const TemplatesPage: React.FC = () => {
       const arrayBuffer = await fileCopy.arrayBuffer();
       const zip = new PizZip(arrayBuffer);
       
-      // Siapkan data final berdasarkan jenis
-      let finalData: any = {};
+      // Siapkan data final - untuk kedua jenis, kita kirim semua data yang ada
+      // Template word akan memilih sendiri menggunakan conditional
+      const finalData = { ...data };
 
+      // Tambahkan input manual tetangga batas untuk Sporadik
       if (jenis === 'sporadik') {
-        finalData = {
-          // PEMOHON
-          pemohon_nama: data.pemohon_nama,
-          pemohon_nik: data.pemohon_nik,
-          pemohon_agama: data.pemohon_agama,
-          pemohon_umur: data.pemohon_umur,
-          pemohon_pekerjaan: data.pemohon_pekerjaan,
-          pemohon_alamat: data.pemohon_alamat,
-          pemohon_rt: data.pemohon_rt,
-          pemohon_rw: data.pemohon_rw,
-          pemohon_desa: data.pemohon_desa,
-          pemohon_kecamatan: data.pemohon_kecamatan,
-          pemohon_kota: data.pemohon_kota,
-          
-          // TANAH - LOKASI
-          tanah_alamat: data.tanah_alamat,
-          tanah_rt: data.tanah_rt,
-          tanah_rw: data.tanah_rw,
-          tanah_desa: data.tanah_desa,
-          tanah_kecamatan: data.tanah_kecamatan,
-          tanah_kabupaten: data.tanah_kabupaten,
-          tanah_provinsi: data.tanah_provinsi,
-          tanah_nib: data.tanah_nib,
-          
-          // TANAH - LETTER C
-          tanah_nomor_c: data.tanah_nomor_c,
-          tanah_persil: data.tanah_persil,
-          tanah_klas: data.tanah_klas,
-          tanah_atas_nama_c: data.tanah_atas_nama_c,
-          tanah_berasal_dari: data.tanah_berasal_dari,
-          
-          // TANAH - BATAS
-          batas_utara: data.batas_utara,
-          batas_timur: data.batas_timur,
-          batas_selatan: data.batas_selatan,
-          batas_barat: data.batas_barat,
-          
-          // TANAH - LUAS
-          tanah_luas: data.tanah_luas,
-          tanah_luas_text: data.tanah_luas_text,
-          
-          // TANAH - PEROLEHAN
-          tanah_tahun_kuasai: data.tanah_tahun_kuasai,
-          perolehan_dari: data.perolehan_dari,
-          perolehan_tahun: data.perolehan_tahun,
-          perolehan_sebab: data.perolehan_sebab,
-          
-          // TANAH - PAJAK
-          tanah_nop: data.tanah_nop,
-          tanah_sppt_tahun: data.tanah_sppt_tahun,
-          
-          // SAKSI
-          saksi_0_nama: data.saksi_0_nama,
-          saksi_0_nik: data.saksi_0_nik,
-          saksi_0_umur: data.saksi_0_umur,
-          saksi_0_pekerjaan: data.saksi_0_pekerjaan,
-          saksi_0_alamat: data.saksi_0_alamat,
-          saksi_0_agama: data.saksi_0_agama,
-          
-          saksi_1_nama: data.saksi_1_nama,
-          saksi_1_nik: data.saksi_1_nik,
-          saksi_1_umur: data.saksi_1_umur,
-          saksi_1_pekerjaan: data.saksi_1_pekerjaan,
-          saksi_1_alamat: data.saksi_1_alamat,
-          saksi_1_agama: data.saksi_1_agama,
-          
-          saksi_2_nama: data.saksi_2_nama,
-          saksi_2_nik: data.saksi_2_nik,
-          saksi_2_umur: data.saksi_2_umur,
-          saksi_2_pekerjaan: data.saksi_2_pekerjaan,
-          saksi_2_alamat: data.saksi_2_alamat,
-          saksi_2_agama: data.saksi_2_agama,
-          // BAK - ARRAY OF STRINGS (akses langsung)
-          bak: data.bak,
-          bak_0: data.bak_0,
-          bak_1: data.bak_1,
-          bak_2: data.bak_2,
-          bak_3: data.bak_3,
-          bak_4: data.bak_4,
-          
-          // LOOP RIWAYAT TANAH
-          riwayat_tanah: data.riwayat_tanah || [],
-          
-          // ADMINISTRASI
-          No_Berkas: data.No_Berkas,
-          Tgl_Surat: data.Tgl_Surat,
-          Tgl_Ejaan: data.Tgl_Ejaan,
-          Hari: data.Hari,
-          
-          // KEPALA DESA
-          kepala_desa: data.kepala_desa,
-          kepala_desa_tipe: data.kepala_desa_tipe,
-          
-          // CONDITIONAL
-          isWaris: data.isWaris,
-          isJualBeli: data.isJualBeli,
-          isHibah: data.isHibah,
-          isSertifikat: data.isSertifikat,
-          isLetterC: data.isLetterC,
-          
-          // TETANGGA BATAS (INPUT MANUAL)
-          tetangga_utara_nama: tetanggaBatas.utara.nama || data.batas_utara,
-          tetangga_utara_ttd: tetanggaBatas.utara.ttd || '________________',
-          tetangga_timur_nama: tetanggaBatas.timur.nama || data.batas_timur,
-          tetangga_timur_ttd: tetanggaBatas.timur.ttd || '________________',
-          tetangga_selatan_nama: tetanggaBatas.selatan.nama || data.batas_selatan,
-          tetangga_selatan_ttd: tetanggaBatas.selatan.ttd || '________________',
-          tetangga_barat_nama: tetanggaBatas.barat.nama || data.batas_barat,
-          tetangga_barat_ttd: tetanggaBatas.barat.ttd || '________________',
-          
-          // COUNTER
-          _countRiwayat: data._countRiwayat,
-          _countBak: data._countBak,
-          
-          // UMUM
-          materai: '[MATERAI 10.000]'
-        };
-      } 
-      else { // AKTA
-        finalData = {
-          // LOOP PENJUAL
-          penjual: data.penjual || [],
-          
-          // LOOP PEMBELI
-          pembeli: data.pembeli || [],
-          
-          // LOOP SAKSI
-          saksi_akta: data.saksi_akta || [],
-          
-          // LOOP PERSETUJUAN
-          persetujuan: data.persetujuan || [],
-          isPersetujuan: data.isPersetujuan,
-          Ket_Setuju: data.Ket_Setuju,
-          Setuju1: data.Setuju1,
-          
-          // DATA TANAH
-          T_Jenis: data.T_Jenis,
-          T_C_No: data.T_C_No,
-          T_C_Persil: data.T_C_Persil,
-          T_C_Klas: data.T_C_Klas,
-          T_C_AN: data.T_C_AN,
-          T_SHM_No: data.T_SHM_No,
-          T_SHM_AN: data.T_SHM_AN,
-          T_Luas_M: data.T_Luas_M,
-          T_Luas_E: data.T_Luas_E,
-          T_Batas_U: data.T_Batas_U,
-          T_Batas_T: data.T_Batas_T,
-          T_Batas_S: data.T_Batas_S,
-          T_Batas_B: data.T_Batas_B,
-          T_NOP: data.T_NOP,
-          T_Kec: data.T_Kec,
-          T_Desa: data.T_Desa,
-          T_Alamat: data.T_Alamat,
-          T_Harga: data.T_Harga,
-          T_Harga_E: data.T_Harga_E,
-          
-          // ADMINISTRASI
-          No_Berkas: data.No_Berkas,
-          No_Reg: data.No_Reg,
-          Hari: data.Hari,
-          Tgl_Surat: data.Tgl_Surat,
-          Cak_Tanah: data.Cak_Tanah,
-          Pihak_Penanggung: data.Pihak_Penanggung,
-          Jum_Saksi: data.Jum_Saksi,
-          
-          // COUNTER
-          _countP1: data._countP1,
-          _countP2: data._countP2,
-          _countS: data._countS
-        };
+        finalData.tetangga_utara_nama = tetanggaBatas.utara.nama || data.batas_utara || '';
+        finalData.tetangga_utara_ttd = tetanggaBatas.utara.ttd || '';
+        finalData.tetangga_timur_nama = tetanggaBatas.timur.nama || data.batas_timur || '';
+        finalData.tetangga_timur_ttd = tetanggaBatas.timur.ttd || '';
+        finalData.tetangga_selatan_nama = tetanggaBatas.selatan.nama || data.batas_selatan || '';
+        finalData.tetangga_selatan_ttd = tetanggaBatas.selatan.ttd || '';
+        finalData.tetangga_barat_nama = tetanggaBatas.barat.nama || data.batas_barat || '';
+        finalData.tetangga_barat_ttd = tetanggaBatas.barat.ttd || '';
+        finalData.materai = '[MATERAI 10.000]';
       }
 
       if (debug) {
@@ -939,7 +869,8 @@ export const TemplatesPage: React.FC = () => {
         linebreaks: true,
         delimiters: { start: '{', end: '}' },
         nullGetter: (part) => {
-          return `[${part.value}]`;
+          // Jika data tidak ada, kembalikan string kosong
+          return '';
         }
       });
 
@@ -1024,7 +955,7 @@ export const TemplatesPage: React.FC = () => {
             GENERATOR DOKUMEN PERTANAHAN
           </h2>
           <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">
-            Etana Logic v2.5 • Sporadik (Letter C) | Akta Jual Beli
+            Etana Logic v2.5 • Sporadik | Akta (PPAT & Notaris)
           </p>
         </div>
         <Button 
@@ -1066,13 +997,13 @@ export const TemplatesPage: React.FC = () => {
             {previewData && !loading && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <SummaryWidget 
-                  label="PENJUAL" 
+                  label="PIHAK 1" 
                   val={previewData._countP1 || 0} 
                   icon={<UserCheck size={14}/>} 
                   color="emerald" 
                 />
                 <SummaryWidget 
-                  label="PEMBELI" 
+                  label="PIHAK 2" 
                   val={previewData._countP2 || 0} 
                   icon={<UserCheck size={14}/>} 
                   color="blue" 
@@ -1123,9 +1054,9 @@ export const TemplatesPage: React.FC = () => {
                       : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
                   }`}
                 >
-                  <BookOpen size={14} className="mx-auto mb-1" />
+                  <ScrollText size={14} className="mx-auto mb-1" />
                   AKTA
-                  <span className="block text-[8px] font-normal mt-1">(Jual Beli)</span>
+                  <span className="block text-[8px] font-normal mt-1">(PPAT/Notaris)</span>
                 </button>
               </div>
             </div>
@@ -1182,7 +1113,7 @@ export const TemplatesPage: React.FC = () => {
                     KAMUS TAG - {previewData.No_Berkas || 'BERKAS'}
                   </h2>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                    Klik tag untuk menyalin | Pilih tab sesuai jenis dokumen
+                    SATU VERSI UNTUK SEMUA JENIS DOKUMEN
                   </p>
                 </div>
               </div>
@@ -1206,7 +1137,7 @@ export const TemplatesPage: React.FC = () => {
               </div>
             </div>
             
-            {/* Tab Navigation - HANYA 2 TAB */}
+            {/* Tab Navigation */}
             <div className="border-b border-slate-200 bg-white">
               <div className="flex gap-2 p-4">
                 <button
@@ -1217,7 +1148,7 @@ export const TemplatesPage: React.FC = () => {
                   }`}
                   onClick={() => setJenisDokumen('sporadik')}
                 >
-                  📄 SPORADIK (Letter C)
+                  📄 SPORADIK
                 </button>
                 <button
                   className={`px-6 py-3 text-xs font-black uppercase rounded-xl transition-all ${
@@ -1227,180 +1158,170 @@ export const TemplatesPage: React.FC = () => {
                   }`}
                   onClick={() => setJenisDokumen('akta')}
                 >
-                  📜 AKTA JUAL BELI
+                  📜 AKTA
                 </button>
               </div>
             </div>
             
-            {/* Content - Kamus Tag per Jenis Dokumen */}
+            {/* Content - KAMUS TAG */}
             <div className="p-10 overflow-y-auto flex-1 bg-slate-50">
-              {jenisDokumen === 'sporadik' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                {/* KATEGORI: LOOP UNTUK AKTA */}
+                <TagCategory title="LOOP (AKTA)" icon={<Repeat size={16}/>} color="blue">
+                  <TagRow tag="{#penjual}" val="Mulai loop penjual" desc="Loop untuk PIHAK_1" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{_index}" val="Nomor urut" desc="Nomor urut dalam loop" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{Nama}" val={previewData.penjual?.[0]?.Nama} desc="Nama" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{NIK}" val={previewData.penjual?.[0]?.NIK} desc="NIK" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{/penjual}" val="Akhir loop penjual" desc="Penutup loop" onCopy={copyToClipboard} copied={copiedTag} />
                   
-                  {/* KATEGORI: PEMOHON */}
-                  <TagCategory title="PEMOHON" icon={<UserCheck size={16}/>} color="emerald">
-                    <TagRow tag="pemohon_nama" val={previewData.pemohon_nama} desc="Nama lengkap pemohon" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="pemohon_nik" val={previewData.pemohon_nik} desc="NIK pemohon" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="pemohon_agama" val={previewData.pemohon_agama} desc="Agama pemohon" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="pemohon_umur" val={previewData.pemohon_umur} desc="Umur pemohon (tahun)" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="pemohon_pekerjaan" val={previewData.pemohon_pekerjaan} desc="Pekerjaan pemohon" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="pemohon_alamat" val={previewData.pemohon_alamat} desc="Alamat lengkap pemohon" onCopy={copyToClipboard} copied={copiedTag} />
-                  </TagCategory>
-
-                  {/* KATEGORI: TANAH - LOKASI */}
-                  <TagCategory title="LOKASI TANAH" icon={<MapPin size={16}/>} color="blue">
-                    <TagRow tag="tanah_alamat" val={previewData.tanah_alamat} desc="Alamat / jalan tanah" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="tanah_rt" val={previewData.tanah_rt} desc="RT lokasi tanah" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="tanah_rw" val={previewData.tanah_rw} desc="RW lokasi tanah" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="tanah_desa" val={previewData.tanah_desa} desc="Desa/Kelurahan" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="tanah_kecamatan" val={previewData.tanah_kecamatan} desc="Kecamatan" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="tanah_kabupaten" val={previewData.tanah_kabupaten} desc="Kabupaten/Kota" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="tanah_nib" val={previewData.tanah_nib} desc="NIB (Nomor Identifikasi Bidang)" onCopy={copyToClipboard} copied={copiedTag} />
-                  </TagCategory>
-
-                  {/* KATEGORI: LETTER C */}
-                  <TagCategory title="LETTER C" icon={<Layers size={16}/>} color="purple">
-                    <TagRow tag="tanah_nomor_c" val={previewData.tanah_nomor_c} desc="Nomor Kohir (C)" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="tanah_persil" val={previewData.tanah_persil} desc="Nomor Persil" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="tanah_klas" val={previewData.tanah_klas} desc="Klasifikasi Tanah" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="tanah_atas_nama_c" val={previewData.tanah_atas_nama_c} desc="Atas Nama di Letter C" onCopy={copyToClipboard} copied={copiedTag} />
-                  </TagCategory>
-
-                  {/* KATEGORI: BATAS TANAH */}
-                  <TagCategory title="BATAS TANAH" icon={<MapPin size={16}/>} color="orange">
-                    <TagRow tag="batas_utara" val={previewData.batas_utara} desc="Batas Utara (nama pemilik)" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="batas_timur" val={previewData.batas_timur} desc="Batas Timur (nama pemilik)" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="batas_selatan" val={previewData.batas_selatan} desc="Batas Selatan (nama pemilik)" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="batas_barat" val={previewData.batas_barat} desc="Batas Barat (nama pemilik)" onCopy={copyToClipboard} copied={copiedTag} />
-                  </TagCategory>
-
-                  {/* KATEGORI: LUAS & PEROLEHAN */}
-                  <TagCategory title="LUAS & PEROLEHAN" icon={<History size={16}/>} color="amber">
-                    <TagRow tag="tanah_luas" val={previewData.tanah_luas} desc="Luas tanah (m²)" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="tanah_luas_text" val={previewData.tanah_luas_text} desc="Luas (terbilang)" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="tanah_tahun_kuasai" val={previewData.tanah_tahun_kuasai} desc="Tahun mulai dikuasai" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="perolehan_dari" val={previewData.perolehan_dari} desc="Diperoleh dari siapa" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="perolehan_tahun" val={previewData.perolehan_tahun} desc="Tahun perolehan" onCopy={copyToClipboard} copied={copiedTag} />
-                  </TagCategory>
-
-                  {/* KATEGORI: SAKSI */}
-                  <TagCategory title="SAKSI" icon={<Users size={16}/>} color="pink">
-                    <TagRow tag="saksi_0_nama" val={previewData.saksi_0_nama} desc="Nama saksi 1" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="saksi_1_nama" val={previewData.saksi_1_nama} desc="Nama saksi 2" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="saksi_2_nama" val={previewData.saksi_2_nama} desc="Nama saksi 3" onCopy={copyToClipboard} copied={copiedTag} />
-                  </TagCategory>
-
-                  {/* KATEGORI: BAK - ARRAY OF STRINGS */}
-                  <TagCategory title="BAK (Berita Acara Kesaksian)" icon={<FileText size={16}/>} color="yellow">
-                    <TagRow tag="bak_0" val={previewData.bak_0} desc="Baris pertama BAK" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="bak_1" val={previewData.bak_1} desc="Baris kedua BAK" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="bak_2" val={previewData.bak_2} desc="Baris ketiga BAK" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="bak_3" val={previewData.bak_3} desc="Baris keempat BAK" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="bak_4" val={previewData.bak_4} desc="Baris kelima BAK" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="_countBak" val={previewData._countBak} desc="Jumlah baris BAK" onCopy={copyToClipboard} copied={copiedTag} />
-                  </TagCategory>
-
-                  {/* KATEGORI: LOOP RIWAYAT TANAH */}
-                  <TagCategory title="RIWAYAT TANAH (LOOP)" icon={<History size={16}/>} color="teal">
-                    <TagRow tag="{#riwayat_tanah}" val="Mulai loop riwayat" desc="Loop untuk setiap riwayat kepemilikan" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="{_index}" val="Nomor urut" desc="Nomor urut dalam loop" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="{atas_nama}" val={previewData.riwayat_tanah?.[0]?.atas_nama} desc="Nama pemilik terdahulu" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="{c_no}" val={previewData.riwayat_tanah?.[0]?.c_no} desc="Nomor C terdahulu" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="{persil_no}" val={previewData.riwayat_tanah?.[0]?.persil_no} desc="Nomor Persil terdahulu" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="{klas}" val={previewData.riwayat_tanah?.[0]?.klas} desc="Klas tanah terdahulu" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="{luas}" val={previewData.riwayat_tanah?.[0]?.luas} desc="Luas tanah (m²)" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="{dasar_dialihkan}" val={previewData.riwayat_tanah?.[0]?.dasar_dialihkan} desc="Dasar pengalihan" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="{/riwayat_tanah}" val="Akhir loop riwayat" desc="Penutup loop" onCopy={copyToClipboard} copied={copiedTag} />
-                  </TagCategory>
-
-                  {/* KATEGORI: ADMINISTRASI */}
-                  <TagCategory title="ADMINISTRASI" icon={<FileText size={16}/>} color="gray">
-                    <TagRow tag="No_Berkas" val={previewData.No_Berkas} desc="Nomor Berkas" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="Tgl_Surat" val={previewData.Tgl_Surat} desc="Tanggal Surat" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="Hari" val={previewData.Hari} desc="Hari" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="kepala_desa" val={previewData.kepala_desa} desc="Nama Kepala Desa" onCopy={copyToClipboard} copied={copiedTag} />
-                  </TagCategory>
-
-                  {/* KATEGORI: TETANGGA BATAS (INPUT MANUAL) */}
-                  <TagCategory title="TETANGGA BATAS" icon={<Users size={16}/>} color="red">
-                    <TagRow tag="tetangga_utara_nama" val="[Input Manual]" desc="Nama tetangga utara" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="tetangga_utara_ttd" val="[Input Manual]" desc="Tanda tangan tetangga utara" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="tetangga_timur_nama" val="[Input Manual]" desc="Nama tetangga timur" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="tetangga_timur_ttd" val="[Input Manual]" desc="Tanda tangan tetangga timur" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="tetangga_selatan_nama" val="[Input Manual]" desc="Nama tetangga selatan" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="tetangga_selatan_ttd" val="[Input Manual]" desc="Tanda tangan tetangga selatan" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="tetangga_barat_nama" val="[Input Manual]" desc="Nama tetangga barat" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="tetangga_barat_ttd" val="[Input Manual]" desc="Tanda tangan tetangga barat" onCopy={copyToClipboard} copied={copiedTag} />
-                  </TagCategory>
-                </div>
-              )}
-
-              {jenisDokumen === 'akta' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <TagRow tag="{#pembeli}" val="Mulai loop pembeli" desc="Loop untuk PIHAK_2" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{/pembeli}" val="Akhir loop pembeli" desc="Penutup loop" onCopy={copyToClipboard} copied={copiedTag} />
                   
-                  {/* KATEGORI: LOOP PENJUAL */}
-                  <TagCategory title="LOOP PENJUAL" icon={<UserCheck size={16}/>} color="emerald">
-                    <TagRow tag="{#penjual}" val="Mulai loop penjual" desc="Loop untuk setiap penjual" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="{_index}" val="Nomor urut" desc="Nomor urut dalam loop" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="{Nama}" val={previewData.penjual?.[0]?.Nama} desc="Nama penjual" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="{NIK}" val={previewData.penjual?.[0]?.NIK} desc="NIK penjual" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="{Pekerjaan}" val={previewData.penjual?.[0]?.Pekerjaan} desc="Pekerjaan penjual" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="{Alamat}" val={previewData.penjual?.[0]?.Alamat} desc="Alamat penjual" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="{/penjual}" val="Akhir loop penjual" desc="Penutup loop" onCopy={copyToClipboard} copied={copiedTag} />
-                  </TagCategory>
+                  <TagRow tag="{#saksi_akta}" val="Mulai loop saksi" desc="Loop untuk saksi" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{/saksi_akta}" val="Akhir loop saksi" desc="Penutup loop" onCopy={copyToClipboard} copied={copiedTag} />
+                  
+                  <TagRow tag="{#riwayat_tanah}" val="Mulai loop riwayat" desc="Loop riwayat tanah" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{/riwayat_tanah}" val="Akhir loop riwayat" desc="Penutup loop" onCopy={copyToClipboard} copied={copiedTag} />
+                </TagCategory>
 
-                  {/* KATEGORI: LOOP PEMBELI */}
-                  <TagCategory title="LOOP PEMBELI" icon={<UserCheck size={16}/>} color="blue">
-                    <TagRow tag="{#pembeli}" val="Mulai loop pembeli" desc="Loop untuk setiap pembeli" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="{Nama}" val={previewData.pembeli?.[0]?.Nama} desc="Nama pembeli" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="{NIK}" val={previewData.pembeli?.[0]?.NIK} desc="NIK pembeli" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="{/pembeli}" val="Akhir loop pembeli" desc="Penutup loop" onCopy={copyToClipboard} copied={copiedTag} />
-                  </TagCategory>
+                {/* KATEGORI: CONDITIONAL FLAGS */}
+                <TagCategory title="KONDISI" icon={<ShieldCheck size={16}/>} color="yellow">
+                  <TagRow tag="isJualBeli" val={String(previewData.isJualBeli)} desc="Boolean: true jika Jual Beli" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="isWaris" val={String(previewData.isWarisFlag)} desc="Boolean: true jika Waris" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="isHibah" val={String(previewData.isHibah)} desc="Boolean: true jika Hibah" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="isLetterC" val={String(previewData.isLetterC)} desc="Boolean: true jika Letter C" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="isSHM" val={String(previewData.isSHM)} desc="Boolean: true jika SHM" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="isSHMElektronik" val={String(previewData.isSHMElektronik)} desc="Boolean: true jika SHM Elektronik" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="isPersetujuan" val={String(previewData.isPersetujuan)} desc="Boolean: ada persetujuan" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="isIstri" val={String(previewData.isIstri)} desc="Boolean: persetujuan istri" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="isSuami" val={String(previewData.isSuami)} desc="Boolean: persetujuan suami" onCopy={copyToClipboard} copied={copiedTag} />
+                </TagCategory>
 
-                  {/* KATEGORI: LOOP SAKSI */}
-                  <TagCategory title="LOOP SAKSI" icon={<Users size={16}/>} color="purple">
-                    <TagRow tag="{#saksi_akta}" val="Mulai loop saksi" desc="Loop untuk setiap saksi" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="{Nama}" val={previewData.saksi_akta?.[0]?.Nama} desc="Nama saksi" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="{NIK}" val={previewData.saksi_akta?.[0]?.NIK} desc="NIK saksi" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="{/saksi_akta}" val="Akhir loop saksi" desc="Penutup loop" onCopy={copyToClipboard} copied={copiedTag} />
-                  </TagCategory>
+                {/* KATEGORI: DATA TANAH - LETTER C */}
+                <TagCategory title="LETTER C" icon={<Layers size={16}/>} color="purple">
+                  <TagRow tag="nomor_c" val={previewData.nomor_c} desc="Nomor Kohir (C)" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="persil" val={previewData.persil} desc="Nomor Persil" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="klas" val={previewData.klas} desc="Klasifikasi Tanah" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="atas_nama_c" val={previewData.atas_nama_c} desc="Atas Nama di Letter C" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="berasal_dari" val={previewData.berasal_dari} desc="Berasal dari (asal-usul)" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tahun_perolehan_alas_hak" val={previewData.tahun_perolehan_alas_hak} desc="Tahun perolehan alas hak" onCopy={copyToClipboard} copied={copiedTag} />
+                </TagCategory>
 
-                  {/* KATEGORI: LOOP PERSETUJUAN */}
-                  <TagCategory title="PERSETUJUAN" icon={<ShieldCheck size={16}/>} color="yellow">
-                    <TagRow tag="isPersetujuan" val={String(previewData.isPersetujuan)} desc="Ada persetujuan?" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="Ket_Setuju" val={previewData.Ket_Setuju} desc="Keterangan persetujuan" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="Setuju1_Nama" val={previewData.Setuju1?.Nama} desc="Nama yang menyetujui" onCopy={copyToClipboard} copied={copiedTag} />
-                  </TagCategory>
+                {/* KATEGORI: DATA TANAH - SHM ANALOG */}
+                <TagCategory title="SHM ANALOG" icon={<BookOpen size={16}/>} color="green">
+                  <TagRow tag="no_shm" val={previewData.no_shm} desc="Nomor SHM" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="atas_nama_shm" val={previewData.atas_nama_shm} desc="Atas Nama di SHM" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="nib" val={previewData.nib} desc="NIB (Nomor Identifikasi Bidang)" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="no_su" val={previewData.no_su} desc="Nomor SU (Surat Ukur)" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tanggal_su" val={previewData.tanggal_su} desc="Tanggal SU" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tanggal_shm" val={previewData.tanggal_shm} desc="Tanggal SHM" onCopy={copyToClipboard} copied={copiedTag} />
+                </TagCategory>
 
-                  {/* KATEGORI: DATA TANAH */}
-                  <TagCategory title="DATA TANAH" icon={<MapPin size={16}/>} color="orange">
-                    <TagRow tag="T_Jenis" val={previewData.T_Jenis} desc="Jenis tanah (Letter C/SHM)" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="T_C_No" val={previewData.T_C_No} desc="Nomor C (jika Letter C)" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="T_C_Persil" val={previewData.T_C_Persil} desc="Nomor Persil" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="T_C_Klas" val={previewData.T_C_Klas} desc="Klas" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="T_SHM_No" val={previewData.T_SHM_No} desc="Nomor SHM (jika SHM)" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="T_Luas_M" val={previewData.T_Luas_M} desc="Luas (m²)" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="T_Luas_E" val={previewData.T_Luas_E} desc="Luas (terbilang)" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="T_Batas_U" val={previewData.T_Batas_U} desc="Batas Utara" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="T_Batas_T" val={previewData.T_Batas_T} desc="Batas Timur" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="T_Batas_S" val={previewData.T_Batas_S} desc="Batas Selatan" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="T_Batas_B" val={previewData.T_Batas_B} desc="Batas Barat" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="T_Desa" val={previewData.T_Desa} desc="Desa" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="T_Kec" val={previewData.T_Kec} desc="Kecamatan" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="T_Harga" val={previewData.T_Harga} desc="Harga (Rp)" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="T_Harga_E" val={previewData.T_Harga_E} desc="Harga (terbilang)" onCopy={copyToClipboard} copied={copiedTag} />
-                  </TagCategory>
+                {/* KATEGORI: DATA TANAH - SHM ELEKTRONIK */}
+                <TagCategory title="SHM ELEKTRONIK" icon={<FileText size={16}/>} color="cyan">
+                  <TagRow tag="atas_nama_shm_el" val={previewData.atas_nama_shm_el} desc="Atas Nama SHM Elektronik" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="kode_sertifikat" val={previewData.kode_sertifikat} desc="Kode Sertifikat Elektronik" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="nibel" val={previewData.nibel} desc="NIBEL (Nomor Identifikasi Elektronik)" onCopy={copyToClipboard} copied={copiedTag} />
+                </TagCategory>
 
-                  {/* KATEGORI: ADMINISTRASI */}
-                  <TagCategory title="ADMINISTRASI" icon={<FileText size={16}/>} color="gray">
-                    <TagRow tag="No_Berkas" val={previewData.No_Berkas} desc="Nomor Berkas" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="No_Reg" val={previewData.No_Reg} desc="Nomor Register" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="Hari" val={previewData.Hari} desc="Hari" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="Tgl_Surat" val={previewData.Tgl_Surat} desc="Tanggal Surat" onCopy={copyToClipboard} copied={copiedTag} />
-                    <TagRow tag="Pihak_Penanggung" val={previewData.Pihak_Penanggung} desc="Pihak penanggung biaya" onCopy={copyToClipboard} copied={copiedTag} />
-                  </TagCategory>
-                </div>
-              )}
+                {/* KATEGORI: BATAS & LUAS TANAH */}
+                <TagCategory title="BATAS & LUAS" icon={<MapPin size={16}/>} color="orange">
+                  <TagRow tag="batas_utara" val={previewData.batas_utara} desc="Batas Utara" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="batas_timur" val={previewData.batas_timur} desc="Batas Timur" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="batas_selatan" val={previewData.batas_selatan} desc="Batas Selatan" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="batas_barat" val={previewData.batas_barat} desc="Batas Barat" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="luas_seluruhnya" val={previewData.luas_seluruhnya} desc="Luas tanah seluruhnya (m²)" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="ejaan_luas_seluruhnya" val={previewData.ejaan_luas_seluruhnya} desc="Luas (terbilang)" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="luas_dimohon" val={previewData.luas_dimohon} desc="Luas dimohon (m²)" onCopy={copyToClipboard} copied={copiedTag} />
+                </TagCategory>
+
+                {/* KATEGORI: NOP & PAJAK */}
+                <TagCategory title="NOP & PAJAK" icon={<FileSpreadsheet size={16}/>} color="lime">
+                  <TagRow tag="nop" val={previewData.nop} desc="NOP (Nomor Objek Pajak)" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="sppt_tahun" val={previewData.sppt_tahun} desc="Tahun SPPT" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="pajak_grand_total" val={previewData.pajak_grand_total} desc="Total Pajak" onCopy={copyToClipboard} copied={copiedTag} />
+                </TagCategory>
+
+                {/* KATEGORI: DATA PEMOHON */}
+                <TagCategory title="PEMOHON" icon={<UserCheck size={16}/>} color="emerald">
+                  <TagRow tag="pemohon_nama" val={previewData.pemohon_nama} desc="Nama pemohon" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="pemohon_nik" val={previewData.pemohon_nik} desc="NIK pemohon" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="pemohon_umur" val={previewData.pemohon_umur} desc="Umur pemohon" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="pemohon_pekerjaan" val={previewData.pemohon_pekerjaan} desc="Pekerjaan pemohon" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="pemohon_alamat" val={previewData.pemohon_alamat} desc="Alamat pemohon" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="pemohon_tempat_lahir" val={previewData.pemohon_tempat_lahir} desc="Tempat lahir" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="pemohon_tanggal_lahir" val={previewData.pemohon_tanggal_lahir} desc="Tanggal lahir" onCopy={copyToClipboard} copied={copiedTag} />
+                </TagCategory>
+
+                {/* KATEGORI: LOKASI TANAH */}
+                <TagCategory title="LOKASI TANAH" icon={<MapPin size={16}/>} color="blue">
+                  <TagRow tag="tanah_alamat" val={previewData.tanah_alamat} desc="Alamat tanah" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tanah_desa" val={previewData.tanah_desa} desc="Desa/Kelurahan" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tanah_kecamatan" val={previewData.tanah_kecamatan} desc="Kecamatan" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tanah_kabupaten" val={previewData.tanah_kabupaten} desc="Kabupaten/Kota" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tanah_rt" val={previewData.tanah_rt} desc="RT" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tanah_rw" val={previewData.tanah_rw} desc="RW" onCopy={copyToClipboard} copied={copiedTag} />
+                </TagCategory>
+
+                {/* KATEGORI: SAKSI (SPORADIK) */}
+                <TagCategory title="SAKSI (SPORADIK)" icon={<Users size={16}/>} color="pink">
+                  <TagRow tag="saksi_0_nama" val={previewData.saksi_0_nama} desc="Nama saksi 1" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="saksi_1_nama" val={previewData.saksi_1_nama} desc="Nama saksi 2" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="saksi_2_nama" val={previewData.saksi_2_nama} desc="Nama saksi 3" onCopy={copyToClipboard} copied={copiedTag} />
+                </TagCategory>
+
+                {/* KATEGORI: BAK (ARRAY OF STRINGS) */}
+                <TagCategory title="BAK" icon={<FileText size={16}/>} color="amber">
+                  <TagRow tag="bak_0" val={previewData.bak_0} desc="Baris pertama BAK" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="bak_1" val={previewData.bak_1} desc="Baris kedua BAK" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="bak_2" val={previewData.bak_2} desc="Baris ketiga BAK" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="bak_3" val={previewData.bak_3} desc="Baris keempat BAK" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="_countBak" val={previewData._countBak} desc="Jumlah baris BAK" onCopy={copyToClipboard} copied={copiedTag} />
+                </TagCategory>
+
+                {/* KATEGORI: ADMINISTRASI */}
+                <TagCategory title="ADMINISTRASI" icon={<FileText size={16}/>} color="gray">
+                  <TagRow tag="No_Berkas" val={previewData.No_Berkas} desc="Nomor Berkas" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="No_Reg" val={previewData.No_Reg} desc="Nomor Register" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="Hari" val={previewData.Hari} desc="Hari" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="Tgl_Surat" val={previewData.Tgl_Surat} desc="Tanggal Surat" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="Tgl_Ejaan" val={previewData.Tgl_Ejaan} desc="Tanggal (terbilang)" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="kepala_desa" val={previewData.kepala_desa} desc="Nama Kepala Desa" onCopy={copyToClipboard} copied={copiedTag} />
+                </TagCategory>
+
+                {/* KATEGORI: KHUSUS WARIS */}
+                <TagCategory title="WARIS" icon={<History size={16}/>} color="red">
+                  <TagRow tag="nama_almarhum" val={previewData.nama_almarhum} desc="Nama almarhum" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="desa_waris" val={previewData.desa_waris} desc="Desa waris" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="register_waris_desa" val={previewData.register_waris_desa} desc="Register waris desa" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tanggal_waris" val={previewData.tanggal_waris} desc="Tanggal waris" onCopy={copyToClipboard} copied={copiedTag} />
+                </TagCategory>
+
+                {/* KATEGORI: KHUSUS AKTA KUASA */}
+                <TagCategory title="AKTA KUASA" icon={<FileSignature size={16}/>} color="indigo">
+                  <TagRow tag="nomor_akta_kuasa" val={previewData.nomor_akta_kuasa} desc="Nomor akta kuasa" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="nama_notaris_kuasa" val={previewData.nama_notaris_kuasa} desc="Nama notaris" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="kedudukan_notaris" val={previewData.kedudukan_notaris} desc="Kedudukan notaris" onCopy={copyToClipboard} copied={copiedTag} />
+                </TagCategory>
+
+                {/* KATEGORI: TETANGGA BATAS (INPUT MANUAL) */}
+                <TagCategory title="TETANGGA BATAS" icon={<Users size={16}/>} color="yellow">
+                  <TagRow tag="tetangga_utara_nama" val="[Input Manual]" desc="Nama tetangga utara" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tetangga_utara_ttd" val="[Input Manual]" desc="Tanda tangan tetangga utara" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tetangga_timur_nama" val="[Input Manual]" desc="Nama tetangga timur" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tetangga_timur_ttd" val="[Input Manual]" desc="Tanda tangan tetangga timur" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tetangga_selatan_nama" val="[Input Manual]" desc="Nama tetangga selatan" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tetangga_selatan_ttd" val="[Input Manual]" desc="Tanda tangan tetangga selatan" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tetangga_barat_nama" val="[Input Manual]" desc="Nama tetangga barat" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tetangga_barat_ttd" val="[Input Manual]" desc="Tanda tangan tetangga barat" onCopy={copyToClipboard} copied={copiedTag} />
+                </TagCategory>
+
+                {/* KATEGORI: UMUM */}
+                <TagCategory title="UMUM" icon={<FileText size={16}/>} color="slate">
+                  <TagRow tag="materai" val="[MATERAI 10.000]" desc="Tempat materai" onCopy={copyToClipboard} copied={copiedTag} />
+                </TagCategory>
+              </div>
             </div>
           </div>
         </div>
@@ -1421,10 +1342,10 @@ export const TemplatesPage: React.FC = () => {
               </div>
               <div>
                 <h2 className="text-sm font-black uppercase tracking-tighter text-slate-900">
-                  PREVIEW {jenisDokumen === 'sporadik' ? 'SPORADIK' : 'AKTA JUAL BELI'}
+                  PREVIEW {jenisDokumen === 'sporadik' ? 'SPORADIK' : 'AKTA'}
                 </h2>
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                  Berkas: {previewData.No_Berkas || '________________'}
+                  Berkas: {previewData.No_Berkas || ''}
                 </p>
               </div>
             </div>
@@ -1465,7 +1386,7 @@ export const TemplatesPage: React.FC = () => {
                       SEBELAH UTARA
                     </label>
                     <p className="text-sm font-bold text-slate-900 mb-3">
-                      {previewData.batas_utara || '________________'}
+                      {previewData.batas_utara || ''}
                     </p>
                     <input
                       type="text"
@@ -1495,7 +1416,7 @@ export const TemplatesPage: React.FC = () => {
                       SEBELAH TIMUR
                     </label>
                     <p className="text-sm font-bold text-slate-900 mb-3">
-                      {previewData.batas_timur || '________________'}
+                      {previewData.batas_timur || ''}
                     </p>
                     <input
                       type="text"
@@ -1525,7 +1446,7 @@ export const TemplatesPage: React.FC = () => {
                       SEBELAH SELATAN
                     </label>
                     <p className="text-sm font-bold text-slate-900 mb-3">
-                      {previewData.batas_selatan || '________________'}
+                      {previewData.batas_selatan || ''}
                     </p>
                     <input
                       type="text"
@@ -1555,7 +1476,7 @@ export const TemplatesPage: React.FC = () => {
                       SEBELAH BARAT
                     </label>
                     <p className="text-sm font-bold text-slate-900 mb-3">
-                      {previewData.batas_barat || '________________'}
+                      {previewData.batas_barat || ''}
                     </p>
                     <input
                       type="text"
@@ -1582,46 +1503,35 @@ export const TemplatesPage: React.FC = () => {
               </div>
             )}
 
-            {/* Preview Dokumen (sederhana) */}
+            {/* Kolom Kanan: Preview Data */}
             <div className={`flex-1 bg-slate-100 p-8 overflow-y-auto ${jenisDokumen !== 'sporadik' ? 'w-full' : ''}`}>
               <div className="bg-white w-full max-w-[850px] mx-auto shadow-[0_50px_100px_rgba(0,0,0,0.15)] p-[30mm] text-slate-800 font-serif relative border border-slate-200">
                 
                 <div className="text-center mb-8">
                   <h1 className="text-xl font-black underline tracking-tight uppercase">
-                    PREVIEW {jenisDokumen === 'sporadik' ? 'SPORADIK' : 'AKTA JUAL BELI'}
+                    PREVIEW DATA
                   </h1>
-                  <p className="text-xs mt-2">Nomor: {previewData.No_Berkas || '________________'}</p>
+                  <p className="text-xs mt-2">Nomor: {previewData.No_Berkas || ''}</p>
                 </div>
 
-                {/* Preview Sporadik */}
-                {jenisDokumen === 'sporadik' && (
-                  <div className="space-y-4">
-                    <p><span className="font-bold">Pemohon:</span> {previewData.pemohon_nama}</p>
-                    <p><span className="font-bold">NIK:</span> {previewData.pemohon_nik}</p>
-                    <p><span className="font-bold">Alamat:</span> {previewData.pemohon_alamat}</p>
-                    <p><span className="font-bold">Tanah:</span> C.{previewData.tanah_nomor_c} Persil {previewData.tanah_persil} Klas {previewData.tanah_klas}</p>
-                    <p><span className="font-bold">Lokasi:</span> {previewData.tanah_desa}, {previewData.tanah_kecamatan}</p>
-                    <p><span className="font-bold">Luas:</span> {previewData.tanah_luas} m²</p>
-                    <p><span className="font-bold">Batas:</span> U:{previewData.batas_utara}, T:{previewData.batas_timur}, S:{previewData.batas_selatan}, B:{previewData.batas_barat}</p>
-                    <p><span className="font-bold">Dikuasai sejak:</span> {previewData.tanah_tahun_kuasai}</p>
-                    <p><span className="font-bold">BAK:</span> {previewData.bak_0}</p>
-                    <p><span className="font-bold">Jumlah Riwayat:</span> {previewData._countRiwayat}</p>
-                  </div>
-                )}
-
-                {/* Preview Akta */}
-                {jenisDokumen === 'akta' && (
-                  <div className="space-y-4">
-                    <p><span className="font-bold">Penjual:</span> {previewData._countP1} orang</p>
-                    <p><span className="font-bold">Pembeli:</span> {previewData._countP2} orang</p>
-                    <p><span className="font-bold">Saksi:</span> {previewData._countS} orang</p>
-                    <p><span className="font-bold">Jenis Tanah:</span> {previewData.T_Jenis}</p>
-                    <p><span className="font-bold">Nomor:</span> {previewData.T_C_No || previewData.T_SHM_No}</p>
-                    <p><span className="font-bold">Lokasi:</span> {previewData.T_Desa}, {previewData.T_Kec}</p>
-                    <p><span className="font-bold">Luas:</span> {previewData.T_Luas_M} m²</p>
-                    <p><span className="font-bold">Harga:</span> Rp {previewData.T_Harga}</p>
-                  </div>
-                )}
+                {/* Preview sederhana */}
+                <div className="space-y-4">
+                  <p><span className="font-bold">Jenis Dokumen:</span> {jenisDokumen === 'sporadik' ? 'Sporadik' : 'Akta'}</p>
+                  <p><span className="font-bold">Jenis Perolehan:</span> {
+                    previewData.isJualBeli ? 'Jual Beli' : 
+                    previewData.isWarisFlag ? 'Waris' : 
+                    previewData.isHibah ? 'Hibah' : ''
+                  }</p>
+                  <p><span className="font-bold">Jenis Tanah:</span> {
+                    previewData.isLetterC ? 'Letter C' : 
+                    previewData.isSHM ? 'SHM' : 
+                    previewData.isSHMElektronik ? 'SHM Elektronik' : ''
+                  }</p>
+                  <p><span className="font-bold">Pemohon/Penjual:</span> {previewData.pemohon_nama || (previewData.penjual?.[0]?.Nama) || ''}</p>
+                  <p><span className="font-bold">Lokasi Tanah:</span> {previewData.tanah_desa}, {previewData.tanah_kecamatan}</p>
+                  <p><span className="font-bold">Luas:</span> {previewData.luas_seluruhnya} m²</p>
+                  <p><span className="font-bold">Nomor C/SHM:</span> {previewData.nomor_c || previewData.no_shm || ''}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -1632,7 +1542,7 @@ export const TemplatesPage: React.FC = () => {
 };
 
 // ============================================
-// SUB COMPONENTS (TANPA DEKLARASI ULANG CARD, BUTTON, SELECT)
+// SUB COMPONENTS
 // ============================================
 
 interface TagCategoryProps {
@@ -1654,6 +1564,11 @@ const TagCategory: React.FC<TagCategoryProps> = ({ title, icon, children, color 
     green: 'border-green-200 text-green-700 bg-green-50',
     teal: 'border-teal-200 text-teal-700 bg-teal-50',
     gray: 'border-gray-200 text-gray-700 bg-gray-50',
+    indigo: 'border-indigo-200 text-indigo-700 bg-indigo-50',
+    cyan: 'border-cyan-200 text-cyan-700 bg-cyan-50',
+    lime: 'border-lime-200 text-lime-700 bg-lime-50',
+    amber: 'border-amber-200 text-amber-700 bg-amber-50',
+    slate: 'border-slate-200 text-slate-700 bg-slate-50'
   };
 
   return (
@@ -1700,7 +1615,7 @@ const TagRow: React.FC<TagRowProps> = ({ tag, val, desc, onCopy, copied }) => {
           {copied === fullTag ? <ClipboardCheck size={14}/> : <Copy size={14}/>}
         </button>
       </div>
-      {val && val !== '________________' && val !== 0 && (
+      {val && val !== 0 && (
         <div className="text-[9px] font-bold text-slate-400 truncate mt-1 px-1 italic">
           Contoh: {String(val)}
         </div>
