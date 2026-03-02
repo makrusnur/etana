@@ -412,6 +412,7 @@ export interface LetterCPersil {
   letter_c_id: string;
   nomor_persil: string;
   jenis_tanah: string; // <-- Tambahkan ini Om
+  is_void?: boolean;
   klas_desa: string;
   luas_meter: number;
   asal_usul?: string;

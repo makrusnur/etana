@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { 
-  Plus, MapPin, User, FolderPlus, Loader2, X, Trash2, Search, Layers, Edit3, Camera, ImageIcon, } from 'lucide-react';
+  Plus, MapPin, User, FolderPlus, Loader2, X, Trash2, Search, Layers, Edit3, Camera, ImageIcon, 
+  Ban, ChevronLeft, ChevronRight, AlertCircle
+} from 'lucide-react';
 import { supabase } from '../../services/db'; 
 import { processLetterC } from '../../services/ocr';
 import { Kecamatan, Desa, LetterC, LetterCPersil } from '../../types';
@@ -12,6 +14,9 @@ interface FormTambahCProps {
   editData: LetterC | null;
   onClose: () => void;
   onSuccess: () => void;
+  existingKohirList?: LetterC[]; // Tambahkan prop untuk daftar kohir yang ada
+  currentIndex?: number; // Indeks data yang sedang diedit
+  onNavigate?: (newIndex: number) => void; // Fungsi navigasi
 }
 
 export const DataLetterC = () => {
@@ -24,6 +29,7 @@ export const DataLetterC = () => {
   );
   const [showModal, setShowModal] = useState(false);
   const [selectedKohir, setSelectedKohir] = useState<LetterC | null>(null);
+  const [currentKohirIndex, setCurrentKohirIndex] = useState<number>(-1);
   const [searchTerm, setSearchTerm] = useState('');
   const [kohirSearch, setKohirSearch] = useState('');
 
@@ -41,7 +47,7 @@ export const DataLetterC = () => {
     const { data } = await supabase.from('letter_c')
       .select('*')
       .eq('desa_id', selectedDesaId)
-      .order('created_at', { ascending: false }) // Data terbaru di atas
+      .order('created_at', { ascending: false })
       .order('nomor_c');
     if (data) setKohirList(data);
   };
@@ -64,8 +70,17 @@ export const DataLetterC = () => {
   };
 
   const handleEdit = (kohir: LetterC) => {
+    const index = kohirList.findIndex(k => k.id === kohir.id);
     setSelectedKohir(kohir);
+    setCurrentKohirIndex(index);
     setShowModal(true);
+  };
+
+  const handleNavigate = (newIndex: number) => {
+    if (newIndex >= 0 && newIndex < kohirList.length) {
+      setSelectedKohir(kohirList[newIndex]);
+      setCurrentKohirIndex(newIndex);
+    }
   };
 
   const filteredKecamatans = kecamatans.map(kec => ({
@@ -82,7 +97,7 @@ export const DataLetterC = () => {
 
   return (
     <div className="flex flex-col lg:flex-row h-screen lg:h-[calc(100vh-140px)] gap-4 lg:gap-8 p-2 lg:p-4 bg-[#F8F9FA] text-zinc-900 overflow-hidden font-sans">
-      {/* SIDEBAR - Scrollable horizontal on mobile */}
+      {/* SIDEBAR */}
       <div className="w-full lg:w-80 flex flex-col shrink-0">
         <div className="mb-4 lg:mb-6 space-y-4 px-2">
           <div className="flex justify-between items-center">
@@ -141,7 +156,7 @@ export const DataLetterC = () => {
         </div>
       </div>
 
-      {/* MAIN CONTENT AREA */}
+      {/* MAIN CONTENT */}
       <div className="flex-1 bg-white rounded-t-[2.5rem] lg:rounded-[2.5rem] border border-zinc-100 flex flex-col overflow-hidden shadow-sm">
         <div className="p-6 lg:p-8 flex flex-col sm:flex-row justify-between items-start sm:items-end border-b border-zinc-50 gap-4">
           <div>
@@ -161,7 +176,7 @@ export const DataLetterC = () => {
                   onChange={(e) => setKohirSearch(e.target.value)}
                 />
               </div>
-              <button onClick={() => { setSelectedKohir(null); setShowModal(true); }} className="w-full sm:w-auto bg-zinc-900 text-white px-6 lg:px-8 py-3 lg:py-4 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 shadow-lg transition-all">
+              <button onClick={() => { setSelectedKohir(null); setCurrentKohirIndex(-1); setShowModal(true); }} className="w-full sm:w-auto bg-zinc-900 text-white px-6 lg:px-8 py-3 lg:py-4 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 shadow-lg transition-all">
                 <Plus size={18}/> Tambah Kohir
               </button>
             </div>
@@ -186,7 +201,7 @@ export const DataLetterC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-50">
-                  {filteredKohirList.map(k => (
+                  {filteredKohirList.map((k, index) => (
                     <tr key={k.id} className="group hover:bg-zinc-50/50 transition-colors">
                       <td className="py-6 px-4 font-black text-zinc-900 text-lg">C.{k.nomor_c}</td>
                       <td className="py-6 font-bold text-zinc-700 text-[15px] uppercase">{k.nama_pemilik}</td>
@@ -221,23 +236,29 @@ export const DataLetterC = () => {
           selectedDesaId={selectedDesaId} 
           editData={selectedKohir} 
           onClose={() => setShowModal(false)} 
-          onSuccess={() => { fetchKohir(); setShowModal(false); }} 
+          onSuccess={() => { fetchKohir(); setShowModal(false); }}
+          existingKohirList={kohirList}
+          currentIndex={currentKohirIndex}
+          onNavigate={handleNavigate}
         />
       )}
     </div>
   );
 };
 
-const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess }: FormTambahCProps) => {
+const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKohirList = [], currentIndex = -1, onNavigate }: FormTambahCProps) => {
   // --- STATE ---
   const [loading, setLoading] = useState(false);
+  const [voidLoading, setVoidLoading] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(editData?.image_url || null);
   const [form, setForm] = useState({ nomor_c: '', nama_pemilik: '', alamat_pemilik: '', image_url: '' });
   const [rows, setRows] = useState<Partial<LetterCPersil>[]>([
-    { nomor_persil: '', jenis_tanah: 'Tanah Kering', klas_desa: '', luas_meter: 0, asal_usul: '' }
+    { nomor_persil: '', jenis_tanah: 'Tanah Kering', klas_desa: '', luas_meter: 0, asal_usul: '', is_void: false }
   ]);
+  const [showAddPrompt, setShowAddPrompt] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
 
   // --- STATE UNTUK CROP ---
   const [crop, setCrop] = useState<Crop>({
@@ -259,11 +280,44 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess }: FormTamba
         image_url: editData.image_url || ''
       });
       fetchPersils(editData.id);
+    } else {
+      // Reset form untuk data baru
+      setForm({ nomor_c: '', nama_pemilik: '', alamat_pemilik: '', image_url: '' });
+      setRows([{ nomor_persil: '', jenis_tanah: 'Tanah Kering', klas_desa: '', luas_meter: 0, asal_usul: '', is_void: false }]);
+      setPreviewUrl(null);
+      setImageFile(null);
     }
+    setIsDirty(false);
   }, [editData]);
 
+  // Deteksi perubahan form
+  useEffect(() => {
+    if (editData) {
+      const isFormChanged = 
+        form.nomor_c !== editData.nomor_c ||
+        form.nama_pemilik !== editData.nama_pemilik ||
+        form.alamat_pemilik !== (editData.alamat_pemilik || '') ||
+        imageFile !== null;
+      
+      setIsDirty(isFormChanged);
+    } else {
+      const isFormFilled = 
+        form.nomor_c !== '' || 
+        form.nama_pemilik !== '' || 
+        form.alamat_pemilik !== '' ||
+        rows.some(r => r.nomor_persil !== '' && r.nomor_persil !== undefined) ||
+        imageFile !== null;
+      
+      setIsDirty(isFormFilled);
+    }
+  }, [form, rows, imageFile, editData]);
+
   const fetchPersils = async (letterCId: string) => {
-    const { data } = await supabase.from('letter_c_persil').select('*').eq('letter_c_id', letterCId);
+    const { data } = await supabase
+      .from('letter_c_persil')
+      .select('*')
+      .eq('letter_c_id', letterCId)
+      .order('created_at');
     if (data && data.length > 0) setRows(data);
   };
 
@@ -366,6 +420,29 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess }: FormTamba
     return data.publicUrl;
   };
 
+  const handleToggleVoid = async (persilId: string, currentVoidStatus: boolean) => {
+    if (!confirm(`Apakah Anda yakin ingin ${currentVoidStatus ? 'mengaktifkan kembali' : 'mencoret'} persil ini?`)) return;
+    
+    setVoidLoading(persilId);
+    try {
+      const { error } = await supabase
+        .from('letter_c_persil')
+        .update({ is_void: !currentVoidStatus })
+        .eq('id', persilId);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setRows(rows.map(row => 
+        row.id === persilId ? { ...row, is_void: !currentVoidStatus } : row
+      ));
+    } catch (err: any) {
+      alert("Gagal mengubah status: " + err.message);
+    } finally {
+      setVoidLoading(null);
+    }
+  };
+
   const handleSave = async () => {
     if (!form.nomor_c || !form.nama_pemilik) return;
     setLoading(true);
@@ -392,10 +469,12 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess }: FormTamba
         jenis_tanah: r.jenis_tanah,
         klas_desa: r.klas_desa,
         luas_meter: r.luas_meter || 0,
-        asal_usul: r.asal_usul
+        asal_usul: r.asal_usul,
+        is_void: false
       }));
 
       await supabase.from('letter_c_persil').insert(persils);
+      setIsDirty(false);
       onSuccess();
     } catch (err: any) { 
       alert(err.message); 
@@ -409,15 +488,90 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess }: FormTamba
     setRows(newRows);
   };
 
+  const handleNavigateWithCheck = (direction: 'prev' | 'next') => {
+  // Untuk data terbaru di paling atas (index 0):
+  // - Prev (panah kiri) = ke data yang lebih baru (index lebih kecil)
+  // - Next (panah kanan) = ke data yang lebih lama (index lebih besar)
+  const newIndex = direction === 'prev' ? currentIndex - 1 : currentIndex + 1;
+  
+  if (newIndex < 0) {
+    // Jika di awal daftar dan prev, tampilkan prompt tambah data baru di awal?
+    // Atau bisa juga kasih notifikasi sudah di data terbaru
+    alert('Anda sudah berada di data terbaru');
+    return;
+  }
+  
+  if (newIndex >= existingKohirList.length) {
+    // Jika di akhir daftar dan next, tampilkan prompt tambah data baru
+    setShowAddPrompt(true);
+    return;
+  }
+
+  if (isDirty) {
+    if (confirm('Ada perubahan yang belum disimpan. Apakah Anda yakin ingin meninggalkan halaman ini?')) {
+      onNavigate?.(newIndex);
+    }
+  } else {
+    onNavigate?.(newIndex);
+  }
+};
+  const handleAddNewFromPrompt = () => {
+    setShowAddPrompt(false);
+    onClose(); // Tutup modal saat ini
+    // Trigger tambah data baru (akan membuka modal baru dengan form kosong)
+    setTimeout(() => {
+      // Ini akan memicu pembukaan modal baru dengan form kosong
+      // Kita perlu mengkomunikasikan ke parent untuk membuka modal dengan editData = null
+      // Untuk sementara, kita bisa menggunakan event custom atau props callback
+      if (onNavigate) {
+        // Reset ke form kosong dengan memanggil onNavigate dengan index -1
+        // Tapi karena onNavigate hanya untuk navigasi antar data yang ada, kita perlu cara lain
+        // Alternatif: buka modal baru dengan editData = null
+        window.dispatchEvent(new CustomEvent('open-new-letter-c'));
+      }
+    }, 100);
+  };
+
   return (
     <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-md z-[100] flex items-end lg:items-center justify-center p-0 lg:p-6 text-zinc-900">
       <div className="bg-white w-full max-w-6xl rounded-t-[2.5rem] lg:rounded-[3rem] flex flex-col h-[95vh] lg:h-auto lg:max-h-[92vh] shadow-2xl overflow-hidden shadow-black/50">
         
         {/* HEADER */}
         <div className="p-6 lg:p-8 border-b border-zinc-50 flex justify-between items-center bg-zinc-50/20 shrink-0">
-          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
-            {editData ? 'Update Kohir' : 'Entry Kohir Baru'}
-          </span>
+          <div className="flex items-center gap-4">
+            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
+              {editData ? 'Update Kohir' : 'Entry Kohir Baru'}
+            </span>
+            {editData && existingKohirList.length > 0 && (
+              <div className="flex items-center gap-2 ml-4">
+                <button
+                  onClick={() => handleNavigateWithCheck('prev')}
+                  disabled={currentIndex <= 0}
+                  className={`p-2 rounded-xl transition-all ${
+                    currentIndex <= 0 
+                      ? 'text-zinc-200 cursor-not-allowed' 
+                      : 'text-zinc-600 hover:bg-zinc-100'
+                  }`}
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <span className="text-xs font-bold text-zinc-600">
+                  {currentIndex + 1} / {existingKohirList.length}
+                </span>
+                <button
+                  onClick={() => handleNavigateWithCheck('next')}
+                  disabled={currentIndex >= existingKohirList.length - 1}
+                  className={`p-2 rounded-xl transition-all ${
+                    currentIndex >= existingKohirList.length - 1
+                      ? 'text-zinc-200 cursor-not-allowed'
+                      : 'text-zinc-600 hover:bg-zinc-100'
+                  }`}
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+            )}
+          </div>
           <button onClick={onClose} className="p-3 hover:bg-zinc-100 rounded-full text-zinc-400"><X/></button>
         </div>
         
@@ -503,7 +657,7 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess }: FormTamba
                   <Layers size={16}/> Rincian Persil
                 </h4>
                 <button 
-                  onClick={() => setRows([...rows, { nomor_persil: '', jenis_tanah: 'Tanah Kering', klas_desa: '', luas_meter: 0, asal_usul: '' }])} 
+                  onClick={() => setRows([...rows, { nomor_persil: '', jenis_tanah: 'Tanah Kering', klas_desa: '', luas_meter: 0, asal_usul: '', is_void: false }])} 
                   className="text-[10px] font-black text-zinc-900 bg-zinc-100 px-5 py-2.5 rounded-xl uppercase hover:bg-zinc-200 transition-all"
                 >
                   + Tambah
@@ -512,90 +666,132 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess }: FormTamba
               
               {/* CONTAINER LIST PERSIL */}
               <div className="mt-8 space-y-4">
-                {/* HEADER TABEL - Hanya muncul di Desktop (lg) */}
+                {/* HEADER TABEL */}
                 <div className="hidden lg:flex px-2 pb-2 gap-3 items-center border-b border-zinc-200">
                   <div className="w-[12%]"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">No. Persil</label></div>
                   <div className="w-[18%]"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Jenis</label></div>
                   <div className="w-[10%] text-center"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Klas</label></div>
                   <div className="w-[12%]"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Luas (M²)</label></div>
                   <div className="flex-1"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Asal-Usul / Keterangan</label></div>
-                  {rows.length > 1 && <div className="w-10"></div>}
+                  {rows.length > 1 && <div className="w-20"></div>}
                 </div>
 
                 <div className="space-y-3">
-                  {rows.map((row, i) => (
-                    <div key={i} className="group p-2 lg:p-0 flex flex-wrap lg:flex-nowrap gap-3 items-center relative">
-                      
-                      {/* Nomor Persil - 12% */}
-                      <div className="w-[48%] lg:w-[12%]">
-                        <input 
-                          className="w-full px-4 py-3 text-xs border border-zinc-200 rounded-xl outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/5 bg-white font-bold transition-all text-zinc-900" 
-                          placeholder="Nomor Persil" 
-                          value={row.nomor_persil} 
-                          onChange={e => updateRow(i, 'nomor_persil', e.target.value)} 
-                        />
-                      </div>
-
-                      {/* Jenis Tanah - 18% */}
-                      <div className="w-[48%] lg:w-[18%] relative">
-                        <select 
-                          className="w-full px-4 py-3 text-xs border border-zinc-200 rounded-xl outline-none focus:border-emerald-500 bg-white font-bold appearance-none cursor-pointer text-zinc-900" 
-                          value={row.jenis_tanah} 
-                          onChange={e => updateRow(i, 'jenis_tanah', e.target.value)}
-                        >
-                          <option value="Tanah Kering">Tanah Kering</option>
-                          <option value="Sawah">Sawah</option>
-                        </select>
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
-                          <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path d="M19 9l-7 7-7-7"/></svg>
+                  {rows.map((row, i) => {
+                    const isVoid = row.is_void || false;
+                    const hasId = !!row.id;
+                    
+                    return (
+                      <div key={i} className={`group p-2 lg:p-0 flex flex-wrap lg:flex-nowrap gap-3 items-center relative transition-all ${
+                        isVoid ? 'opacity-50' : ''
+                      }`}>
+                        
+                        {/* Nomor Persil */}
+                        <div className="w-[48%] lg:w-[12%]">
+                          <input 
+                            className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/5 bg-white font-bold transition-all text-zinc-900 ${
+                              isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200'
+                            }`} 
+                            placeholder="Nomor Persil" 
+                            value={row.nomor_persil} 
+                            onChange={e => updateRow(i, 'nomor_persil', e.target.value)}
+                            disabled={isVoid} 
+                          />
                         </div>
-                      </div>
 
-                      {/* Klasifikasi - 10% */}
-                      <div className="w-[30%] lg:w-[10%]">
-                        <input 
-                          className="w-full px-4 py-3 text-xs border border-zinc-200 rounded-xl outline-none focus:border-emerald-500 bg-white font-bold text-center uppercase text-zinc-900" 
-                          placeholder="Klas" 
-                          value={row.klas_desa} 
-                          onChange={e => updateRow(i, 'klas_desa', e.target.value)} 
-                        />
-                      </div>
+                        {/* Jenis Tanah */}
+                        <div className="w-[48%] lg:w-[18%] relative">
+                          <select 
+                            className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 bg-white font-bold appearance-none cursor-pointer ${
+                              isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200 text-zinc-900'
+                            }`} 
+                            value={row.jenis_tanah} 
+                            onChange={e => updateRow(i, 'jenis_tanah', e.target.value)}
+                            disabled={isVoid}
+                          >
+                            <option value="Tanah Kering">Tanah Kering</option>
+                            <option value="Sawah">Sawah</option>
+                          </select>
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
+                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path d="M19 9l-7 7-7-7"/></svg>
+                          </div>
+                        </div>
 
-                      {/* Luas - 12% */}
-                      <div className="w-[30%] lg:w-[12%]">
-                        <input 
-                          className="w-full px-4 py-3 text-xs border border-zinc-200 rounded-xl outline-none focus:border-emerald-500 bg-white font-bold text-zinc-900" 
-                          placeholder="0" 
-                          type="number" 
-                          value={row.luas_meter === 0 ? '' : row.luas_meter} 
-                          onChange={e => {
-                            const val = e.target.value;
-                            updateRow(i, 'luas_meter', val === '' ? 0 : parseFloat(val));
-                          }} 
-                        />
-                      </div>
+                        {/* Klasifikasi */}
+                        <div className="w-[30%] lg:w-[10%]">
+                          <input 
+                            className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 bg-white font-bold text-center uppercase ${
+                              isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200 text-zinc-900'
+                            }`} 
+                            placeholder="Klas" 
+                            value={row.klas_desa} 
+                            onChange={e => updateRow(i, 'klas_desa', e.target.value)}
+                            disabled={isVoid}
+                          />
+                        </div>
 
-                      {/* Asal Usul - Sisa Ruang (flex-1) */}
-                      <div className="w-full lg:flex-1">
-                        <textarea 
-                          className="w-full px-4 py-3 text-xs border border-zinc-200 rounded-xl outline-none focus:border-emerald-500 bg-white font-medium text-zinc-900 min-h-[50px] resize-y" 
-                          placeholder="Asal-Usul / Keterangan Lengkap..." 
-                          value={row.asal_usul} 
-                          onChange={e => updateRow(i, 'asal_usul', e.target.value)} 
-                        />
-                      </div>
+                        {/* Luas */}
+                        <div className="w-[30%] lg:w-[12%]">
+                          <input 
+                            className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 bg-white font-bold ${
+                              isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200 text-zinc-900'
+                            }`} 
+                            placeholder="0" 
+                            type="number" 
+                            value={row.luas_meter === 0 ? '' : row.luas_meter} 
+                            onChange={e => {
+                              const val = e.target.value;
+                              updateRow(i, 'luas_meter', val === '' ? 0 : parseFloat(val));
+                            }}
+                            disabled={isVoid}
+                          />
+                        </div>
 
-                      {/* Tombol Hapus */}
-                      {rows.length > 1 && (
-                        <button 
-                          onClick={() => setRows(rows.filter((_, idx) => idx !== i))} 
-                          className="p-2 text-zinc-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
-                        >
-                          <Trash2 size={18}/>
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                        {/* Asal Usul */}
+                        <div className="w-full lg:flex-1">
+                          <textarea 
+                            className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 bg-white font-medium min-h-[50px] resize-y ${
+                              isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200 text-zinc-900'
+                            }`} 
+                            placeholder="Asal-Usul / Keterangan Lengkap..." 
+                            value={row.asal_usul} 
+                            onChange={e => updateRow(i, 'asal_usul', e.target.value)}
+                            disabled={isVoid}
+                          />
+                        </div>
+
+                        {/* BUTTON CORE */}
+                        {hasId && (
+                          <button 
+                            onClick={() => handleToggleVoid(row.id!, isVoid)}
+                            disabled={voidLoading === row.id}
+                            className={`p-2 rounded-xl transition-all ${
+                              isVoid 
+                                ? 'text-emerald-500 hover:bg-emerald-50' 
+                                : 'text-zinc-300 hover:text-amber-500 hover:bg-amber-50'
+                            }`}
+                            title={isVoid ? 'Aktifkan kembali' : 'Coret persil (tidak berlaku)'}
+                          >
+                            {voidLoading === row.id ? (
+                              <Loader2 size={18} className="animate-spin" />
+                            ) : (
+                              <Ban size={18} />
+                            )}
+                          </button>
+                        )}
+
+                        {/* Tombol Hapus */}
+                        {rows.length > 1 && !isVoid && (
+                          <button 
+                            onClick={() => setRows(rows.filter((_, idx) => idx !== i))} 
+                            className="p-2 text-zinc-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                          >
+                            <Trash2 size={18}/>
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -653,6 +849,35 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess }: FormTamba
                 className="flex-1 py-4 bg-zinc-900 text-white rounded-2xl text-xs font-black uppercase shadow-lg shadow-zinc-200 hover:bg-zinc-800 transition-all"
               >
                 Proses Area Ini
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PROMPT TAMBAH DATA BARU */}
+      {showAddPrompt && (
+        <div className="fixed inset-0 z-[120] bg-zinc-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2rem] max-w-md w-full p-8 shadow-2xl">
+            <div className="flex items-center gap-3 mb-6 text-amber-600">
+              <AlertCircle size={24} />
+              <h3 className="text-sm font-black uppercase tracking-widest">Tambah Data Baru?</h3>
+            </div>
+            <p className="text-zinc-600 mb-8 text-sm">
+              Anda sudah berada di akhir daftar kohir. Apakah Anda ingin menambah data kohir baru?
+            </p>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowAddPrompt(false)}
+                className="flex-1 py-4 text-xs font-black uppercase text-zinc-400 hover:text-zinc-600 transition-all border border-zinc-200 rounded-2xl"
+              >
+                Kembali
+              </button>
+              <button
+                onClick={handleAddNewFromPrompt}
+                className="flex-1 py-4 bg-zinc-900 text-white rounded-2xl text-xs font-black uppercase shadow-lg hover:bg-zinc-800 transition-all"
+              >
+                Tambah Baru
               </button>
             </div>
           </div>

@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Loader2, Search, Layers, ChevronRight, Hash, Building2, Ruler } from 'lucide-react';
+import { MapPin, Loader2, Search, Layers, ChevronRight, Hash, Building2 } from 'lucide-react';
 import { supabase } from '../../services/db';
 import { Kecamatan, Desa, LetterCPersil } from '../../types';
 
-// Interface yang sudah diperketat untuk relasi Owner
 interface PersilWithOwner extends LetterCPersil {
   letter_c: {
     nomor_c: string;
@@ -21,6 +20,7 @@ export const Persil = () => {
   const [selectedDesaId, setSelectedDesaId] = useState<string | null>(
     localStorage.getItem('last_selected_desa_id') || null
   );
+  const [error, setError] = useState<string | null>(null);
   
   const [searchDesa, setSearchDesa] = useState(''); 
   const [searchTerm, setSearchTerm] = useState(''); 
@@ -29,61 +29,140 @@ export const Persil = () => {
   // --- 1. Fetch Data Wilayah ---
   useEffect(() => {
     const fetchRegions = async () => {
-      const { data: kec } = await supabase.from('kecamatan').select('*').order('nama');
-      const { data: des } = await supabase.from('desa').select('*').order('nama');
-      if (kec) setKecamatans(kec);
-      if (des) setDesas(des);
+      try {
+        const { data: kec } = await supabase.from('kecamatan').select('*').order('nama');
+        const { data: des } = await supabase.from('desa').select('*').order('nama');
+        if (kec) setKecamatans(kec);
+        if (des) setDesas(des);
+      } catch (err: any) {
+        console.error("Error fetching regions:", err.message);
+        setError("Gagal memuat data wilayah");
+      }
     };
     fetchRegions();
   }, []);
 
-  // --- 2. Fetch Data Persil (Manual Fetch to avoid PGRST201) ---
+  // --- 2. Fetch Data Persil dengan handling khusus untuk desa bermasalah ---
   useEffect(() => {
     const fetchPersils = async () => {
-      if (!selectedDesaId) return;
+      if (!selectedDesaId) {
+        setPersilList([]);
+        return;
+      }
+      
       setLoading(true);
+      setError(null);
       
       try {
-        // Ambil ID Letter C yang ada di desa terpilih
-        const { data: owners, error: ownerError } = await supabase
-          .from('letter_c')
-          .select('id')
-          .eq('desa_id', selectedDesaId);
+        console.log(`Mencoba fetch data untuk desa ID: ${selectedDesaId}`);
+        
+        // APPROACH 1: Coba dengan raw query dulu (untuk debug)
+        const { data: rawData, error: rawError } = await supabase
+          .from('letter_c_persil')
+          .select('count', { count: 'exact', head: true });
+        
+        console.log('Koneksi Supabase OK, total persil:', rawData);
+        
+        // APPROACH 2: Query dengan LEFT JOIN yang lebih aman
+        const { data, error } = await supabase
+          .from('letter_c_persil')
+          .select(`
+            *,
+            letter_c:letter_c_id (
+              nomor_c,
+              nama_pemilik,
+              desa_id
+            )
+          `);
 
-        if (ownerError) throw ownerError;
+        if (error) {
+          console.error('Error dengan JOIN:', error);
+          throw error;
+        }
 
-        if (owners && owners.length > 0) {
-          const ownerIds = owners.map(o => o.id);
+        console.log('Data mentah:', data);
 
-          // Ambil persil dengan join manual via foreign key
-          const { data: persils, error: persilError } = await supabase
-            .from('letter_c_persil')
-            .select(`
-              *,
-              letter_c:letter_c_id (
-                nomor_c, 
-                nama_pemilik, 
-                desa_id
-              )
-            `)
-            .in('letter_c_id', ownerIds)
-            .order('nomor_persil');
+        if (data && data.length > 0) {
+          // Filter manual berdasarkan desa_id
+          const filteredData = data.filter((item: any) => {
+            // Pastikan letter_c ada dan desa_id-nya sesuai
+            return item.letter_c && item.letter_c.desa_id === selectedDesaId;
+          });
 
-          if (persilError) throw persilError;
-
-          if (persils) {
-            const normalized = persils.map((item: any) => ({
-              ...item,
-              letter_c: Array.isArray(item.letter_c) ? item.letter_c[0] : item.letter_c
-            }));
-            setPersilList(normalized);
-          }
+          console.log(`Data setelah filter desa: ${filteredData.length} item`);
+          
+          // Normalisasi data
+          const normalized = filteredData.map((item: any) => ({
+            ...item,
+            letter_c: Array.isArray(item.letter_c) ? item.letter_c[0] : item.letter_c
+          }));
+          
+          setPersilList(normalized);
         } else {
           setPersilList([]);
         }
+
       } catch (err: any) {
-        console.error("Error fetching data:", err.message);
-        setPersilList([]);
+        console.error("Error fetching data dengan JOIN:", err.message);
+        
+        // APPROACH 3: Fallback ke two-step query
+        try {
+          console.log("Mencoba fallback ke two-step query...");
+          
+          // Ambil semua letter_c di desa ini
+          const { data: letterCData, error: letterCError } = await supabase
+            .from('letter_c')
+            .select('id, nomor_c, nama_pemilik')
+            .eq('desa_id', selectedDesaId);
+
+          if (letterCError) throw letterCError;
+
+          if (!letterCData || letterCData.length === 0) {
+            setPersilList([]);
+            setLoading(false);
+            return;
+          }
+
+          console.log(`Ditemukan ${letterCData.length} letter_c`);
+
+          const letterCIds = letterCData.map(lc => lc.id);
+          
+          // Buat map untuk lookup
+          const letterCMap = new Map();
+          letterCData.forEach(lc => {
+            letterCMap.set(lc.id, {
+              nomor_c: lc.nomor_c,
+              nama_pemilik: lc.nama_pemilik,
+              desa_id: selectedDesaId
+            });
+          });
+
+          // Ambil semua persil
+          const { data: persils, error: persilError } = await supabase
+            .from('letter_c_persil')
+            .select('*')
+            .in('letter_c_id', letterCIds)
+            .order('nomor_persil', { ascending: true });
+
+          if (persilError) throw persilError;
+
+          if (persils && persils.length > 0) {
+            const persilWithOwner = persils.map(persil => ({
+              ...persil,
+              letter_c: letterCMap.get(persil.letter_c_id) || null
+            }));
+            console.log(`Fallback sukses: ${persilWithOwner.length} persil`);
+            setPersilList(persilWithOwner);
+          } else {
+            console.log('Tidak ada persil di desa ini');
+            setPersilList([]);
+          }
+
+        } catch (fallbackErr: any) {
+          console.error("Fallback juga gagal:", fallbackErr.message);
+          setError(`Gagal memuat data: ${fallbackErr.message}`);
+          setPersilList([]);
+        }
       } finally {
         setLoading(false);
       }
@@ -93,29 +172,32 @@ export const Persil = () => {
   }, [selectedDesaId]);
 
   // --- 3. Filter Logic ---
-  const filteredKecamatans = kecamatans.map(kec => ({
-    ...kec,
-    desas: desas.filter(d => 
-      d.kecamatan_id === kec.id && 
-      d.nama.toLowerCase().includes(searchDesa.toLowerCase())
-    )
-  })).filter(kec => kec.desas.length > 0);
+  const filteredKecamatans = kecamatans
+    .map(kec => ({
+      ...kec,
+      desas: desas.filter(d => 
+        d.kecamatan_id === kec.id && 
+        d.nama.toLowerCase().includes(searchDesa.toLowerCase())
+      )
+    }))
+    .filter(kec => kec.desas.length > 0);
 
   const filteredPersils = persilList.filter(p => {
-    // 1. Ambil data nomor persil dan ubah ke string agar bisa dicari
     const noPersil = String(p.nomor_persil || "").toLowerCase();
-    
-    // 2. Ambil kata kunci pencarian
+    const noKohir = String(p.letter_c?.nomor_c || "").toLowerCase();
+    const namaPemilik = String(p.letter_c?.nama_pemilik || "").toLowerCase();
     const cari = searchTerm.toLowerCase();
-
-    // 3. LOGIC UTAMA: Hanya cek apakah No. Persil mengandung kata kunci
-    const matchesSearch = noPersil.includes(cari);
     
-    // 4. Tetap jalankan filter Jenis Tanah (Sawah/Kering)
+    const matchesSearch = noPersil.includes(cari) || 
+                         noKohir.includes(cari) ||
+                         namaPemilik.includes(cari);
+    
     const matchesFilter = filterJenis === 'Semua' || p.jenis_tanah === filterJenis;
     
     return matchesSearch && matchesFilter;
   });
+
+  const selectedDesa = desas.find(d => d.id === selectedDesaId);
 
   return (
     <div className="flex h-[calc(100vh-140px)] gap-8 p-4 bg-[#F8F9FA] text-zinc-900 font-sans">
@@ -136,29 +218,39 @@ export const Persil = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto px-2 space-y-6 scrollbar-hide">
-          {filteredKecamatans.map(k => (
-            <div key={k.id} className="space-y-1">
-              <div className="flex items-center gap-2 px-2 mb-2">
-                <Building2 size={12} className="text-zinc-400"/>
-                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{k.nama}</span>
+          {filteredKecamatans.length > 0 ? (
+            filteredKecamatans.map(k => (
+              <div key={k.id} className="space-y-1">
+                <div className="flex items-center gap-2 px-2 mb-2">
+                  <Building2 size={12} className="text-zinc-400"/>
+                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{k.nama}</span>
+                </div>
+                {k.desas.map(d => (
+                  <button 
+                    key={d.id} 
+                    onClick={() => { 
+                      setSelectedDesaId(d.id); 
+                      localStorage.setItem('last_selected_desa_id', d.id);
+                      setError(null); // Reset error saat ganti desa
+                    }}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[13px] font-bold transition-all ${
+                      selectedDesaId === d.id ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-500 hover:bg-white'
+                    }`}
+                  >
+                    <span className="flex items-center gap-3">
+                      <MapPin size={14} className={selectedDesaId === d.id ? 'text-white' : 'text-zinc-300'}/> 
+                      {d.nama}
+                    </span>
+                    {selectedDesaId === d.id && <ChevronRight size={14}/>}
+                  </button>
+                ))}
               </div>
-              {k.desas.map(d => (
-                <button 
-                  key={d.id} 
-                  onClick={() => { setSelectedDesaId(d.id); localStorage.setItem('last_selected_desa_id', d.id); }}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[13px] font-bold transition-all ${
-                    selectedDesaId === d.id ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-500 hover:bg-white'
-                  }`}
-                >
-                  <span className="flex items-center gap-3">
-                    <MapPin size={14} className={selectedDesaId === d.id ? 'text-white' : 'text-zinc-300'}/> 
-                    {d.nama}
-                  </span>
-                  {selectedDesaId === d.id && <ChevronRight size={14}/>}
-                </button>
-              ))}
+            ))
+          ) : (
+            <div className="text-center py-10 text-zinc-400 text-xs font-bold uppercase tracking-wider">
+              Tidak ada data
             </div>
-          ))}
+          )}
         </div>
       </div>
 
@@ -169,9 +261,12 @@ export const Persil = () => {
         <div className="p-8 border-b border-zinc-50 flex justify-between items-end bg-white/50 backdrop-blur-sm">
           <div>
             <h2 className="text-3xl font-black tracking-tight">
-              {selectedDesaId ? desas.find(d => d.id === selectedDesaId)?.nama : "Data Persil"}
+              {selectedDesa ? selectedDesa.nama : "Data Persil"}
             </h2>
             <p className="text-sm text-zinc-400 font-medium mt-1 uppercase tracking-wider">Arsip Rincian Tanah Desa</p>
+            {error && (
+              <p className="text-xs text-red-500 mt-2 font-bold">{error}</p>
+            )}
           </div>
           
           {/* Tab Filter Jenis Tanah */}
@@ -213,8 +308,18 @@ export const Persil = () => {
                 <p className="font-black uppercase tracking-[0.4em] text-[10px] mt-6 leading-relaxed">Pilih desa pada sidebar</p>
              </div>
           ) : filteredPersils.length === 0 ? (
-            <div className="text-center p-20 text-zinc-300 font-bold uppercase text-[10px] tracking-widest">
-              Data tidak ditemukan
+            <div className="text-center p-20">
+              <p className="text-zinc-300 font-bold uppercase text-[10px] tracking-widest">
+                {error ? 'Error memuat data' : 'Tidak ada data persil di desa ini'}
+              </p>
+              {error && (
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="mt-4 px-6 py-3 bg-zinc-900 text-white rounded-xl text-xs font-black uppercase"
+                >
+                  Coba Refresh
+                </button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -231,22 +336,21 @@ export const Persil = () => {
                 <tbody>
                   {filteredPersils.map(p => (
                     <tr key={p.id} className="group transition-all">
-                      {/* Kolom No. Persil */}
                       <td className="py-6 px-6 bg-zinc-50/50 rounded-l-[1.5rem] font-black text-xl text-zinc-900 group-hover:bg-zinc-900 group-hover:text-white transition-all">
-                        {p.nomor_persil}
+                        {p.nomor_persil || '-'}
                       </td>
 
-                      {/* Kolom No. Kohir (C) */}
                       <td className="py-6 bg-zinc-50/50 group-hover:bg-zinc-50 transition-colors">
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-lg bg-zinc-200 flex items-center justify-center group-hover:bg-zinc-300">
                              <Hash size={12} className="text-zinc-500"/>
                           </div>
-                          <span className="font-black text-lg text-zinc-800">C.{p.letter_c?.nomor_c || '-'}</span>
+                          <span className="font-black text-lg text-zinc-800">
+                            {p.letter_c?.nomor_c ? `C.${p.letter_c.nomor_c}` : '-'}
+                          </span>
                         </div>
                       </td>
 
-                      {/* Kolom Nama Pemilik */}
                       <td className="py-6 bg-zinc-50/50 group-hover:bg-zinc-50 transition-colors">
                         <div className="font-black text-zinc-800 uppercase tracking-tight text-base leading-none">
                           {p.letter_c?.nama_pemilik || "Tanpa Nama"}
@@ -256,24 +360,24 @@ export const Persil = () => {
                         </div>
                       </td>
 
-                      {/* Kolom Jenis & Klas */}
                       <td className="py-6 bg-zinc-50/50 group-hover:bg-zinc-50 transition-colors">
                         <div className="flex items-center gap-2">
                           <span className={`text-[9px] font-black px-2 py-1 rounded-md uppercase ${
                             p.jenis_tanah === 'Sawah' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'
                           }`}>
-                            {p.jenis_tanah}
+                            {p.jenis_tanah || '-'}
                           </span>
                           <span className="text-sm font-bold text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded-md">
-                            {p.klas_desa}
+                            {p.klas_desa || '-'}
                           </span>
                         </div>
                       </td>
 
-                      {/* Kolom Luas */}
                       <td className="py-6 px-6 bg-zinc-50/50 rounded-r-[1.5rem] text-right group-hover:bg-zinc-50 transition-colors">
                         <div className="flex items-center justify-end gap-2">
-                          <span className="font-black text-xl text-zinc-900">{p.luas_meter?.toLocaleString('id-ID')}</span>
+                          <span className="font-black text-xl text-zinc-900">
+                            {p.luas_meter ? p.luas_meter.toLocaleString('id-ID') : '0'}
+                          </span>
                           <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">m²</span>
                         </div>
                       </td>
