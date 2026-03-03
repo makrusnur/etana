@@ -782,14 +782,20 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
                         )}
 
                         {/* Tombol Hapus */}
-                        {rows.length > 1 && !isVoid && (
-                          <button 
-                            onClick={() => setRows(rows.filter((_, idx) => idx !== i))} 
-                            className="p-2 text-zinc-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
-                          >
-                            <Trash2 size={18}/>
-                          </button>
-                        )}
+                            {rows.length > 1 && (
+                              <button 
+                                onClick={() => setRows(rows.filter((_, idx) => idx !== i))} 
+                                className={`p-2 rounded-xl transition-all ${
+                                  isVoid 
+                                    ? 'text-zinc-200 cursor-not-allowed' 
+                                    : 'text-zinc-300 hover:text-rose-500 hover:bg-rose-50'
+                                }`}
+                                disabled={isVoid}
+                                title={isVoid ? 'Tidak bisa menghapus persil yang sudah dicoret' : 'Hapus persil'}
+                              >
+                                <Trash2 size={18}/>
+                              </button>
+                            )}
                       </div>
                     );
                   })}
