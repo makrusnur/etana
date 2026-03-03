@@ -14,9 +14,9 @@ interface FormTambahCProps {
   editData: LetterC | null;
   onClose: () => void;
   onSuccess: () => void;
-  existingKohirList?: LetterC[]; // Tambahkan prop untuk daftar kohir yang ada
-  currentIndex?: number; // Indeks data yang sedang diedit
-  onNavigate?: (newIndex: number) => void; // Fungsi navigasi
+  existingKohirList?: LetterC[];
+  currentIndex?: number;
+  onNavigate?: (newIndex: number) => void;
 }
 
 export const DataLetterC = () => {
@@ -318,7 +318,15 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
       .select('*')
       .eq('letter_c_id', letterCId)
       .order('created_at');
-    if (data && data.length > 0) setRows(data);
+    
+    if (data && data.length > 0) {
+      // Pastikan is_void terbaca dengan benar sebagai boolean
+      const formattedData = data.map(item => ({
+        ...item,
+        is_void: item.is_void === true // Konversi ke boolean
+      }));
+      setRows(formattedData);
+    }
   };
 
   // --- FUNGSI GENERATE HASIL CROP ---
@@ -425,17 +433,24 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
     
     setVoidLoading(persilId);
     try {
+      const newVoidStatus = !currentVoidStatus;
+      
       const { error } = await supabase
         .from('letter_c_persil')
-        .update({ is_void: !currentVoidStatus })
+        .update({ is_void: newVoidStatus })
         .eq('id', persilId);
       
       if (error) throw error;
       
       // Update local state
       setRows(rows.map(row => 
-        row.id === persilId ? { ...row, is_void: !currentVoidStatus } : row
+        row.id === persilId ? { ...row, is_void: newVoidStatus } : row
       ));
+
+      // Refresh data dari database untuk memastikan konsistensi
+      if (editData) {
+        await fetchPersils(editData.id);
+      }
     } catch (err: any) {
       alert("Gagal mengubah status: " + err.message);
     } finally {
@@ -470,7 +485,7 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
         klas_desa: r.klas_desa,
         luas_meter: r.luas_meter || 0,
         asal_usul: r.asal_usul,
-        is_void: false
+        is_void: r.is_void || false // Pertahankan status is_void yang sudah ada
       }));
 
       await supabase.from('letter_c_persil').insert(persils);
@@ -489,46 +504,32 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
   };
 
   const handleNavigateWithCheck = (direction: 'prev' | 'next') => {
-  // Untuk data terbaru di paling atas (index 0):
-  // - Prev (panah kiri) = ke data yang lebih baru (index lebih kecil)
-  // - Next (panah kanan) = ke data yang lebih lama (index lebih besar)
-  const newIndex = direction === 'prev' ? currentIndex - 1 : currentIndex + 1;
-  
-  if (newIndex < 0) {
-    // Jika di awal daftar dan prev, tampilkan prompt tambah data baru di awal?
-    // Atau bisa juga kasih notifikasi sudah di data terbaru
-    alert('Anda sudah berada di data terbaru');
-    return;
-  }
-  
-  if (newIndex >= existingKohirList.length) {
-    // Jika di akhir daftar dan next, tampilkan prompt tambah data baru
-    setShowAddPrompt(true);
-    return;
-  }
+    const newIndex = direction === 'prev' ? currentIndex - 1 : currentIndex + 1;
+    
+    if (newIndex < 0) {
+      alert('Anda sudah berada di data terbaru');
+      return;
+    }
+    
+    if (newIndex >= existingKohirList.length) {
+      setShowAddPrompt(true);
+      return;
+    }
 
-  if (isDirty) {
-    if (confirm('Ada perubahan yang belum disimpan. Apakah Anda yakin ingin meninggalkan halaman ini?')) {
+    if (isDirty) {
+      if (confirm('Ada perubahan yang belum disimpan. Apakah Anda yakin ingin meninggalkan halaman ini?')) {
+        onNavigate?.(newIndex);
+      }
+    } else {
       onNavigate?.(newIndex);
     }
-  } else {
-    onNavigate?.(newIndex);
-  }
-};
+  };
+
   const handleAddNewFromPrompt = () => {
     setShowAddPrompt(false);
-    onClose(); // Tutup modal saat ini
-    // Trigger tambah data baru (akan membuka modal baru dengan form kosong)
+    onClose();
     setTimeout(() => {
-      // Ini akan memicu pembukaan modal baru dengan form kosong
-      // Kita perlu mengkomunikasikan ke parent untuk membuka modal dengan editData = null
-      // Untuk sementara, kita bisa menggunakan event custom atau props callback
-      if (onNavigate) {
-        // Reset ke form kosong dengan memanggil onNavigate dengan index -1
-        // Tapi karena onNavigate hanya untuk navigasi antar data yang ada, kita perlu cara lain
-        // Alternatif: buka modal baru dengan editData = null
-        window.dispatchEvent(new CustomEvent('open-new-letter-c'));
-      }
+      window.dispatchEvent(new CustomEvent('open-new-letter-c'));
     }, 100);
   };
 
@@ -678,11 +679,11 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
 
                 <div className="space-y-3">
                   {rows.map((row, i) => {
-                    const isVoid = row.is_void || false;
+                    const isVoid = row.is_void === true; // Pastikan boolean
                     const hasId = !!row.id;
                     
                     return (
-                      <div key={i} className={`group p-2 lg:p-0 flex flex-wrap lg:flex-nowrap gap-3 items-center relative transition-all ${
+                      <div key={row.id || i} className={`group p-2 lg:p-0 flex flex-wrap lg:flex-nowrap gap-3 items-center relative transition-all ${
                         isVoid ? 'opacity-50' : ''
                       }`}>
                         
@@ -693,7 +694,7 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
                               isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200'
                             }`} 
                             placeholder="Nomor Persil" 
-                            value={row.nomor_persil} 
+                            value={row.nomor_persil || ''} 
                             onChange={e => updateRow(i, 'nomor_persil', e.target.value)}
                             disabled={isVoid} 
                           />
@@ -705,7 +706,7 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
                             className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 bg-white font-bold appearance-none cursor-pointer ${
                               isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200 text-zinc-900'
                             }`} 
-                            value={row.jenis_tanah} 
+                            value={row.jenis_tanah || 'Tanah Kering'} 
                             onChange={e => updateRow(i, 'jenis_tanah', e.target.value)}
                             disabled={isVoid}
                           >
@@ -724,7 +725,7 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
                               isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200 text-zinc-900'
                             }`} 
                             placeholder="Klas" 
-                            value={row.klas_desa} 
+                            value={row.klas_desa || ''} 
                             onChange={e => updateRow(i, 'klas_desa', e.target.value)}
                             disabled={isVoid}
                           />
@@ -754,7 +755,7 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
                               isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200 text-zinc-900'
                             }`} 
                             placeholder="Asal-Usul / Keterangan Lengkap..." 
-                            value={row.asal_usul} 
+                            value={row.asal_usul || ''} 
                             onChange={e => updateRow(i, 'asal_usul', e.target.value)}
                             disabled={isVoid}
                           />

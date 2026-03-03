@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Loader2, Search, Layers, ChevronRight, Hash, Building2 } from 'lucide-react';
+import { MapPin, Loader2, Search, Layers, ChevronRight, Hash, Building2, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../../services/db';
 import { Kecamatan, Desa, LetterCPersil } from '../../types';
 
@@ -25,6 +25,7 @@ export const Persil = () => {
   const [searchDesa, setSearchDesa] = useState(''); 
   const [searchTerm, setSearchTerm] = useState(''); 
   const [filterJenis, setFilterJenis] = useState('Semua');
+  const [showVoid, setShowVoid] = useState(true); // State untuk menampilkan/menyembunyikan persil yang dicoret
 
   // --- 1. Fetch Data Wilayah ---
   useEffect(() => {
@@ -194,7 +195,10 @@ export const Persil = () => {
     
     const matchesFilter = filterJenis === 'Semua' || p.jenis_tanah === filterJenis;
     
-    return matchesSearch && matchesFilter;
+    // Filter berdasarkan showVoid (jika false, sembunyikan yang dicoret)
+    const matchesVoid = showVoid ? true : !p.is_void;
+    
+    return matchesSearch && matchesFilter && matchesVoid;
   });
 
   const selectedDesa = desas.find(d => d.id === selectedDesaId);
@@ -269,19 +273,34 @@ export const Persil = () => {
             )}
           </div>
           
-          {/* Tab Filter Jenis Tanah */}
-          <div className="flex gap-2 bg-zinc-100 p-1.5 rounded-2xl">
-            {['Semua', 'Sawah', 'Tanah Kering'].map(j => (
-              <button 
-                key={j} 
-                onClick={() => setFilterJenis(j)} 
-                className={`px-5 py-2 text-[10px] font-black uppercase rounded-xl transition-all ${
-                  filterJenis === j ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'
-                }`}
-              >
-                {j}
-              </button>
-            ))}
+          <div className="flex gap-2">
+            {/* Toggle Button untuk menampilkan/menyembunyikan persil yang dicoret */}
+            <button
+              onClick={() => setShowVoid(!showVoid)}
+              className={`flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase rounded-xl transition-all ${
+                showVoid 
+                  ? 'bg-zinc-200 text-zinc-900' 
+                  : 'bg-zinc-100 text-zinc-400 hover:text-zinc-600'
+              }`}
+            >
+              {showVoid ? <Eye size={14} /> : <EyeOff size={14} />}
+              {showVoid ? 'Sembunyikan Dicoret' : 'Tampilkan Dicoret'}
+            </button>
+            
+            {/* Tab Filter Jenis Tanah */}
+            <div className="flex gap-2 bg-zinc-100 p-1.5 rounded-2xl">
+              {['Semua', 'Sawah', 'Tanah Kering'].map(j => (
+                <button 
+                  key={j} 
+                  onClick={() => setFilterJenis(j)} 
+                  className={`px-5 py-2 text-[10px] font-black uppercase rounded-xl transition-all ${
+                    filterJenis === j ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'
+                  }`}
+                >
+                  {j}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -334,57 +353,87 @@ export const Persil = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredPersils.map(p => (
-                    <tr key={p.id} className="group transition-all">
-                      <td className="py-6 px-6 bg-zinc-50/50 rounded-l-[1.5rem] font-black text-xl text-zinc-900 group-hover:bg-zinc-900 group-hover:text-white transition-all">
-                        {p.nomor_persil || '-'}
-                      </td>
+                  {filteredPersils.map(p => {
+                    const isVoid = p.is_void === true;
+                    
+                    return (
+                      <tr key={p.id} className={`group transition-all ${isVoid ? 'opacity-50' : ''}`}>
+                        <td className={`py-6 px-6 bg-zinc-50/50 rounded-l-[1.5rem] font-black text-xl transition-all group-hover:bg-zinc-900 group-hover:text-white ${
+                          isVoid ? 'line-through text-zinc-400' : 'text-zinc-900'
+                        }`}>
+                          {p.nomor_persil || '-'}
+                          {isVoid && (
+                            <span className="ml-2 text-[8px] font-black text-red-500 uppercase bg-red-50 px-1.5 py-0.5 rounded">
+                              Dicoret
+                            </span>
+                          )}
+                        </td>
 
-                      <td className="py-6 bg-zinc-50/50 group-hover:bg-zinc-50 transition-colors">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-zinc-200 flex items-center justify-center group-hover:bg-zinc-300">
-                             <Hash size={12} className="text-zinc-500"/>
+                        <td className="py-6 bg-zinc-50/50 group-hover:bg-zinc-50 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                              isVoid ? 'bg-zinc-300' : 'bg-zinc-200 group-hover:bg-zinc-300'
+                            }`}>
+                               <Hash size={12} className="text-zinc-500"/>
+                            </div>
+                            <span className={`font-black text-lg ${isVoid ? 'text-zinc-400 line-through' : 'text-zinc-800'}`}>
+                              {p.letter_c?.nomor_c ? `C.${p.letter_c.nomor_c}` : '-'}
+                            </span>
                           </div>
-                          <span className="font-black text-lg text-zinc-800">
-                            {p.letter_c?.nomor_c ? `C.${p.letter_c.nomor_c}` : '-'}
-                          </span>
-                        </div>
-                      </td>
+                        </td>
 
-                      <td className="py-6 bg-zinc-50/50 group-hover:bg-zinc-50 transition-colors">
-                        <div className="font-black text-zinc-800 uppercase tracking-tight text-base leading-none">
-                          {p.letter_c?.nama_pemilik || "Tanpa Nama"}
-                        </div>
-                        <div className="text-[10px] text-zinc-400 font-bold uppercase mt-1">
-                          Pemilik Terdaftar
-                        </div>
-                      </td>
-
-                      <td className="py-6 bg-zinc-50/50 group-hover:bg-zinc-50 transition-colors">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[9px] font-black px-2 py-1 rounded-md uppercase ${
-                            p.jenis_tanah === 'Sawah' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'
+                        <td className="py-6 bg-zinc-50/50 group-hover:bg-zinc-50 transition-colors">
+                          <div className={`font-black uppercase tracking-tight text-base leading-none ${
+                            isVoid ? 'text-zinc-400 line-through' : 'text-zinc-800'
                           }`}>
-                            {p.jenis_tanah || '-'}
-                          </span>
-                          <span className="text-sm font-bold text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded-md">
-                            {p.klas_desa || '-'}
-                          </span>
-                        </div>
-                      </td>
+                            {p.letter_c?.nama_pemilik || "Tanpa Nama"}
+                          </div>
+                          <div className="text-[10px] text-zinc-400 font-bold uppercase mt-1">
+                            Pemilik Terdaftar
+                          </div>
+                        </td>
 
-                      <td className="py-6 px-6 bg-zinc-50/50 rounded-r-[1.5rem] text-right group-hover:bg-zinc-50 transition-colors">
-                        <div className="flex items-center justify-end gap-2">
-                          <span className="font-black text-xl text-zinc-900">
-                            {p.luas_meter ? p.luas_meter.toLocaleString('id-ID') : '0'}
-                          </span>
-                          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">m²</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        <td className="py-6 bg-zinc-50/50 group-hover:bg-zinc-50 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[9px] font-black px-2 py-1 rounded-md uppercase ${
+                              isVoid ? 'bg-zinc-200 text-zinc-500' :
+                              p.jenis_tanah === 'Sawah' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'
+                            }`}>
+                              {p.jenis_tanah || '-'}
+                            </span>
+                            <span className={`text-sm font-bold px-2 py-0.5 rounded-md ${
+                              isVoid ? 'bg-zinc-200 text-zinc-500' : 'bg-zinc-100 text-zinc-500'
+                            }`}>
+                              {p.klas_desa || '-'}
+                            </span>
+                          </div>
+                        </td>
+
+                        <td className={`py-6 px-6 bg-zinc-50/50 rounded-r-[1.5rem] text-right group-hover:bg-zinc-50 transition-colors ${
+                          isVoid ? 'line-through text-zinc-400' : ''
+                        }`}>
+                          <div className="flex items-center justify-end gap-2">
+                            <span className="font-black text-xl text-zinc-900">
+                              {p.luas_meter ? p.luas_meter.toLocaleString('id-ID') : '0'}
+                            </span>
+                            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">m²</span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
+              
+              {/* Informasi jumlah data */}
+              <div className="mt-4 text-xs text-zinc-400 font-bold px-6">
+                Menampilkan {filteredPersils.length} dari {persilList.length} persil
+                {!showVoid && persilList.filter(p => p.is_void).length > 0 && (
+                  <span className="ml-2">
+                    ( {persilList.filter(p => p.is_void).length} persil dicoret disembunyikan )
+                  </span>
+                )}
+              </div>
             </div>
           )}
         </div>
