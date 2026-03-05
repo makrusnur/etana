@@ -1,10 +1,6 @@
 // src/pages/TemplatesPage.tsx
 // ============================================
 // TEMPLATES PAGE - GENERATE DOKUMEN PERTANAHAN
-// Sporadik: khusus Letter C (dengan riwayat & BAK)
-// Akta: semua jenis (Jual Beli, Hibah, Waris, IJB, KJ, dll)
-// Data tanah SATU VERSI (tidak dibedakan prefix)
-// Jika data tidak ada, hasilnya string kosong ""
 // ============================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -78,6 +74,7 @@ interface TemplateData {
   tanah_kabupaten?: string;
   tanah_provinsi?: string;
   tanah_tipe_wilayah?: string;
+  penggunaan_tanah?: string;
   
   // LETTER C (dari LandData)
   nomor_c?: string;
@@ -122,11 +119,16 @@ interface TemplateData {
   ejaan_luas_dimohon?: string;
   
   // HARGA TRANSAKSI
-  harga_transaksi?: string;        // sudah diformat Rp
+  harga_transaksi?: string;
   ejaan_harga_transaksi?: string;
   
-  // RIWAYAT TANAH (array untuk loop)
-  riwayat_tanah?: LandHistory[];
+  // RIWAYAT TANAH - 5 textbox statis
+  riwayat_textbox_1?: string;
+  riwayat_textbox_2?: string;
+  riwayat_textbox_3?: string;
+  riwayat_textbox_4?: string;
+  riwayat_textbox_5?: string;
+  _countRiwayat?: number;
   
   // BAK (array of strings)
   bak_list?: string[];
@@ -161,12 +163,121 @@ interface TemplateData {
   saksi_2_agama?: string;
   
   // ========================================
-  // DATA UNTUK AKTA (LOOP)
+  // DATA UNTUK AKTA (LOOP) - DENGAN FORMAT LENGKAP
   // ========================================
-  penjual?: any[];        // PIHAK_1
-  pembeli?: any[];        // PIHAK_2
-  saksi_akta?: any[];     // SAKSI
-  persetujuan?: any[];    // PERSETUJUAN (dari relasi khusus)
+  penjual?: Array<{
+    Sebutan: string;
+    Nama: string;
+    Nama_Upper: string;
+    Nama_Alias?: string | null;
+    NIK: string;
+    Lahir_Tempat: string;
+    Lahir_Tgl: string;
+    Lahir_Indo: string;
+    Lahir_Ejaan: string;
+    Umur: number;
+    Agama: string;
+    Pekerjaan: string;
+    Alamat: string;
+    RT: string;
+    RW: string;
+    Des_Kel: string;
+    Desa: string;
+    Kec: string;
+    Kab_Kot: string;
+    Kota: string;
+    Provinsi: string;
+    Ktp_Masa_Berlaku: string;
+    Ktp_Masa_Ejaan: string;
+    nomorUrut?: number;
+  }>;
+  
+  pembeli?: Array<{
+    Sebutan: string;
+    Nama: string;
+    Nama_Upper: string;
+    Nama_Alias?: string | null;
+    NIK: string;
+    Lahir_Tempat: string;
+    Lahir_Tgl: string;
+    Lahir_Indo: string;
+    Lahir_Ejaan: string;
+    Umur: number;
+    Agama: string;
+    Pekerjaan: string;
+    Alamat: string;
+    RT: string;
+    RW: string;
+    Des_Kel: string;
+    Desa: string;
+    Kec: string;
+    Kab_Kot: string;
+    Kota: string;
+    Provinsi: string;
+    Ktp_Masa_Berlaku: string;
+    Ktp_Masa_Ejaan: string;
+    nomorUrut?: number;
+  }>;
+  
+  saksi_akta?: Array<{
+    Sebutan: string;
+    Nama: string;
+    Nama_Alias?: string | null;
+    NIK: string;
+    Lahir_Tempat: string;
+    Lahir_Tgl: string;
+    Lahir_Indo: string;
+    Lahir_Ejaan: string;
+    Umur: number;
+    Agama: string;
+    Pekerjaan: string;
+    Alamat: string;
+    RT: string;
+    RW: string;
+    Des_Kel: string;
+    Desa: string;
+    Kec: string;
+    Kab_Kot: string;
+    Kota: string;
+    Provinsi: string;
+    Ktp_Masa_Berlaku: string;
+    Ktp_Masa_Ejaan: string;
+    jabatan_saksi?: string;
+    desa_saksi?: string;
+    nomorUrut?: number;
+  }>;
+  
+  persetujuan?: Array<{
+    Sebutan: string;
+    Nama: string;
+    Nama_Alias?: string | null;
+    NIK: string;
+    Lahir_Tempat: string;
+    Lahir_Tgl: string;
+    Lahir_Indo: string;
+    Lahir_Ejaan: string;
+    Umur: number;
+    Agama: string;
+    Pekerjaan: string;
+    Alamat: string;
+    RT: string;
+    RW: string;
+    Des_Kel: string;
+    Desa: string;
+    Kec: string;
+    Kab_Kot: string;
+    Kota: string;
+    Provinsi: string;
+    Ktp_Masa_Berlaku: string;
+    Ktp_Masa_Ejaan: string;
+    Hubungan: string;
+    isIstri: boolean;
+    isSuami: boolean;
+    isAnak: boolean;
+    isSaudara: boolean;
+    isLainnya: boolean;
+    nomorUrut?: number;
+  }>;
   
   // ========================================
   // DATA BERKAS / ADMINISTRASI (dari FileRecord)
@@ -174,11 +285,21 @@ interface TemplateData {
   No_Berkas?: string;
   No_Reg?: string;
   Hari?: string;
-  Tgl_Surat?: string;          // format Indonesia
+  Tgl_Surat?: string;
   Tgl_Ejaan?: string;
   Cakupan_Tanah?: string;
   Pihak_Penanggung?: string;
   Jumlah_Saksi?: number;
+  
+  // DATA TAMBAHAN UNTUK TEMPLATE
+  bulan?: string;
+  tahun_terbilang?: string;
+  Ket_Setuju?: string;
+  
+  // DATA BERKAS UNTUK SPORADIK
+  dikuasai_sejak_tahun?: string;
+  perolehan_dari?: string;
+  sejak_tahun?: string;
   
   // KHUSUS WARIS
   isWaris?: boolean;
@@ -205,7 +326,7 @@ interface TemplateData {
   // DATA KEPALA DESA / LURAH (dari LandData)
   // ========================================
   kepala_desa?: string;
-  jenis_kades?: string;   // "Kepala Desa" atau "Lurah"
+  jenis_kades?: string;
   
   // ========================================
   // CONDITIONAL FLAGS
@@ -228,13 +349,25 @@ interface TemplateData {
   isSuami?: boolean;
   
   // ========================================
+  // INPUT MANUAL (khusus Sporadik)
+  // ========================================
+  tetangga_utara_nama?: string;
+  tetangga_utara_ttd?: string;
+  tetangga_timur_nama?: string;
+  tetangga_timur_ttd?: string;
+  tetangga_selatan_nama?: string;
+  tetangga_selatan_ttd?: string;
+  tetangga_barat_nama?: string;
+  tetangga_barat_ttd?: string;
+  materai?: string;
+  
+  // ========================================
   // DATA COUNTER
   // ========================================
   _countP1?: number;
   _countP2?: number;
   _countS?: number;
   _countSetuju?: number;
-  _countRiwayat?: number;
   _countBak?: number;
 }
 
@@ -287,8 +420,30 @@ export const TemplatesPage: React.FC = () => {
   const [tagSearch, setTagSearch] = useState('');
   const [debug, setDebug] = useState(false);
   
-  // HANYA 2 PILIHAN: Sporadik atau Akta
-  const [jenisDokumen, setJenisDokumen] = useState<'sporadik' | 'akta'>('sporadik');
+  // PILIHAN: Sporadik, Akta Notaris, atau Akta PPAT
+  const [jenisDokumen, setJenisDokumen] = useState<'sporadik' | 'akta_notaris' | 'akta_ppat'>('sporadik');
+  
+  // Untuk Akta: pilih jenis spesifik
+  const [jenisAkta, setJenisAkta] = useState<string>('');
+  
+  // Daftar jenis akta berdasarkan kategori
+  const jenisAktaNotaris = [
+    { value: 'PPJB', label: 'Akta Perjanjian Pengikatan Jual Beli (PPJB)' },
+    { value: 'KUASA_MENJUAL', label: 'Akta Kuasa Menjual' },
+    { value: 'HUTANG_PIUTANG', label: 'Perjanjian Hutang Piutang dengan Jaminan Tanah' },
+    { value: 'PENDIRIAN_PT', label: 'Akta Pendirian PT (Aset Tanah)' },
+    { value: 'WARIS_NOTARIS', label: 'Akta Keterangan Waris' },
+    { value: 'SEWA_MENYEWA', label: 'Perjanjian Sewa Menyewa' }
+  ];
+
+  const jenisAktaPPAT = [
+    { value: 'AJB', label: 'Akta Jual Beli (AJB)' },
+    { value: 'HIBAH', label: 'Akta Hibah' },
+    { value: 'TUKAR_MENUKAR', label: 'Akta Tukar Menukar' },
+    { value: 'PEMBAGIAN_HAK', label: 'Akta Pembagian Hak Bersama' },
+    { value: 'APHT', label: 'Akta Pemberian Hak Tanggungan (APHT)' },
+    { value: 'INBRENG', label: 'Akta Inbreng (Tanah ke PT)' }
+  ];
   
   // Refs
   const templateFileRef = useRef<File | null>(null);
@@ -327,6 +482,17 @@ export const TemplatesPage: React.FC = () => {
   useEffect(() => {
     templateFileRef.current = templateFile;
   }, [templateFile]);
+
+  // Reset jenisAkta ketika kategori berubah
+  useEffect(() => {
+    if (jenisDokumen === 'akta_notaris' && jenisAktaNotaris.length > 0) {
+      setJenisAkta(jenisAktaNotaris[0].value);
+    } else if (jenisDokumen === 'akta_ppat' && jenisAktaPPAT.length > 0) {
+      setJenisAkta(jenisAktaPPAT[0].value);
+    } else {
+      setJenisAkta('');
+    }
+  }, [jenisDokumen]);
 
   // ========================================
   // PREPARE DATA FOR TEMPLATE
@@ -383,12 +549,25 @@ export const TemplatesPage: React.FC = () => {
           }
         }
 
-        // 5. Proses data untuk template
+        // 5. Ambil data persetujuan dari tabel terpisah
+        const { data: persetujuanData, error: persetujuanError } = await supabase
+          .from('persetujuan')
+          .select('*, identitas:identitas_id(*)')
+          .eq('berkas_id', selectedFileId);
+
+        if (persetujuanError) {
+          console.error('Error ambil persetujuan:', persetujuanError);
+        } else {
+          console.log('Data persetujuan dari database:', persetujuanData);
+        }
+
+        // 6. Proses data untuk template
         const processed = processDataForTemplate(
           fileData,
           identities || [],
           landData,
-          relations || []
+          relations || [],
+          persetujuanData || [] // TAMBAHKAN INI
         );
 
         setPreviewData(processed);
@@ -412,7 +591,8 @@ export const TemplatesPage: React.FC = () => {
     file: FileRecord,
     identities: Identity[],
     land: LandData | null,
-    relations: Relation[]
+    relations: Relation[],
+    persetujuanRecords: any[] = [] // PARAMETER BARU
   ): TemplateData => {
     
     // ========================================
@@ -440,6 +620,7 @@ export const TemplatesPage: React.FC = () => {
       }
       if (p.desa) parts.push(`Desa ${p.desa}`);
       if (p.kecamatan) parts.push(`Kec. ${p.kecamatan}`);
+      if (p.kota_kabupaten) parts.push(p.kota_kabupaten);
       return parts.join(', ') || '';
     };
 
@@ -450,6 +631,36 @@ export const TemplatesPage: React.FC = () => {
       return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
     };
 
+    // Format bulan dan tahun terbilang
+    const bulanList = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    
+    let bulan = '';
+    let tahunTerbilang = '';
+    
+    if (file.tanggal) {
+      const tgl = new Date(file.tanggal);
+      if (!isNaN(tgl.getTime())) {
+        bulan = bulanList[tgl.getMonth()];
+        
+        // Format tahun terbilang
+        const tahun = tgl.getFullYear();
+        const tahunTerbilangMap: Record<number, string> = {
+          2019: 'dua ribu sembilan belas',
+          2020: 'dua ribu dua puluh',
+          2021: 'dua ribu dua puluh satu',
+          2022: 'dua ribu dua puluh dua',
+          2023: 'dua ribu dua puluh tiga',
+          2024: 'dua ribu dua puluh empat',
+          2025: 'dua ribu dua puluh lima',
+          2026: 'dua ribu dua puluh enam',
+        };
+        tahunTerbilang = tahunTerbilangMap[tahun] || tahun.toString();
+      }
+    }
+
     // ========================================
     // PISAHKAN DATA BERDASARKAN PERAN
     // ========================================
@@ -459,12 +670,13 @@ export const TemplatesPage: React.FC = () => {
     const saksiRaw: any[] = [];
     const setujuRaw: any[] = [];
 
+    // 1. Ambil dari relations (cara lama)
     relations.forEach((rel) => {
       const person = identities.find((i) => String(i.id).trim() === String(rel.identitas_id).trim());
       if (person) {
         const enriched = {
           ...person,
-          peran_detail: (rel as any).hubungan,
+          peran_detail: (rel as any).hubungan || rel.peran,
           umur: calculateAge(person.tanggal_lahir),
           tgl_lahir_indo: formatDateIndo(person.tanggal_lahir),
           lahir_tgl_strip: formatDateStrip(person.tanggal_lahir),
@@ -484,11 +696,38 @@ export const TemplatesPage: React.FC = () => {
       }
     });
 
+    // 2. Ambil dari tabel persetujuan (cara baru)
+    if (persetujuanRecords && persetujuanRecords.length > 0) {
+      console.log('Memproses data persetujuan dari tabel:', persetujuanRecords.length);
+      
+      persetujuanRecords.forEach((item) => {
+        // Data identitas sudah di-join dalam query
+        const person = item.identitas;
+        if (person) {
+          const enriched = {
+            ...person,
+            peran_detail: item.hubungan, // Hubungan dari tabel persetujuan
+            umur: calculateAge(person.tanggal_lahir),
+            tgl_lahir_indo: formatDateIndo(person.tanggal_lahir),
+            lahir_tgl_strip: formatDateStrip(person.tanggal_lahir),
+            ktp_berlaku_indo: person.ktp_berlaku === "SEUMUR HIDUP" ? "SEUMUR HIDUP" : formatDateIndo(person.ktp_berlaku),
+            ejaan_lahir: person.ejaan_tanggal_lahir || spellDateIndo(person.tanggal_lahir),
+            ejaan_berlaku: person.ejaan_tanggal_ktp_berlaku || (person.ktp_berlaku === "SEUMUR HIDUP" ? "SEUMUR HIDUP" : spellDateIndo(person.ktp_berlaku)),
+            is_seumur_hidup: person.is_seumur_hidup || person.ktp_berlaku === "SEUMUR HIDUP"
+          };
+          setujuRaw.push(enriched);
+        }
+      });
+    }
+
+    console.log('📊 TOTAL Data Persetujuan setelah digabung:', setujuRaw.length);
+    console.log('📊 Detail persetujuan:', setujuRaw.map(p => ({ nama: p.nama, hubungan: p.peran_detail })));
+
     // ========================================
-    // FORMAT DATA UNTUK AKTA (LOOP)
+    // FORMAT DATA UNTUK AKTA (LOOP) - DENGAN FORMAT LENGKAP
     // ========================================
     
-    const mapToArray = (arr: any[]) => arr.map((p) => ({
+    const mapToArray = (arr: any[]) => arr.map((p, index) => ({
       Sebutan: p.sebutan || "",
       Nama: p.nama || "",
       Nama_Upper: (p.nama || "").toUpperCase(),
@@ -498,40 +737,128 @@ export const TemplatesPage: React.FC = () => {
       Lahir_Tgl: p.lahir_tgl_strip || "",
       Lahir_Indo: p.tgl_lahir_indo || "",
       Lahir_Ejaan: p.ejaan_lahir || "",
-      Umur: p.umur || "",
+      Umur: p.umur || 0,
       Agama: p.agama || "",
       Pekerjaan: p.pekerjaan || "",
       Alamat: p.alamat || "",
       RT: p.rt || "",
       RW: p.rw || "",
+      Des_Kel: p.wilayah_type || "",
       Desa: p.desa || "",
       Kec: p.kecamatan || "",
+      Kab_Kot: p.daerah_type || "",
       Kota: p.kota_kabupaten || "",
       Provinsi: p.provinsi || "",
       Ktp_Masa_Berlaku: p.ktp_berlaku_indo || "",
       Ktp_Masa_Ejaan: p.ejaan_berlaku || "",
+      nomorUrut: index + 1,
     }));
 
     // ========================================
-    // FORMAT DATA PERSETUJUAN
+    // FORMAT DATA PERSETUJUAN DENGAN HUBUNGAN
     // ========================================
     
-    const mapSetuju = (arr: any[]) => arr.map((p) => ({
-      Sebutan: p.sebutan || "",
-      Nama: p.nama || "",
-      NIK: formatNIK(p.nik) || "",
-      Lahir_Tempat: p.tempat_lahir || "",
-      Lahir_Tgl: p.lahir_tgl_strip || "",
-      Lahir_Ejaan: p.ejaan_lahir || "",
-      Pekerjaan: p.pekerjaan || "",
-      Alamat: p.alamat || "",
-      RT: p.rt || "",
-      RW: p.rw || "",
-      Desa: p.desa || "",
-      Kec: p.kecamatan || "",
-      Kota: p.kota_kabupaten || "",
-      Provinsi: p.provinsi || "",
-    }));
+    const mapSetuju = (arr: any[]) => arr.map((p, index) => {
+      const hubungan = (p.peran_detail || '').toLowerCase();
+      const isIstri = hubungan.includes('istri');
+      const isSuami = hubungan.includes('suami');
+      const isAnak = hubungan.includes('anak');
+      const isSaudara = hubungan.includes('saudara');
+      
+      const result = {
+        Sebutan: p.sebutan || (isIstri ? 'Ny.' : isAnak ? 'Sdr.' : 'Sdr.'),
+        Nama: p.nama || "",
+        Nama_Alias: toTitleCase(p.alias) || null,
+        NIK: formatNIK(p.nik) || "",
+        Lahir_Tempat: p.tempat_lahir || "",
+        Lahir_Tgl: p.lahir_tgl_strip || "",
+        Lahir_Indo: p.tgl_lahir_indo || "",
+        Lahir_Ejaan: p.ejaan_lahir || "",
+        Umur: p.umur || 0,
+        Agama: p.agama || "",
+        Pekerjaan: p.pekerjaan || "",
+        Alamat: p.alamat || "",
+        Alamat_Lengkap: formatAlamat(p),
+        RT: p.rt || "",
+        RW: p.rw || "",
+        Des_Kel: p.wilayah_type || "",
+        Desa: p.desa || "",
+        Kec: p.kecamatan || "",
+        Kab_Kot: p.daerah_type || "",
+        Kota: p.kota_kabupaten || "",
+        Provinsi: p.provinsi || "",
+        Ktp_Masa_Berlaku: p.ktp_berlaku_indo || "",
+        Ktp_Masa_Ejaan: p.ejaan_berlaku || "",
+        Hubungan: p.peran_detail || '',
+        isIstri,
+        isSuami,
+        isAnak,
+        isSaudara,
+        isLainnya: !isIstri && !isSuami && !isAnak && !isSaudara,
+        nomorUrut: index + 1,
+      };
+      
+      return result;
+    });
+
+    // ========================================
+    // FORMAT DATA SAKSI DENGAN JABATAN (JIKA KEPALA DESA)
+    // ========================================
+    
+    const mapSaksi = (arr: any[]) => arr.map((p, index) => {
+      const isKades = land?.nama_kepala_desa === p.nama;
+      
+      return {
+        Sebutan: p.sebutan || "Sdr.",
+        Nama: p.nama || "",
+        Nama_Alias: toTitleCase(p.alias) || null,
+        NIK: formatNIK(p.nik) || "",
+        Lahir_Tempat: p.tempat_lahir || "",
+        Lahir_Tgl: p.lahir_tgl_strip || "",
+        Lahir_Indo: p.tgl_lahir_indo || "",
+        Lahir_Ejaan: p.ejaan_lahir || "",
+        Umur: p.umur || 0,
+        Agama: p.agama || "",
+        Pekerjaan: p.pekerjaan || "",
+        Alamat: p.alamat || "",
+        Alamat_Lengkap: formatAlamat(p),
+        RT: p.rt || "",
+        RW: p.rw || "",
+        Des_Kel: p.wilayah_type || "",
+        Desa: p.desa || "",
+        Kec: p.kecamatan || "",
+        Kab_Kot: p.daerah_type || "",
+        Kota: p.kota_kabupaten || "",
+        Provinsi: p.provinsi || "",
+        Ktp_Masa_Berlaku: p.ktp_berlaku_indo || "",
+        Ktp_Masa_Ejaan: p.ejaan_berlaku || "",
+        jabatan_saksi: isKades ? land?.jenis_kades || 'Kepala Desa' : '',
+        desa_saksi: isKades ? land?.desa || '' : '',
+        nomorUrut: index + 1,
+      };
+    });
+
+    // ========================================
+    // GENERATE KETERANGAN PERSETUJUAN (Ket_Setuju)
+    // ========================================
+    
+    let Ket_Setuju = '';
+    switch (file.menurut_keterangan) {
+      case 'PERSETUJUAN':
+        Ket_Setuju = `dengan persetujuan ${file.keterangan_persetujuan || ''}nya, yaitu :`;
+        break;
+      case 'AKTA_KUASA':
+        Ket_Setuju = `berdasarkan Akta Kuasa Nomor ${file.nomor_akta_kuasa || ''} tanggal ${file.tanggal_akta_kuasa ? formatDateIndo(file.tanggal_akta_kuasa) : ''} (${file.ejaan_tanggal_akta || ''}) yang dibuat dihadapan ${file.nama_notaris_kuasa || ''}, Notaris di ${file.kedudukan_notaris || ''}`;
+        break;
+      case 'AHLI_WARIS':
+        Ket_Setuju = `sebagai Ahli Waris dari Almarhum ${file.nama_almarhum || ''} berdasarkan Register Waris Desa ${file.desa_waris || ''} Nomor ${file.register_waris_desa || ''} tanggal ${file.tanggal_waris ? formatDateIndo(file.tanggal_waris) : ''} (${file.ejaan_tanggal_waris || ''})`;
+        break;
+      case 'STANDAR':
+        Ket_Setuju = 'tanpa persetujuan dari pihak manapun';
+        break;
+      default:
+        Ket_Setuju = '';
+    }
 
     // ========================================
     // DATA UTAMA
@@ -560,6 +887,27 @@ export const TemplatesPage: React.FC = () => {
     });
 
     // ========================================
+    // PROSES RIWAYAT TANAH - 5 TEXTBOX STATIS
+    // ========================================
+    const riwayatList = land?.riwayat_tanah || [];
+    const riwayatTextboxes: Record<string, string> = {};
+
+    // Format untuk 5 textbox
+    for (let i = 0; i < 5; i++) {
+      if (i < riwayatList.length) {
+        const item = riwayatList[i];
+        // Format teks untuk textbox sesuai permintaan
+        riwayatTextboxes[`riwayat_textbox_${i + 1}`] = 
+          `${item.atas_nama || ''}\n` +
+          `C.${item.c_no || ''} / Persil ${item.persil_no || ''} / Klas ${item.klas || ''}\n` +
+          `Luas: ${item.luas || 0} m²\n` +
+          `${item.dasar_dialihkan || ''}`;
+      } else {
+        riwayatTextboxes[`riwayat_textbox_${i + 1}`] = ''; // kosong jika tidak ada data
+      }
+    }
+
+    // ========================================
     // TENTUKAN JENIS PEROLEHAN DAN FLAGS
     // ========================================
     const jenisPerolehan = (file.jenis_perolehan || '').toUpperCase();
@@ -583,6 +931,11 @@ export const TemplatesPage: React.FC = () => {
       identities,
       landData: land || undefined,
       relations,
+      
+      // Data tambahan untuk template
+      bulan,
+      tahun_terbilang: tahunTerbilang,
+      Ket_Setuju,
       
       // ========================================
       // DATA PEMOHON - string kosong jika tidak ada
@@ -617,6 +970,7 @@ export const TemplatesPage: React.FC = () => {
       tanah_kabupaten: land?.kabupaten_kota || 'Pasuruan',
       tanah_provinsi: 'Jawa Timur',
       tanah_tipe_wilayah: land?.tipe_wilayah || '',
+      penggunaan_tanah: land?.penggunaan_tanah || '',
       
       // ========================================
       // DATA TANAH - LETTER C
@@ -679,9 +1033,10 @@ export const TemplatesPage: React.FC = () => {
       ejaan_harga_transaksi: land?.ejaan_harga_transaksi || '',
       
       // ========================================
-      // RIWAYAT TANAH
+      // RIWAYAT TANAH - 5 TEXTBOX STATIS
       // ========================================
-      riwayat_tanah: land?.riwayat_tanah || [],
+      ...riwayatTextboxes,
+      _countRiwayat: riwayatList.length,
       
       // ========================================
       // BAK
@@ -714,11 +1069,11 @@ export const TemplatesPage: React.FC = () => {
       saksi_2_agama: saksiList[2]?.agama || '',
       
       // ========================================
-      // DATA AKTA (LOOP)
+      // DATA AKTA (LOOP) - DENGAN FORMAT LENGKAP
       // ========================================
       penjual: mapToArray(p1Raw),
       pembeli: mapToArray(p2Raw),
-      saksi_akta: mapToArray(saksiRaw),
+      saksi_akta: mapSaksi(saksiRaw),
       persetujuan: mapSetuju(setujuRaw),
       
       // ========================================
@@ -732,6 +1087,11 @@ export const TemplatesPage: React.FC = () => {
       Cakupan_Tanah: file.cakupan_tanah || '',
       Pihak_Penanggung: file.pihak_penanggung || '',
       Jumlah_Saksi: parseInt(file.jumlah_saksi || '0') || saksiRaw.length,
+      
+      // DATA BERKAS UNTUK SPORADIK
+      dikuasai_sejak_tahun: file.tahun_perolehan || '',
+      perolehan_dari: land?.atas_nama_letter_c || '',
+      sejak_tahun: land?.tahun_perolehan_alas_hak || '',
       
       // KHUSUS WARIS
       isWaris,
@@ -777,13 +1137,25 @@ export const TemplatesPage: React.FC = () => {
       isSuami: file.keterangan_persetujuan === "SUAMI",
       
       // ========================================
+      // INPUT MANUAL (akan diisi saat preview)
+      // ========================================
+      tetangga_utara_nama: '',
+      tetangga_utara_ttd: '',
+      tetangga_timur_nama: '',
+      tetangga_timur_ttd: '',
+      tetangga_selatan_nama: '',
+      tetangga_selatan_ttd: '',
+      tetangga_barat_nama: '',
+      tetangga_barat_ttd: '',
+      materai: '[MATERAI 10.000]',
+      
+      // ========================================
       // COUNTER
       // ========================================
       _countP1: p1Raw.length,
       _countP2: p2Raw.length,
       _countS: saksiRaw.length,
       _countSetuju: setujuRaw.length,
-      _countRiwayat: land?.riwayat_tanah?.length || 0,
       _countBak: bakList.length,
     };
   };
@@ -825,7 +1197,7 @@ export const TemplatesPage: React.FC = () => {
   const generateWordDocument = async (
     templateFile: File,
     data: TemplateData,
-    jenis: 'sporadik' | 'akta',
+    jenis: 'sporadik' | 'akta_notaris' | 'akta_ppat',
     options: GenerateOptions = {}
   ): Promise<GenerateResult> => {
     
@@ -836,15 +1208,39 @@ export const TemplatesPage: React.FC = () => {
       if (!data) throw new Error('Data tidak boleh kosong');
 
       console.log(`🚀 Generating ${jenis} document...`);
+      console.log('📊 Data Persetujuan untuk template:', data.persetujuan);
+      console.log('📊 Jumlah Persetujuan:', data._countSetuju);
 
       // Buat copy file
       const fileCopy = new File([templateFile], templateFile.name, { type: templateFile.type });
       const arrayBuffer = await fileCopy.arrayBuffer();
       const zip = new PizZip(arrayBuffer);
       
-      // Siapkan data final - untuk kedua jenis, kita kirim semua data yang ada
-      // Template word akan memilih sendiri menggunakan conditional
-      const finalData = { ...data };
+      // Siapkan data final
+      const finalData = { 
+        ...data,
+        // Tambahkan flags untuk jenis akta
+        isNotaris: jenis === 'akta_notaris',
+        isPPAT: jenis === 'akta_ppat',
+        jenisAkta: jenisAkta,
+      };
+
+      // Tambahkan flags spesifik untuk jenis akta
+      if (jenis === 'akta_notaris') {
+        finalData.isPPJB = jenisAkta === 'PPJB';
+        finalData.isKuasaMenjual = jenisAkta === 'KUASA_MENJUAL';
+        finalData.isHutangPiutang = jenisAkta === 'HUTANG_PIUTANG';
+        finalData.isPendirianPT = jenisAkta === 'PENDIRIAN_PT';
+        finalData.isWarisNotaris = jenisAkta === 'WARIS_NOTARIS';
+        finalData.isSewaMenyewa = jenisAkta === 'SEWA_MENYEWA';
+      } else if (jenis === 'akta_ppat') {
+        finalData.isAJB = jenisAkta === 'AJB';
+        finalData.isHibah = jenisAkta === 'HIBAH' || data.isHibah;
+        finalData.isTukarMenukar = jenisAkta === 'TUKAR_MENUKAR' || data.isTukarMenukar;
+        finalData.isPembagianHak = jenisAkta === 'PEMBAGIAN_HAK';
+        finalData.isAPHT = jenisAkta === 'APHT';
+        finalData.isInbreng = jenisAkta === 'INBRENG';
+      }
 
       // Tambahkan input manual tetangga batas untuk Sporadik
       if (jenis === 'sporadik') {
@@ -859,9 +1255,16 @@ export const TemplatesPage: React.FC = () => {
         finalData.materai = '[MATERAI 10.000]';
       }
 
+      // DEBUG: tampilkan data final
       if (debug) {
         console.log('📊 Final Data:', finalData);
       }
+      
+      console.log('=== DATA UNTUK TEMPLATE ===');
+      console.log('Penjual:', JSON.stringify(finalData.penjual, null, 2));
+      console.log('Pembeli:', JSON.stringify(finalData.pembeli, null, 2));
+      console.log('Persetujuan:', JSON.stringify(finalData.persetujuan, null, 2));
+      console.log('Saksi:', JSON.stringify(finalData.saksi_akta, null, 2));
 
       // Inisialisasi Docxtemplater
       const doc = new Docxtemplater(zip, {
@@ -884,7 +1287,11 @@ export const TemplatesPage: React.FC = () => {
         compressionOptions: { level: 9 }
       });
 
-      const prefix = jenis === 'sporadik' ? 'SPORADIK' : 'AKTA';
+      let prefix = 'DOKUMEN';
+      if (jenis === 'sporadik') prefix = 'SPORADIK';
+      else if (jenis === 'akta_notaris') prefix = `NOTARIS_${jenisAkta}`;
+      else if (jenis === 'akta_ppat') prefix = `PPAT_${jenisAkta}`;
+      
       const fileName = `${prefix}_${finalData.No_Berkas || 'GENERATED'}_${new Date().getTime()}.docx`;
 
       console.log(`✅ ${prefix} document generated:`, fileName);
@@ -931,7 +1338,7 @@ export const TemplatesPage: React.FC = () => {
       if (result.success && result.blob) {
         saveAs(result.blob, result.fileName);
         setShowFinalPreview(false);
-        alert(`✅ Dokumen ${jenisDokumen} berhasil digenerate!`);
+        alert(`✅ Dokumen berhasil digenerate!`);
       } else {
         alert(`❌ Gagal: ${result.error}`);
       }
@@ -943,7 +1350,7 @@ export const TemplatesPage: React.FC = () => {
   };
 
   // ========================================
-  // RENDER UI
+  // RENDER UI (KAMUS TAG)
   // ========================================
   
   return (
@@ -955,17 +1362,9 @@ export const TemplatesPage: React.FC = () => {
             GENERATOR DOKUMEN PERTANAHAN
           </h2>
           <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">
-            Etana Logic v2.5 • Sporadik | Akta (PPAT & Notaris)
+            Etana Logic v2.5 • Sporadik | Notaris | PPAT
           </p>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={() => {}} 
-          size="sm" 
-          className="rounded-xl border-2 font-black text-[10px] uppercase"
-        >
-          <FileSpreadsheet size={14} className="mr-2" /> Export Data
-        </Button>
       </div>
 
       {/* Main Grid */}
@@ -1028,38 +1427,62 @@ export const TemplatesPage: React.FC = () => {
         {/* Card Upload Template */}
         <Card title="UPLOAD TEMPLATE" className="shadow-xl border-t-4 border-t-blue-600 rounded-[32px]">
           <div className="space-y-4">
-            {/* Pilihan Jenis Dokumen - HANYA 2 PILIHAN */}
+            {/* Pilihan Jenis Dokumen - 3 PILIHAN */}
             <div className="mb-4">
               <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">
                 Pilih Jenis Dokumen
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-1">
                 <button
                   onClick={() => setJenisDokumen('sporadik')}
-                  className={`py-3 text-[10px] font-black uppercase rounded-xl transition-all ${
+                  className={`py-2 text-[9px] font-black uppercase rounded-xl transition-all ${
                     jenisDokumen === 'sporadik' 
                       ? 'bg-slate-900 text-white shadow-sm' 
                       : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
                   }`}
                 >
-                  <FileText size={14} className="mx-auto mb-1" />
                   SPORADIK
-                  <span className="block text-[8px] font-normal mt-1">(Letter C)</span>
                 </button>
                 <button
-                  onClick={() => setJenisDokumen('akta')}
-                  className={`py-3 text-[10px] font-black uppercase rounded-xl transition-all ${
-                    jenisDokumen === 'akta' 
-                      ? 'bg-slate-900 text-white shadow-sm' 
+                  onClick={() => setJenisDokumen('akta_notaris')}
+                  className={`py-2 text-[9px] font-black uppercase rounded-xl transition-all ${
+                    jenisDokumen === 'akta_notaris' 
+                      ? 'bg-blue-600 text-white shadow-sm' 
                       : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
                   }`}
                 >
-                  <ScrollText size={14} className="mx-auto mb-1" />
-                  AKTA
-                  <span className="block text-[8px] font-normal mt-1">(PPAT/Notaris)</span>
+                  NOTARIS
+                </button>
+                <button
+                  onClick={() => setJenisDokumen('akta_ppat')}
+                  className={`py-2 text-[9px] font-black uppercase rounded-xl transition-all ${
+                    jenisDokumen === 'akta_ppat' 
+                      ? 'bg-emerald-600 text-white shadow-sm' 
+                      : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                  }`}
+                >
+                  PPAT
                 </button>
               </div>
             </div>
+
+            {/* Pilihan Jenis Akta Spesifik (untuk Notaris/PPAT) */}
+            {(jenisDokumen === 'akta_notaris' || jenisDokumen === 'akta_ppat') && (
+              <div className="mb-4">
+                <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">
+                  Jenis Akta {jenisDokumen === 'akta_notaris' ? 'Notaris' : 'PPAT'}
+                </label>
+                <select
+                  value={jenisAkta}
+                  onChange={(e) => setJenisAkta(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-slate-900"
+                >
+                  {(jenisDokumen === 'akta_notaris' ? jenisAktaNotaris : jenisAktaPPAT).map(j => (
+                    <option key={j.value} value={j.value}>{j.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Upload Area */}
             <div className="p-6 border-2 border-dashed rounded-[24px] bg-slate-50 border-slate-200 relative group hover:border-blue-400 transition-all text-center">
@@ -1071,7 +1494,7 @@ export const TemplatesPage: React.FC = () => {
               />
               <Upload size={40} className="mx-auto text-slate-300 mb-3 group-hover:text-blue-500 transition-colors" />
               <p className="text-[10px] font-black text-slate-500 uppercase px-2 truncate">
-                {templateFile ? templateFile.name : `Upload Template ${jenisDokumen}.docx`}
+                {templateFile ? templateFile.name : `Upload Template .docx`}
               </p>
             </div>
             
@@ -1152,13 +1575,23 @@ export const TemplatesPage: React.FC = () => {
                 </button>
                 <button
                   className={`px-6 py-3 text-xs font-black uppercase rounded-xl transition-all ${
-                    jenisDokumen === 'akta' 
-                      ? 'bg-slate-900 text-white' 
+                    jenisDokumen === 'akta_notaris' 
+                      ? 'bg-blue-600 text-white' 
                       : 'bg-slate-100 text-slate-400'
                   }`}
-                  onClick={() => setJenisDokumen('akta')}
+                  onClick={() => setJenisDokumen('akta_notaris')}
                 >
-                  📜 AKTA
+                  📜 NOTARIS
+                </button>
+                <button
+                  className={`px-6 py-3 text-xs font-black uppercase rounded-xl transition-all ${
+                    jenisDokumen === 'akta_ppat' 
+                      ? 'bg-emerald-600 text-white' 
+                      : 'bg-slate-100 text-slate-400'
+                  }`}
+                  onClick={() => setJenisDokumen('akta_ppat')}
+                >
+                  📜 PPAT
                 </button>
               </div>
             </div>
@@ -1170,32 +1603,54 @@ export const TemplatesPage: React.FC = () => {
                 {/* KATEGORI: LOOP UNTUK AKTA */}
                 <TagCategory title="LOOP (AKTA)" icon={<Repeat size={16}/>} color="blue">
                   <TagRow tag="{#penjual}" val="Mulai loop penjual" desc="Loop untuk PIHAK_1" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="{_index}" val="Nomor urut" desc="Nomor urut dalam loop" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{nomorUrut}" val="Nomor urut" desc="Nomor urut dalam loop" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{Sebutan}" val={previewData.penjual?.[0]?.Sebutan} desc="Sebutan (Tuan/Nyonya)" onCopy={copyToClipboard} copied={copiedTag} />
                   <TagRow tag="{Nama}" val={previewData.penjual?.[0]?.Nama} desc="Nama" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{Nama_Alias}" val={previewData.penjual?.[0]?.Nama_Alias} desc="Nama Alias (jika ada)" onCopy={copyToClipboard} copied={copiedTag} />
                   <TagRow tag="{NIK}" val={previewData.penjual?.[0]?.NIK} desc="NIK" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{Lahir_Tempat}" val={previewData.penjual?.[0]?.Lahir_Tempat} desc="Tempat lahir" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{Lahir_Tgl}" val={previewData.penjual?.[0]?.Lahir_Tgl} desc="Tanggal lahir" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{Lahir_Ejaan}" val={previewData.penjual?.[0]?.Lahir_Ejaan} desc="Tanggal lahir terbilang" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{Pekerjaan}" val={previewData.penjual?.[0]?.Pekerjaan} desc="Pekerjaan" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{Alamat}" val={previewData.penjual?.[0]?.Alamat} desc="Alamat" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{RT}" val={previewData.penjual?.[0]?.RT} desc="RT" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{RW}" val={previewData.penjual?.[0]?.RW} desc="RW" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{Desa}" val={previewData.penjual?.[0]?.Desa} desc="Desa" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{Kec}" val={previewData.penjual?.[0]?.Kec} desc="Kecamatan" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{Kota}" val={previewData.penjual?.[0]?.Kota} desc="Kota/Kabupaten" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{Ktp_Masa_Berlaku}" val={previewData.penjual?.[0]?.Ktp_Masa_Berlaku} desc="Masa berlaku KTP" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{Ktp_Masa_Ejaan}" val={previewData.penjual?.[0]?.Ktp_Masa_Ejaan} desc="Masa berlaku terbilang" onCopy={copyToClipboard} copied={copiedTag} />
                   <TagRow tag="{/penjual}" val="Akhir loop penjual" desc="Penutup loop" onCopy={copyToClipboard} copied={copiedTag} />
                   
                   <TagRow tag="{#pembeli}" val="Mulai loop pembeli" desc="Loop untuk PIHAK_2" onCopy={copyToClipboard} copied={copiedTag} />
                   <TagRow tag="{/pembeli}" val="Akhir loop pembeli" desc="Penutup loop" onCopy={copyToClipboard} copied={copiedTag} />
-                  
-                  <TagRow tag="{#saksi_akta}" val="Mulai loop saksi" desc="Loop untuk saksi" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="{/saksi_akta}" val="Akhir loop saksi" desc="Penutup loop" onCopy={copyToClipboard} copied={copiedTag} />
-                  
-                  <TagRow tag="{#riwayat_tanah}" val="Mulai loop riwayat" desc="Loop riwayat tanah" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="{/riwayat_tanah}" val="Akhir loop riwayat" desc="Penutup loop" onCopy={copyToClipboard} copied={copiedTag} />
                 </TagCategory>
 
-                {/* KATEGORI: CONDITIONAL FLAGS */}
-                <TagCategory title="KONDISI" icon={<ShieldCheck size={16}/>} color="yellow">
-                  <TagRow tag="isJualBeli" val={String(previewData.isJualBeli)} desc="Boolean: true jika Jual Beli" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="isWaris" val={String(previewData.isWarisFlag)} desc="Boolean: true jika Waris" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="isHibah" val={String(previewData.isHibah)} desc="Boolean: true jika Hibah" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="isLetterC" val={String(previewData.isLetterC)} desc="Boolean: true jika Letter C" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="isSHM" val={String(previewData.isSHM)} desc="Boolean: true jika SHM" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="isSHMElektronik" val={String(previewData.isSHMElektronik)} desc="Boolean: true jika SHM Elektronik" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="isPersetujuan" val={String(previewData.isPersetujuan)} desc="Boolean: ada persetujuan" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="isIstri" val={String(previewData.isIstri)} desc="Boolean: persetujuan istri" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="isSuami" val={String(previewData.isSuami)} desc="Boolean: persetujuan suami" onCopy={copyToClipboard} copied={copiedTag} />
+                {/* KATEGORI: LOOP PERSETUJUAN */}
+                <TagCategory title="LOOP PERSETUJUAN" icon={<Users size={16}/>} color="pink">
+                  <TagRow tag="{#persetujuan}" val="Mulai loop persetujuan" desc="Loop untuk pihak yang menyetujui" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{Hubungan}" val={previewData.persetujuan?.[0]?.Hubungan} desc="Hubungan (ISTRI/ANAK/dll)" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{#isIstri}" val="Kondisional untuk istri" desc="Teks untuk istri" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{#isSuami}" val="Kondisional untuk suami" desc="Teks untuk suami" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{#isAnak}" val="Kondisional untuk anak" desc="Teks untuk anak" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{#isSaudara}" val="Kondisional untuk saudara" desc="Teks untuk saudara" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{#isLainnya}" val="Kondisional untuk lainnya" desc="Teks untuk lainnya" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{/persetujuan}" val="Akhir loop persetujuan" desc="Penutup loop" onCopy={copyToClipboard} copied={copiedTag} />
+                </TagCategory>
+
+                {/* KATEGORI: LOOP SAKSI */}
+                <TagCategory title="LOOP SAKSI" icon={<Users size={16}/>} color="purple">
+                  <TagRow tag="{#saksi_akta}" val="Mulai loop saksi" desc="Loop untuk saksi" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{jabatan_saksi}" val={previewData.saksi_akta?.[0]?.jabatan_saksi} desc="Jabatan (jika kepala desa)" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{desa_saksi}" val={previewData.saksi_akta?.[0]?.desa_saksi} desc="Desa (jika kepala desa)" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="{/saksi_akta}" val="Akhir loop saksi" desc="Penutup loop" onCopy={copyToClipboard} copied={copiedTag} />
+                </TagCategory>
+
+                {/* KATEGORI: DATA UMUM TEMPLATE */}
+                <TagCategory title="DATA UMUM" icon={<FileText size={16}/>} color="gray">
+                  <TagRow tag="bulan" val={previewData.bulan} desc="Nama bulan" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tahun_terbilang" val={previewData.tahun_terbilang} desc="Tahun terbilang" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="Ket_Setuju" val={previewData.Ket_Setuju} desc="Keterangan persetujuan" onCopy={copyToClipboard} copied={copiedTag} />
                 </TagCategory>
 
                 {/* KATEGORI: DATA TANAH - LETTER C */}
@@ -1204,25 +1659,6 @@ export const TemplatesPage: React.FC = () => {
                   <TagRow tag="persil" val={previewData.persil} desc="Nomor Persil" onCopy={copyToClipboard} copied={copiedTag} />
                   <TagRow tag="klas" val={previewData.klas} desc="Klasifikasi Tanah" onCopy={copyToClipboard} copied={copiedTag} />
                   <TagRow tag="atas_nama_c" val={previewData.atas_nama_c} desc="Atas Nama di Letter C" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="berasal_dari" val={previewData.berasal_dari} desc="Berasal dari (asal-usul)" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="tahun_perolehan_alas_hak" val={previewData.tahun_perolehan_alas_hak} desc="Tahun perolehan alas hak" onCopy={copyToClipboard} copied={copiedTag} />
-                </TagCategory>
-
-                {/* KATEGORI: DATA TANAH - SHM ANALOG */}
-                <TagCategory title="SHM ANALOG" icon={<BookOpen size={16}/>} color="green">
-                  <TagRow tag="no_shm" val={previewData.no_shm} desc="Nomor SHM" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="atas_nama_shm" val={previewData.atas_nama_shm} desc="Atas Nama di SHM" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="nib" val={previewData.nib} desc="NIB (Nomor Identifikasi Bidang)" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="no_su" val={previewData.no_su} desc="Nomor SU (Surat Ukur)" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="tanggal_su" val={previewData.tanggal_su} desc="Tanggal SU" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="tanggal_shm" val={previewData.tanggal_shm} desc="Tanggal SHM" onCopy={copyToClipboard} copied={copiedTag} />
-                </TagCategory>
-
-                {/* KATEGORI: DATA TANAH - SHM ELEKTRONIK */}
-                <TagCategory title="SHM ELEKTRONIK" icon={<FileText size={16}/>} color="cyan">
-                  <TagRow tag="atas_nama_shm_el" val={previewData.atas_nama_shm_el} desc="Atas Nama SHM Elektronik" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="kode_sertifikat" val={previewData.kode_sertifikat} desc="Kode Sertifikat Elektronik" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="nibel" val={previewData.nibel} desc="NIBEL (Nomor Identifikasi Elektronik)" onCopy={copyToClipboard} copied={copiedTag} />
                 </TagCategory>
 
                 {/* KATEGORI: BATAS & LUAS TANAH */}
@@ -1233,51 +1669,6 @@ export const TemplatesPage: React.FC = () => {
                   <TagRow tag="batas_barat" val={previewData.batas_barat} desc="Batas Barat" onCopy={copyToClipboard} copied={copiedTag} />
                   <TagRow tag="luas_seluruhnya" val={previewData.luas_seluruhnya} desc="Luas tanah seluruhnya (m²)" onCopy={copyToClipboard} copied={copiedTag} />
                   <TagRow tag="ejaan_luas_seluruhnya" val={previewData.ejaan_luas_seluruhnya} desc="Luas (terbilang)" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="luas_dimohon" val={previewData.luas_dimohon} desc="Luas dimohon (m²)" onCopy={copyToClipboard} copied={copiedTag} />
-                </TagCategory>
-
-                {/* KATEGORI: NOP & PAJAK */}
-                <TagCategory title="NOP & PAJAK" icon={<FileSpreadsheet size={16}/>} color="lime">
-                  <TagRow tag="nop" val={previewData.nop} desc="NOP (Nomor Objek Pajak)" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="sppt_tahun" val={previewData.sppt_tahun} desc="Tahun SPPT" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="pajak_grand_total" val={previewData.pajak_grand_total} desc="Total Pajak" onCopy={copyToClipboard} copied={copiedTag} />
-                </TagCategory>
-
-                {/* KATEGORI: DATA PEMOHON */}
-                <TagCategory title="PEMOHON" icon={<UserCheck size={16}/>} color="emerald">
-                  <TagRow tag="pemohon_nama" val={previewData.pemohon_nama} desc="Nama pemohon" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="pemohon_nik" val={previewData.pemohon_nik} desc="NIK pemohon" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="pemohon_umur" val={previewData.pemohon_umur} desc="Umur pemohon" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="pemohon_pekerjaan" val={previewData.pemohon_pekerjaan} desc="Pekerjaan pemohon" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="pemohon_alamat" val={previewData.pemohon_alamat} desc="Alamat pemohon" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="pemohon_tempat_lahir" val={previewData.pemohon_tempat_lahir} desc="Tempat lahir" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="pemohon_tanggal_lahir" val={previewData.pemohon_tanggal_lahir} desc="Tanggal lahir" onCopy={copyToClipboard} copied={copiedTag} />
-                </TagCategory>
-
-                {/* KATEGORI: LOKASI TANAH */}
-                <TagCategory title="LOKASI TANAH" icon={<MapPin size={16}/>} color="blue">
-                  <TagRow tag="tanah_alamat" val={previewData.tanah_alamat} desc="Alamat tanah" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="tanah_desa" val={previewData.tanah_desa} desc="Desa/Kelurahan" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="tanah_kecamatan" val={previewData.tanah_kecamatan} desc="Kecamatan" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="tanah_kabupaten" val={previewData.tanah_kabupaten} desc="Kabupaten/Kota" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="tanah_rt" val={previewData.tanah_rt} desc="RT" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="tanah_rw" val={previewData.tanah_rw} desc="RW" onCopy={copyToClipboard} copied={copiedTag} />
-                </TagCategory>
-
-                {/* KATEGORI: SAKSI (SPORADIK) */}
-                <TagCategory title="SAKSI (SPORADIK)" icon={<Users size={16}/>} color="pink">
-                  <TagRow tag="saksi_0_nama" val={previewData.saksi_0_nama} desc="Nama saksi 1" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="saksi_1_nama" val={previewData.saksi_1_nama} desc="Nama saksi 2" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="saksi_2_nama" val={previewData.saksi_2_nama} desc="Nama saksi 3" onCopy={copyToClipboard} copied={copiedTag} />
-                </TagCategory>
-
-                {/* KATEGORI: BAK (ARRAY OF STRINGS) */}
-                <TagCategory title="BAK" icon={<FileText size={16}/>} color="amber">
-                  <TagRow tag="bak_0" val={previewData.bak_0} desc="Baris pertama BAK" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="bak_1" val={previewData.bak_1} desc="Baris kedua BAK" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="bak_2" val={previewData.bak_2} desc="Baris ketiga BAK" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="bak_3" val={previewData.bak_3} desc="Baris keempat BAK" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="_countBak" val={previewData._countBak} desc="Jumlah baris BAK" onCopy={copyToClipboard} copied={copiedTag} />
                 </TagCategory>
 
                 {/* KATEGORI: ADMINISTRASI */}
@@ -1286,12 +1677,14 @@ export const TemplatesPage: React.FC = () => {
                   <TagRow tag="No_Reg" val={previewData.No_Reg} desc="Nomor Register" onCopy={copyToClipboard} copied={copiedTag} />
                   <TagRow tag="Hari" val={previewData.Hari} desc="Hari" onCopy={copyToClipboard} copied={copiedTag} />
                   <TagRow tag="Tgl_Surat" val={previewData.Tgl_Surat} desc="Tanggal Surat" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="Tgl_Ejaan" val={previewData.Tgl_Ejaan} desc="Tanggal (terbilang)" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="kepala_desa" val={previewData.kepala_desa} desc="Nama Kepala Desa" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="Tgl_Ejaan" val={previewData.Tgl_Ejaan} desc="Tanggal terbilang" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="Pihak_Penanggung" val={previewData.Pihak_Penanggung} desc="Pihak penanggung biaya" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="Jumlah_Saksi" val={previewData.Jumlah_Saksi} desc="Jumlah saksi" onCopy={copyToClipboard} copied={copiedTag} />
                 </TagCategory>
 
                 {/* KATEGORI: KHUSUS WARIS */}
                 <TagCategory title="WARIS" icon={<History size={16}/>} color="red">
+                  <TagRow tag="isWaris" val={String(previewData.isWaris)} desc="Flag waris" onCopy={copyToClipboard} copied={copiedTag} />
                   <TagRow tag="nama_almarhum" val={previewData.nama_almarhum} desc="Nama almarhum" onCopy={copyToClipboard} copied={copiedTag} />
                   <TagRow tag="desa_waris" val={previewData.desa_waris} desc="Desa waris" onCopy={copyToClipboard} copied={copiedTag} />
                   <TagRow tag="register_waris_desa" val={previewData.register_waris_desa} desc="Register waris desa" onCopy={copyToClipboard} copied={copiedTag} />
@@ -1301,24 +1694,63 @@ export const TemplatesPage: React.FC = () => {
                 {/* KATEGORI: KHUSUS AKTA KUASA */}
                 <TagCategory title="AKTA KUASA" icon={<FileSignature size={16}/>} color="indigo">
                   <TagRow tag="nomor_akta_kuasa" val={previewData.nomor_akta_kuasa} desc="Nomor akta kuasa" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tanggal_akta_kuasa" val={previewData.tanggal_akta_kuasa} desc="Tanggal akta kuasa" onCopy={copyToClipboard} copied={copiedTag} />
                   <TagRow tag="nama_notaris_kuasa" val={previewData.nama_notaris_kuasa} desc="Nama notaris" onCopy={copyToClipboard} copied={copiedTag} />
                   <TagRow tag="kedudukan_notaris" val={previewData.kedudukan_notaris} desc="Kedudukan notaris" onCopy={copyToClipboard} copied={copiedTag} />
                 </TagCategory>
 
-                {/* KATEGORI: TETANGGA BATAS (INPUT MANUAL) */}
-                <TagCategory title="TETANGGA BATAS" icon={<Users size={16}/>} color="yellow">
-                  <TagRow tag="tetangga_utara_nama" val="[Input Manual]" desc="Nama tetangga utara" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="tetangga_utara_ttd" val="[Input Manual]" desc="Tanda tangan tetangga utara" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="tetangga_timur_nama" val="[Input Manual]" desc="Nama tetangga timur" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="tetangga_timur_ttd" val="[Input Manual]" desc="Tanda tangan tetangga timur" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="tetangga_selatan_nama" val="[Input Manual]" desc="Nama tetangga selatan" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="tetangga_selatan_ttd" val="[Input Manual]" desc="Tanda tangan tetangga selatan" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="tetangga_barat_nama" val="[Input Manual]" desc="Nama tetangga barat" onCopy={copyToClipboard} copied={copiedTag} />
-                  <TagRow tag="tetangga_barat_ttd" val="[Input Manual]" desc="Tanda tangan tetangga barat" onCopy={copyToClipboard} copied={copiedTag} />
+                {/* KATEGORI: FLAGS KONDISI */}
+                <TagCategory title="FLAGS KONDISI" icon={<ShieldCheck size={16}/>} color="yellow">
+                  <TagRow tag="isJualBeli" val={String(previewData.isJualBeli)} desc="Jual Beli" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="isHibah" val={String(previewData.isHibah)} desc="Hibah" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="isWarisFlag" val={String(previewData.isWarisFlag)} desc="Waris" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="isTukarMenukar" val={String(previewData.isTukarMenukar)} desc="Tukar Menukar" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="isLetterC" val={String(previewData.isLetterC)} desc="Letter C" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="isSHM" val={String(previewData.isSHM)} desc="SHM" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="isSHMElektronik" val={String(previewData.isSHMElektronik)} desc="SHM Elektronik" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="isPersetujuan" val={String(previewData.isPersetujuan)} desc="Ada persetujuan" onCopy={copyToClipboard} copied={copiedTag} />
                 </TagCategory>
 
-                {/* KATEGORI: UMUM */}
-                <TagCategory title="UMUM" icon={<FileText size={16}/>} color="slate">
+                {/* KATEGORI: RIWAYAT TANAH */}
+                <TagCategory title="RIWAYAT TANAH" icon={<History size={16}/>} color="orange">
+                  <TagRow tag="riwayat_textbox_1" val={previewData.riwayat_textbox_1} desc="Riwayat 1" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="riwayat_textbox_2" val={previewData.riwayat_textbox_2} desc="Riwayat 2" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="riwayat_textbox_3" val={previewData.riwayat_textbox_3} desc="Riwayat 3" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="riwayat_textbox_4" val={previewData.riwayat_textbox_4} desc="Riwayat 4" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="riwayat_textbox_5" val={previewData.riwayat_textbox_5} desc="Riwayat 5" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="_countRiwayat" val={previewData._countRiwayat} desc="Jumlah riwayat" onCopy={copyToClipboard} copied={copiedTag} />
+                </TagCategory>
+
+                {/* KATEGORI: BAK */}
+                <TagCategory title="BAK" icon={<FileText size={16}/>} color="amber">
+                  <TagRow tag="bak_0" val={previewData.bak_0} desc="Baris 1 BAK" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="bak_1" val={previewData.bak_1} desc="Baris 2 BAK" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="bak_2" val={previewData.bak_2} desc="Baris 3 BAK" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="_countBak" val={previewData._countBak} desc="Jumlah BAK" onCopy={copyToClipboard} copied={copiedTag} />
+                </TagCategory>
+
+                {/* KATEGORI: SPORADIK */}
+                <TagCategory title="SPORADIK" icon={<MapPin size={16}/>} color="emerald">
+                  <TagRow tag="pemohon_nama" val={previewData.pemohon_nama} desc="Nama pemohon" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="pemohon_nik" val={previewData.pemohon_nik} desc="NIK pemohon" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="pemohon_umur" val={previewData.pemohon_umur} desc="Umur pemohon" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="pemohon_pekerjaan" val={previewData.pemohon_pekerjaan} desc="Pekerjaan pemohon" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="pemohon_alamat" val={previewData.pemohon_alamat} desc="Alamat pemohon" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="saksi_0_nama" val={previewData.saksi_0_nama} desc="Nama saksi 1" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="saksi_1_nama" val={previewData.saksi_1_nama} desc="Nama saksi 2" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="saksi_2_nama" val={previewData.saksi_2_nama} desc="Nama saksi 3" onCopy={copyToClipboard} copied={copiedTag} />
+                </TagCategory>
+
+                {/* KATEGORI: INPUT MANUAL */}
+                <TagCategory title="INPUT MANUAL" icon={<FileText size={16}/>} color="slate">
+                  <TagRow tag="tetangga_utara_nama" val="[Input]" desc="Nama tetangga utara" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tetangga_utara_ttd" val="[Input]" desc="TTD tetangga utara" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tetangga_timur_nama" val="[Input]" desc="Nama tetangga timur" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tetangga_timur_ttd" val="[Input]" desc="TTD tetangga timur" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tetangga_selatan_nama" val="[Input]" desc="Nama tetangga selatan" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tetangga_selatan_ttd" val="[Input]" desc="TTD tetangga selatan" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tetangga_barat_nama" val="[Input]" desc="Nama tetangga barat" onCopy={copyToClipboard} copied={copiedTag} />
+                  <TagRow tag="tetangga_barat_ttd" val="[Input]" desc="TTD tetangga barat" onCopy={copyToClipboard} copied={copiedTag} />
                   <TagRow tag="materai" val="[MATERAI 10.000]" desc="Tempat materai" onCopy={copyToClipboard} copied={copiedTag} />
                 </TagCategory>
               </div>
@@ -1342,7 +1774,11 @@ export const TemplatesPage: React.FC = () => {
               </div>
               <div>
                 <h2 className="text-sm font-black uppercase tracking-tighter text-slate-900">
-                  PREVIEW {jenisDokumen === 'sporadik' ? 'SPORADIK' : 'AKTA'}
+                  PREVIEW {
+                    jenisDokumen === 'sporadik' ? 'SPORADIK' : 
+                    jenisDokumen === 'akta_notaris' ? `NOTARIS - ${jenisAkta}` : 
+                    `PPAT - ${jenisAkta}`
+                  }
                 </h2>
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
                   Berkas: {previewData.No_Berkas || ''}
@@ -1383,11 +1819,8 @@ export const TemplatesPage: React.FC = () => {
                   {/* Utara */}
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
                     <label className="text-[10px] font-black text-slate-400 uppercase block mb-3">
-                      SEBELAH UTARA
+                      SEBELAH UTARA ({previewData.batas_utara || 'Batas Utara'})
                     </label>
-                    <p className="text-sm font-bold text-slate-900 mb-3">
-                      {previewData.batas_utara || ''}
-                    </p>
                     <input
                       type="text"
                       placeholder="Nama (sesuai KTP)"
@@ -1413,11 +1846,8 @@ export const TemplatesPage: React.FC = () => {
                   {/* Timur */}
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
                     <label className="text-[10px] font-black text-slate-400 uppercase block mb-3">
-                      SEBELAH TIMUR
+                      SEBELAH TIMUR ({previewData.batas_timur || 'Batas Timur'})
                     </label>
-                    <p className="text-sm font-bold text-slate-900 mb-3">
-                      {previewData.batas_timur || ''}
-                    </p>
                     <input
                       type="text"
                       placeholder="Nama (sesuai KTP)"
@@ -1443,11 +1873,8 @@ export const TemplatesPage: React.FC = () => {
                   {/* Selatan */}
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
                     <label className="text-[10px] font-black text-slate-400 uppercase block mb-3">
-                      SEBELAH SELATAN
+                      SEBELAH SELATAN ({previewData.batas_selatan || 'Batas Selatan'})
                     </label>
-                    <p className="text-sm font-bold text-slate-900 mb-3">
-                      {previewData.batas_selatan || ''}
-                    </p>
                     <input
                       type="text"
                       placeholder="Nama (sesuai KTP)"
@@ -1473,11 +1900,8 @@ export const TemplatesPage: React.FC = () => {
                   {/* Barat */}
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
                     <label className="text-[10px] font-black text-slate-400 uppercase block mb-3">
-                      SEBELAH BARAT
+                      SEBELAH BARAT ({previewData.batas_barat || 'Batas Barat'})
                     </label>
-                    <p className="text-sm font-bold text-slate-900 mb-3">
-                      {previewData.batas_barat || ''}
-                    </p>
                     <input
                       type="text"
                       placeholder="Nama (sesuai KTP)"
@@ -1516,21 +1940,62 @@ export const TemplatesPage: React.FC = () => {
 
                 {/* Preview sederhana */}
                 <div className="space-y-4">
-                  <p><span className="font-bold">Jenis Dokumen:</span> {jenisDokumen === 'sporadik' ? 'Sporadik' : 'Akta'}</p>
+                  <p><span className="font-bold">Jenis Dokumen:</span> {
+                    jenisDokumen === 'sporadik' ? 'Sporadik (Letter C)' : 
+                    jenisDokumen === 'akta_notaris' ? `Notaris - ${jenisAkta}` : 
+                    `PPAT - ${jenisAkta}`
+                  }</p>
                   <p><span className="font-bold">Jenis Perolehan:</span> {
                     previewData.isJualBeli ? 'Jual Beli' : 
                     previewData.isWarisFlag ? 'Waris' : 
-                    previewData.isHibah ? 'Hibah' : ''
+                    previewData.isHibah ? 'Hibah' : 
+                    previewData.isTukarMenukar ? 'Tukar Menukar' : '-'
                   }</p>
                   <p><span className="font-bold">Jenis Tanah:</span> {
                     previewData.isLetterC ? 'Letter C' : 
-                    previewData.isSHM ? 'SHM' : 
-                    previewData.isSHMElektronik ? 'SHM Elektronik' : ''
+                    previewData.isSHM ? 'SHM Analog' : 
+                    previewData.isSHMElektronik ? 'SHM Elektronik' : '-'
                   }</p>
-                  <p><span className="font-bold">Pemohon/Penjual:</span> {previewData.pemohon_nama || (previewData.penjual?.[0]?.Nama) || ''}</p>
-                  <p><span className="font-bold">Lokasi Tanah:</span> {previewData.tanah_desa}, {previewData.tanah_kecamatan}</p>
-                  <p><span className="font-bold">Luas:</span> {previewData.luas_seluruhnya} m²</p>
-                  <p><span className="font-bold">Nomor C/SHM:</span> {previewData.nomor_c || previewData.no_shm || ''}</p>
+                  <p><span className="font-bold">Jumlah Pihak 1:</span> {previewData._countP1 || 0}</p>
+                  <p><span className="font-bold">Jumlah Pihak 2:</span> {previewData._countP2 || 0}</p>
+                  <p><span className="font-bold">Jumlah Persetujuan:</span> {previewData._countSetuju || 0}</p>
+                  <p><span className="font-bold">Jumlah Saksi:</span> {previewData._countS || 0}</p>
+                  <p><span className="font-bold">Lokasi Tanah:</span> {previewData.tanah_desa ? `${previewData.tanah_desa}, ${previewData.tanah_kecamatan}` : '-'}</p>
+                  <p><span className="font-bold">Luas:</span> {previewData.luas_seluruhnya ? `${previewData.luas_seluruhnya} m²` : '-'}</p>
+                  <p><span className="font-bold">Nomor C/SHM:</span> {previewData.nomor_c || previewData.no_shm || '-'}</p>
+                  <p><span className="font-bold">Harga Transaksi:</span> Rp {previewData.harga_transaksi || '0'}</p>
+                  
+                  {/* Preview Data Loop */}
+                  {previewData._countP1 && previewData._countP1 > 0 && (
+                    <div className="mt-4">
+                      <p className="font-bold">Penjual:</p>
+                      <ul className="list-disc pl-5 text-xs">
+                        {previewData.penjual?.map((p, i) => (
+                          <li key={i}>{p.Nama} ({p.NIK}) - {p.Alamat}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {previewData._countSetuju && previewData._countSetuju > 0 && (
+                    <div className="mt-2">
+                      <p className="font-bold">Persetujuan:</p>
+                      <ul className="list-disc pl-5 text-xs">
+                        {previewData.persetujuan?.map((p, i) => (
+                          <li key={i}>{p.Nama} ({p.Hubungan})</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {previewData._countRiwayat && previewData._countRiwayat > 0 && (
+                    <div className="mt-2">
+                      <p className="font-bold">Riwayat Tanah:</p>
+                      <ul className="list-disc pl-5 text-xs">
+                        {previewData.riwayat_textbox_1 && <li>Riwayat 1: {previewData.riwayat_textbox_1?.substring(0, 50)}...</li>}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1615,9 +2080,9 @@ const TagRow: React.FC<TagRowProps> = ({ tag, val, desc, onCopy, copied }) => {
           {copied === fullTag ? <ClipboardCheck size={14}/> : <Copy size={14}/>}
         </button>
       </div>
-      {val && val !== 0 && (
+      {val && val !== 0 && val !== '' && (
         <div className="text-[9px] font-bold text-slate-400 truncate mt-1 px-1 italic">
-          Contoh: {String(val)}
+          Contoh: {String(val).substring(0, 50)}{String(val).length > 50 ? '...' : ''}
         </div>
       )}
     </div>
