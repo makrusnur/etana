@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import { 
   Plus, MapPin, User, FolderPlus, Loader2, X, Trash2, Search, Layers, Edit3, Camera, ImageIcon, 
-  Ban, ChevronLeft, ChevronRight, AlertCircle
+  Ban, ChevronLeft, ChevronRight, AlertCircle, Menu, ChevronDown, Printer
 } from 'lucide-react';
 import { supabase } from '../../services/db'; 
 import { processLetterC } from '../../services/ocr';
 import { Kecamatan, Desa, LetterC, LetterCPersil } from '../../types';
 import ReactCrop, { Crop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
+import { saveAs } from 'file-saver';
+import PizZip from 'pizzip';
+import Docxtemplater from 'docxtemplater';
 
 interface FormTambahCProps {
   selectedDesaId: string;
@@ -32,6 +35,8 @@ export const DataLetterC = () => {
   const [currentKohirIndex, setCurrentKohirIndex] = useState<number>(-1);
   const [searchTerm, setSearchTerm] = useState('');
   const [kohirSearch, setKohirSearch] = useState('');
+  const [showDesaModal, setShowDesaModal] = useState(false);
+  const [printLoading, setPrintLoading] = useState<string | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -83,22 +88,250 @@ export const DataLetterC = () => {
     }
   };
 
-  const filteredKecamatans = kecamatans.map(kec => ({
-    ...kec,
-    desas: desas.filter(d => 
-      d.kecamatan_id === kec.id && d.nama.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  }));
+  // Fungsi untuk mencetak kutipan Letter C
+  const handlePrintKutipan = async (kohir: LetterC) => {
+    try {
+      setPrintLoading(kohir.id);
+      
+      // Ambil data desa dan kecamatan
+      const desa = desas.find(d => d.id === selectedDesaId);
+      const kecamatan = kecamatans.find(k => k.id === desa?.kecamatan_id);
+      
+      if (!desa || !kecamatan) {
+        alert("Data desa tidak ditemukan");
+        return;
+      }
+
+      // Ambil data persil untuk kohir ini
+      const { data: persils } = await supabase
+        .from('letter_c_persil')
+        .select('*')
+        .eq('letter_c_id', kohir.id)
+        .order('nomor_persil');
+
+      // Kelompokkan persil berdasarkan jenis tanah
+      const persilSawah = persils?.filter(p => p.jenis_tanah === 'Sawah') || [];
+      const persilKering = persils?.filter(p => p.jenis_tanah === 'Tanah Kering') || [];
+
+      // Siapkan data untuk template (placeholder pendek)
+      const dataForTemplate: Record<string, any> = {
+        desa: desa.nama.toUpperCase(),
+        kec: kecamatan.nama.toUpperCase(),
+        nama: kohir.nama_pemilik.toUpperCase(),
+        no_c: kohir.nomor_c,
+        alamat: kohir.alamat_pemilik || '-',
+        tempat: 'Jepara',
+        tgl: new Date().toLocaleDateString('id-ID', { 
+          day: 'numeric', 
+          month: 'long', 
+          year: 'numeric' 
+        }),
+        petinggi: 'ABDUL BASIR, S.Kom.I' // Bisa diambil dari data desa nanti
+      };
+
+      // Data persil SAWAH (kiri) - maksimal 10 baris
+      for (let i = 0; i < 10; i++) {
+        const idx = i + 1;
+        if (i < persilSawah.length) {
+          const p = persilSawah[i];
+          dataForTemplate[`ps${idx}`] = p.nomor_persil || '';
+          dataForTemplate[`ks${idx}`] = p.klas_desa || '';
+          dataForTemplate[`ls${idx}`] = p.luas_meter || 0;
+          dataForTemplate[`ket${idx}`] = p.asal_usul || '';
+        } else {
+          dataForTemplate[`ps${idx}`] = '';
+          dataForTemplate[`ks${idx}`] = '';
+          dataForTemplate[`ls${idx}`] = '';
+          dataForTemplate[`ket${idx}`] = '';
+        }
+      }
+
+      // Data persil TANAH KERING (kanan) - maksimal 10 baris
+      for (let i = 0; i < 10; i++) {
+        const idx = i + 1;
+        if (i < persilKering.length) {
+          const p = persilKering[i];
+          dataForTemplate[`pk${idx}`] = p.nomor_persil || '';
+          dataForTemplate[`kk${idx}`] = p.klas_desa || '';
+          dataForTemplate[`lk${idx}`] = p.luas_meter || 0;
+          dataForTemplate[`ketk${idx}`] = p.asal_usul || '';
+        } else {
+          dataForTemplate[`pk${idx}`] = '';
+          dataForTemplate[`kk${idx}`] = '';
+          dataForTemplate[`lk${idx}`] = '';
+          dataForTemplate[`ketk${idx}`] = '';
+        }
+      }
+
+      // Generate Word document
+      await generateKutipanWord(dataForTemplate);
+      
+    } catch (error) {
+      console.error('Error printing:', error);
+      alert('Gagal mencetak dokumen');
+    } finally {
+      setPrintLoading(null);
+    }
+  };
+
+  // Fungsi untuk generate Word document
+  const generateKutipanWord = async (data: any) => {
+    try {
+      // Load template file dari public folder
+      const response = await fetch('../../public/templates/kutipan-letter-c.docx');
+      if (!response.ok) {
+        throw new Error('Template file tidak ditemukan');
+      }
+      
+      const templateBlob = await response.blob();
+      const arrayBuffer = await templateBlob.arrayBuffer();
+      
+      // Inisialisasi PizZip dan Docxtemplater
+      const zip = new PizZip(arrayBuffer);
+      const doc = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true,
+        delimiters: { start: '{', end: '}' },
+        nullGetter: () => ''
+      });
+
+      // Render data
+      doc.render(data);
+
+      // Generate blob
+      const generatedBlob = doc.getZip().generate({
+        type: 'blob',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 9 }
+      });
+
+      // Download file
+      const fileName = `KUTIPAN_C_${data.no_c}_${new Date().getTime()}.docx`;
+      saveAs(generatedBlob, fileName);
+
+    } catch (error) {
+      console.error('Error generating document:', error);
+      throw error;
+    }
+  };
+
+  // Filter kecamatan yang memiliki desa sesuai search
+  const filteredKecamatans = kecamatans
+    .map(kec => ({
+      ...kec,
+      desas: desas.filter(d => 
+        d.kecamatan_id === kec.id && 
+        d.nama.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    }))
+    .filter(kec => kec.desas.length > 0);
 
   const filteredKohirList = kohirList.filter(k => 
     k.nomor_c.toLowerCase().includes(kohirSearch.toLowerCase()) ||
     k.nama_pemilik.toLowerCase().includes(kohirSearch.toLowerCase())
   );
 
+  const selectedDesa = desas.find(d => d.id === selectedDesaId);
+  const selectedKecamatan = kecamatans.find(k => k.id === selectedDesa?.kecamatan_id);
+
   return (
     <div className="flex flex-col lg:flex-row h-screen lg:h-[calc(100vh-140px)] gap-4 lg:gap-8 p-2 lg:p-4 bg-[#F8F9FA] text-zinc-900 overflow-hidden font-sans">
-      {/* SIDEBAR */}
-      <div className="w-full lg:w-80 flex flex-col shrink-0">
+      
+      {/* MOBILE HEADER */}
+      <div className="lg:hidden flex items-center justify-between p-3 bg-white border-b border-zinc-200 mb-2 rounded-xl shadow-sm w-full">
+        <button
+          onClick={() => setShowDesaModal(true)}
+          className="p-2 hover:bg-zinc-100 rounded-lg"
+        >
+          <Menu size={24} />
+        </button>
+        <div className="flex-1 mx-2 text-center">
+          <h2 className="font-bold text-lg truncate">
+            {selectedDesa ? selectedDesa.nama : "Pilih Desa"}
+          </h2>
+          {selectedKecamatan && (
+            <p className="text-xs text-zinc-500">{selectedKecamatan.nama}</p>
+          )}
+        </div>
+        {selectedDesaId && (
+          <button
+            onClick={() => { setSelectedKohir(null); setCurrentKohirIndex(-1); setShowModal(true); }}
+            className="bg-zinc-900 text-white p-2 rounded-lg"
+          >
+            <Plus size={20} />
+          </button>
+        )}
+      </div>
+
+      {/* MODAL PILIH DESA UNTUK MOBILE */}
+      {showDesaModal && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-end lg:items-center justify-center" onClick={() => setShowDesaModal(false)}>
+          <div className="bg-white w-full max-w-lg rounded-t-2xl lg:rounded-2xl max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b flex justify-between items-center bg-white sticky top-0">
+              <h3 className="font-bold text-lg">Pilih Desa</h3>
+              <button onClick={() => setShowDesaModal(false)} className="p-2 hover:bg-zinc-100 rounded-full">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-4 border-b">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18}/>
+                <input 
+                  className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm" 
+                  placeholder="Cari desa..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  autoFocus
+                />
+              </div>
+            </div>
+            
+            <div className="overflow-y-auto p-4 max-h-[60vh]">
+              {loading ? (
+                <div className="p-4 text-center"><Loader2 className="animate-spin mx-auto text-zinc-300"/></div>
+              ) : filteredKecamatans.length === 0 ? (
+                <div className="p-4 text-center text-zinc-400 text-sm">Tidak ada kecamatan</div>
+              ) : (
+                filteredKecamatans.map(k => (
+                  <div key={k.id} className="mb-6">
+                    <h4 className="text-xs font-bold text-zinc-500 mb-2 px-2">{k.nama}</h4>
+                    <div className="space-y-1">
+                      {k.desas.map(d => (
+                        <button
+                          key={d.id}
+                          onClick={() => {
+                            setSelectedDesaId(d.id);
+                            localStorage.setItem('last_selected_desa_id', d.id);
+                            setShowDesaModal(false);
+                            setSearchTerm('');
+                          }}
+                          className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all flex items-center justify-between ${
+                            selectedDesaId === d.id 
+                              ? 'bg-zinc-900 text-white' 
+                              : 'hover:bg-zinc-100 text-zinc-700'
+                          }`}
+                        >
+                          <span className="flex items-center gap-2">
+                            <MapPin size={16} className={selectedDesaId === d.id ? 'text-white' : 'text-zinc-400'} />
+                            {d.nama}
+                          </span>
+                          {selectedDesaId === d.id && (
+                            <span className="text-xs bg-white text-zinc-900 px-2 py-1 rounded-full">Dipilih</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DESKTOP SIDEBAR */}
+      <div className="hidden lg:block lg:w-80 flex-col shrink-0">
         <div className="mb-4 lg:mb-6 space-y-4 px-2">
           <div className="flex justify-between items-center">
             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Wilayah Kerja</h3>
@@ -120,7 +353,7 @@ export const DataLetterC = () => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-2 space-y-6 hidden lg:block">
+        <div className="flex-1 overflow-y-auto px-2 space-y-6">
           {loading ? (
             <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-zinc-300"/></div>
           ) : (
@@ -183,11 +416,48 @@ export const DataLetterC = () => {
           )}
         </div>
 
+        {/* MOBILE: Tombol Ganti Desa */}
+        {selectedDesaId && (
+          <div className="lg:hidden p-3 border-b border-zinc-100">
+            <button
+              onClick={() => setShowDesaModal(true)}
+              className="w-full flex items-center justify-between p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm"
+            >
+              <span className="flex items-center gap-2">
+                <MapPin size={16} className="text-zinc-500" />
+                <span className="font-medium">Ganti Desa</span>
+              </span>
+              <ChevronDown size={16} className="text-zinc-400" />
+            </button>
+          </div>
+        )}
+
+        {/* Mobile Search */}
+        {selectedDesaId && (
+          <div className="lg:hidden p-3 border-b border-zinc-100">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18}/>
+              <input 
+                className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm" 
+                placeholder="Cari kohir..."
+                value={kohirSearch}
+                onChange={(e) => setKohirSearch(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
+
         <div className="flex-1 overflow-x-auto lg:overflow-y-auto p-4 lg:p-8">
           {!selectedDesaId ? (
             <div className="h-full flex flex-col items-center justify-center opacity-20 text-center">
               <Layers size={80} strokeWidth={0.5}/>
               <p className="font-black uppercase tracking-[0.5em] text-[10px] mt-4">Pilih wilayah kerja di sidebar</p>
+              <button 
+                onClick={() => setShowDesaModal(true)}
+                className="lg:hidden mt-4 bg-zinc-900 text-white px-6 py-3 rounded-xl text-sm font-black uppercase"
+              >
+                Pilih Desa
+              </button>
             </div>
           ) : (
             <div className="min-w-[600px] lg:min-w-full">
@@ -201,7 +471,7 @@ export const DataLetterC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-50">
-                  {filteredKohirList.map((k, index) => (
+                  {filteredKohirList.map((k) => (
                     <tr key={k.id} className="group hover:bg-zinc-50/50 transition-colors">
                       <td className="py-6 px-4 font-black text-zinc-900 text-lg">C.{k.nomor_c}</td>
                       <td className="py-6 font-bold text-zinc-700 text-[15px] uppercase">{k.nama_pemilik}</td>
@@ -212,6 +482,21 @@ export const DataLetterC = () => {
                             <ImageIcon size={18}/>
                           </a>
                         )}
+                        
+                        {/* TOMBOL PRINT */}
+                        <button 
+                          onClick={() => handlePrintKutipan(k)} 
+                          disabled={printLoading === k.id}
+                          className="p-3 text-zinc-300 hover:text-green-700 hover:bg-green-50 rounded-xl border border-transparent hover:border-green-100 transition-all disabled:opacity-50"
+                          title="Cetak Kutipan Letter C"
+                        >
+                          {printLoading === k.id ? (
+                            <Loader2 size={18} className="animate-spin" />
+                          ) : (
+                            <Printer size={18} />
+                          )}
+                        </button>
+                        
                         <button onClick={() => handleEdit(k)} className="p-3 text-zinc-400 hover:text-zinc-900 hover:bg-white rounded-xl border border-transparent hover:border-zinc-100 transition-all">
                           <Edit3 size={18}/>
                         </button>
@@ -231,6 +516,7 @@ export const DataLetterC = () => {
         </div>
       </div>
 
+      {/* MODAL FORM TAMBAH C */}
       {showModal && selectedDesaId && (
         <FormTambahC 
           selectedDesaId={selectedDesaId} 
@@ -246,6 +532,7 @@ export const DataLetterC = () => {
   );
 };
 
+// ==================== FORM TAMBAH C COMPONENT ====================
 const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKohirList = [], currentIndex = -1, onNavigate }: FormTambahCProps) => {
   // --- STATE ---
   const [loading, setLoading] = useState(false);
@@ -259,6 +546,7 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
   ]);
   const [showAddPrompt, setShowAddPrompt] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [activeMobileTab, setActiveMobileTab] = useState<'identitas' | 'persil'>('identitas');
 
   // --- STATE UNTUK CROP ---
   const [crop, setCrop] = useState<Crop>({
@@ -281,7 +569,6 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
       });
       fetchPersils(editData.id);
     } else {
-      // Reset form untuk data baru
       setForm({ nomor_c: '', nama_pemilik: '', alamat_pemilik: '', image_url: '' });
       setRows([{ nomor_persil: '', jenis_tanah: 'Tanah Kering', klas_desa: '', luas_meter: 0, asal_usul: '', is_void: false }]);
       setPreviewUrl(null);
@@ -290,7 +577,6 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
     setIsDirty(false);
   }, [editData]);
 
-  // Deteksi perubahan form
   useEffect(() => {
     if (editData) {
       const isFormChanged = 
@@ -298,7 +584,6 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
         form.nama_pemilik !== editData.nama_pemilik ||
         form.alamat_pemilik !== (editData.alamat_pemilik || '') ||
         imageFile !== null;
-      
       setIsDirty(isFormChanged);
     } else {
       const isFormFilled = 
@@ -307,7 +592,6 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
         form.alamat_pemilik !== '' ||
         rows.some(r => r.nomor_persil !== '' && r.nomor_persil !== undefined) ||
         imageFile !== null;
-      
       setIsDirty(isFormFilled);
     }
   }, [form, rows, imageFile, editData]);
@@ -320,16 +604,14 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
       .order('created_at');
     
     if (data && data.length > 0) {
-      // Pastikan is_void terbaca dengan benar sebagai boolean
       const formattedData = data.map(item => ({
         ...item,
-        is_void: item.is_void === true // Konversi ke boolean
+        is_void: item.is_void === true
       }));
       setRows(formattedData);
     }
   };
 
-  // --- FUNGSI GENERATE HASIL CROP ---
   const getCroppedImg = (): Promise<File> => {
     return new Promise((resolve, reject) => {
       if (!imgRef || !crop) {
@@ -434,20 +716,14 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
     setVoidLoading(persilId);
     try {
       const newVoidStatus = !currentVoidStatus;
-      
       const { error } = await supabase
         .from('letter_c_persil')
         .update({ is_void: newVoidStatus })
         .eq('id', persilId);
-      
       if (error) throw error;
-      
-      // Update local state
       setRows(rows.map(row => 
         row.id === persilId ? { ...row, is_void: newVoidStatus } : row
       ));
-
-      // Refresh data dari database untuk memastikan konsistensi
       if (editData) {
         await fetchPersils(editData.id);
       }
@@ -485,7 +761,7 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
         klas_desa: r.klas_desa,
         luas_meter: r.luas_meter || 0,
         asal_usul: r.asal_usul,
-        is_void: r.is_void || false // Pertahankan status is_void yang sudah ada
+        is_void: r.is_void || false
       }));
 
       await supabase.from('letter_c_persil').insert(persils);
@@ -538,13 +814,16 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
       <div className="bg-white w-full max-w-6xl rounded-t-[2.5rem] lg:rounded-[3rem] flex flex-col h-[95vh] lg:h-auto lg:max-h-[92vh] shadow-2xl overflow-hidden shadow-black/50">
         
         {/* HEADER */}
-        <div className="p-6 lg:p-8 border-b border-zinc-50 flex justify-between items-center bg-zinc-50/20 shrink-0">
-          <div className="flex items-center gap-4">
+        <div className="p-4 lg:p-8 border-b border-zinc-50 flex justify-between items-center bg-zinc-50/20 shrink-0">
+          <div className="flex items-center gap-2 lg:gap-4">
+            <button onClick={onClose} className="lg:hidden p-2 hover:bg-zinc-100 rounded-full">
+              <ChevronLeft size={20} />
+            </button>
             <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
               {editData ? 'Update Kohir' : 'Entry Kohir Baru'}
             </span>
             {editData && existingKohirList.length > 0 && (
-              <div className="flex items-center gap-2 ml-4">
+              <div className="hidden lg:flex items-center gap-2 ml-4">
                 <button
                   onClick={() => handleNavigateWithCheck('prev')}
                   disabled={currentIndex <= 0}
@@ -573,15 +852,39 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
               </div>
             )}
           </div>
-          <button onClick={onClose} className="p-3 hover:bg-zinc-100 rounded-full text-zinc-400"><X/></button>
+          <button onClick={onClose} className="hidden lg:block p-3 hover:bg-zinc-100 rounded-full text-zinc-400"><X/></button>
+        </div>
+
+        {/* Mobile Tab Navigation */}
+        <div className="lg:hidden flex border-b border-zinc-200">
+          <button
+            onClick={() => setActiveMobileTab('identitas')}
+            className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${
+              activeMobileTab === 'identitas' 
+                ? 'text-zinc-900 border-b-2 border-zinc-900' 
+                : 'text-zinc-400'
+            }`}
+          >
+            Identitas
+          </button>
+          <button
+            onClick={() => setActiveMobileTab('persil')}
+            className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${
+              activeMobileTab === 'persil' 
+                ? 'text-zinc-900 border-b-2 border-zinc-900' 
+                : 'text-zinc-400'
+            }`}
+          >
+            Persil ({rows.length})
+          </button>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-6 lg:p-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+        <div className="flex-1 overflow-y-auto p-4 lg:p-10">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12">
             
             {/* IDENTITAS */}
-            <div className="lg:col-span-4 space-y-6">
-              <h4 className="flex items-center gap-2 text-zinc-900 font-black text-xs uppercase tracking-widest">
+            <div className={`lg:col-span-4 space-y-6 ${activeMobileTab === 'persil' ? 'hidden lg:block' : ''}`}>
+              <h4 className="hidden lg:flex items-center gap-2 text-zinc-900 font-black text-xs uppercase tracking-widest">
                 <User size={16}/> Identitas Pemilik
               </h4>
               
@@ -589,26 +892,26 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
                 <label className="text-[10px] font-bold text-zinc-400 uppercase">Foto Arsip Letter C</label>
                 <div className="relative group">
                   {previewUrl ? (
-                    <div className="relative h-44 w-full rounded-2xl overflow-hidden border-2 border-zinc-100 shadow-sm">
+                    <div className="relative h-32 lg:h-44 w-full rounded-xl lg:rounded-2xl overflow-hidden border-2 border-zinc-100 shadow-sm">
                       {isScanning && (
                         <div className="absolute inset-0 z-10 bg-zinc-900/60 backdrop-blur-sm flex flex-col items-center justify-center text-white">
-                          <Loader2 className="animate-spin mb-2" size={24}/>
-                          <span className="text-[9px] font-black uppercase tracking-tighter">Menganalisis...</span>
+                          <Loader2 className="animate-spin mb-2" size={20}/>
+                          <span className="text-[8px] font-black uppercase">Menganalisis...</span>
                         </div>
                       )}
                       <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
                       <button 
                         type="button"
                         onClick={() => { setPreviewUrl(null); setImageFile(null); setForm({...form, image_url: ''})}} 
-                        className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors z-20"
+                        className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600"
                       >
-                        <X size={14}/>
+                        <X size={12}/>
                       </button>
                     </div>
                   ) : (
-                    <label className="flex flex-col items-center justify-center h-44 w-full border-2 border-dashed border-zinc-200 rounded-2xl cursor-pointer hover:bg-zinc-50 transition-all relative overflow-hidden">
-                      <Camera className="text-zinc-300 mb-2" size={32}/>
-                      <span className="text-[10px] font-bold text-zinc-400 text-center px-4">Klik untuk ambil foto / upload</span>
+                    <label className="flex flex-col items-center justify-center h-32 lg:h-44 w-full border-2 border-dashed border-zinc-200 rounded-xl lg:rounded-2xl cursor-pointer hover:bg-zinc-50">
+                      <Camera className="text-zinc-300 mb-1" size={24}/>
+                      <span className="text-[8px] lg:text-[10px] font-bold text-zinc-400 text-center px-2">Klik untuk upload</span>
                       <input 
                         type="file" 
                         accept="image/*" 
@@ -628,23 +931,23 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
                 </div>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <input 
-                  className="w-full px-6 py-4 bg-zinc-50 border border-zinc-100 rounded-2xl outline-none focus:bg-white font-bold text-sm text-zinc-900 placeholder:text-zinc-400" 
+                  className="w-full px-4 lg:px-6 py-3 lg:py-4 bg-zinc-50 border border-zinc-100 rounded-xl lg:rounded-2xl text-sm font-bold" 
                   placeholder="Nomor Kohir (C)" 
                   value={form.nomor_c} 
                   onChange={e => setForm({...form, nomor_c: e.target.value})}
                 />
                 <input 
-                  className="w-full px-6 py-4 bg-zinc-50 border border-zinc-100 rounded-2xl outline-none focus:bg-white font-bold text-sm text-zinc-900 placeholder:text-zinc-400" 
+                  className="w-full px-4 lg:px-6 py-3 lg:py-4 bg-zinc-50 border border-zinc-100 rounded-xl lg:rounded-2xl text-sm font-bold" 
                   placeholder="Nama Lengkap" 
                   value={form.nama_pemilik} 
                   onChange={e => setForm({...form, nama_pemilik: e.target.value})}
                 />
                 <textarea 
-                  className="w-full px-6 py-4 bg-zinc-50 border border-zinc-100 rounded-2xl outline-none focus:bg-white text-sm text-zinc-900 placeholder:text-zinc-400" 
+                  className="w-full px-4 lg:px-6 py-3 lg:py-4 bg-zinc-50 border border-zinc-100 rounded-xl lg:rounded-2xl text-sm" 
                   placeholder="Alamat Singkat" 
-                  rows={3} 
+                  rows={2}
                   value={form.alamat_pemilik} 
                   onChange={e => setForm({...form, alamat_pemilik: e.target.value})}
                 />
@@ -652,46 +955,127 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
             </div>
 
             {/* RINCIAN PERSIL */}
-            <div className="lg:col-span-8 space-y-6">
+            <div className={`lg:col-span-8 space-y-4 lg:space-y-6 ${activeMobileTab === 'identitas' ? 'hidden lg:block' : ''}`}>
               <div className="flex justify-between items-center">
-                <h4 className="flex items-center gap-2 text-zinc-900 font-black text-xs uppercase tracking-widest">
+                <h4 className="hidden lg:flex items-center gap-2 text-zinc-900 font-black text-xs uppercase tracking-widest">
                   <Layers size={16}/> Rincian Persil
                 </h4>
                 <button 
                   onClick={() => setRows([...rows, { nomor_persil: '', jenis_tanah: 'Tanah Kering', klas_desa: '', luas_meter: 0, asal_usul: '', is_void: false }])} 
-                  className="text-[10px] font-black text-zinc-900 bg-zinc-100 px-5 py-2.5 rounded-xl uppercase hover:bg-zinc-200 transition-all"
+                  className="text-[10px] font-black text-zinc-900 bg-zinc-100 px-4 lg:px-5 py-2 lg:py-2.5 rounded-lg lg:rounded-xl uppercase hover:bg-zinc-200"
                 >
                   + Tambah
                 </button>
               </div>
               
-              {/* CONTAINER LIST PERSIL */}
-              <div className="mt-8 space-y-4">
-                {/* HEADER TABEL */}
-                <div className="hidden lg:flex px-2 pb-2 gap-3 items-center border-b border-zinc-200">
-                  <div className="w-[12%]"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">No. Persil</label></div>
-                  <div className="w-[18%]"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Jenis</label></div>
-                  <div className="w-[10%] text-center"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Klas</label></div>
-                  <div className="w-[12%]"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Luas (M²)</label></div>
-                  <div className="flex-1"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Asal-Usul / Keterangan</label></div>
-                  {rows.length > 1 && <div className="w-20"></div>}
-                </div>
+              {/* Container List Persil */}
+              <div className="space-y-3">
+                {rows.map((row, i) => {
+                  const isVoid = row.is_void === true;
+                  const hasId = !!row.id;
+                  
+                  return (
+                    <div key={row.id || i} className={`bg-zinc-50 p-3 rounded-xl border ${isVoid ? 'opacity-50 border-zinc-200' : 'border-transparent'}`}>
+                      
+                      {/* Mobile Layout */}
+                      <div className="lg:hidden space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-black text-zinc-400">PERSIL #{i + 1}</span>
+                          <div className="flex gap-1">
+                            {hasId && (
+                              <button 
+                                onClick={() => handleToggleVoid(row.id!, isVoid)}
+                                disabled={voidLoading === row.id}
+                                className={`p-2 rounded-lg ${
+                                  isVoid ? 'text-emerald-500' : 'text-zinc-400'
+                                }`}
+                              >
+                                {voidLoading === row.id ? <Loader2 size={16} className="animate-spin" /> : <Ban size={16} />}
+                              </button>
+                            )}
+                            {rows.length > 1 && (
+                              <button 
+                                onClick={() => setRows(rows.filter((_, idx) => idx !== i))} 
+                                disabled={isVoid}
+                                className={`p-2 rounded-lg ${
+                                  isVoid ? 'text-zinc-200 cursor-not-allowed' : 'text-zinc-400 hover:text-rose-500'
+                                }`}
+                              >
+                                <Trash2 size={16}/>
+                              </button>
+                            )}
+                          </div>
+                        </div>
 
-                <div className="space-y-3">
-                  {rows.map((row, i) => {
-                    const isVoid = row.is_void === true; // Pastikan boolean
-                    const hasId = !!row.id;
-                    
-                    return (
-                      <div key={row.id || i} className={`group p-2 lg:p-0 flex flex-wrap lg:flex-nowrap gap-3 items-center relative transition-all ${
-                        isVoid ? 'opacity-50' : ''
-                      }`}>
-                        
-                        {/* Nomor Persil */}
-                        <div className="w-[48%] lg:w-[12%]">
+                        <div>
+                          <label className="text-[8px] font-bold text-zinc-400 block mb-1">No. Persil</label>
                           <input 
-                            className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/5 bg-white font-bold transition-all text-zinc-900 ${
-                              isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200'
+                            className="w-full px-3 py-2 text-xs border border-zinc-200 rounded-lg bg-white" 
+                            placeholder="Nomor Persil" 
+                            value={row.nomor_persil || ''} 
+                            onChange={e => updateRow(i, 'nomor_persil', e.target.value)}
+                            disabled={isVoid}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[8px] font-bold text-zinc-400 block mb-1">Jenis Tanah</label>
+                          <select 
+                            className="w-full px-3 py-2 text-xs border border-zinc-200 rounded-lg bg-white"
+                            value={row.jenis_tanah || 'Tanah Kering'} 
+                            onChange={e => updateRow(i, 'jenis_tanah', e.target.value)}
+                            disabled={isVoid}
+                          >
+                            <option value="Tanah Kering">Tanah Kering</option>
+                            <option value="Sawah">Sawah</option>
+                          </select>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[8px] font-bold text-zinc-400 block mb-1">Klas</label>
+                            <input 
+                              className="w-full px-3 py-2 text-xs border border-zinc-200 rounded-lg bg-white" 
+                              placeholder="Klas" 
+                              value={row.klas_desa || ''} 
+                              onChange={e => updateRow(i, 'klas_desa', e.target.value)}
+                              disabled={isVoid}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[8px] font-bold text-zinc-400 block mb-1">Luas (M²)</label>
+                            <input 
+                              className="w-full px-3 py-2 text-xs border border-zinc-200 rounded-lg bg-white" 
+                              placeholder="0" 
+                              type="number" 
+                              value={row.luas_meter === 0 ? '' : row.luas_meter} 
+                              onChange={e => {
+                                const val = e.target.value;
+                                updateRow(i, 'luas_meter', val === '' ? 0 : parseFloat(val));
+                              }}
+                              disabled={isVoid}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[8px] font-bold text-zinc-400 block mb-1">Keterangan</label>
+                          <textarea 
+                            className="w-full px-3 py-2 text-xs border border-zinc-200 rounded-lg bg-white min-h-[60px]" 
+                            placeholder="Keterangan..." 
+                            value={row.asal_usul || ''} 
+                            onChange={e => updateRow(i, 'asal_usul', e.target.value)}
+                            disabled={isVoid}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Desktop Layout */}
+                      <div className="hidden lg:flex lg:flex-nowrap gap-3 items-center">
+                        <div className="w-[12%]">
+                          <input 
+                            className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 bg-white font-bold ${
+                              isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200 text-zinc-900'
                             }`} 
                             placeholder="Nomor Persil" 
                             value={row.nomor_persil || ''} 
@@ -700,8 +1084,7 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
                           />
                         </div>
 
-                        {/* Jenis Tanah */}
-                        <div className="w-[48%] lg:w-[18%] relative">
+                        <div className="w-[18%] relative">
                           <select 
                             className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 bg-white font-bold appearance-none cursor-pointer ${
                               isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200 text-zinc-900'
@@ -718,8 +1101,7 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
                           </div>
                         </div>
 
-                        {/* Klasifikasi */}
-                        <div className="w-[30%] lg:w-[10%]">
+                        <div className="w-[10%]">
                           <input 
                             className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 bg-white font-bold text-center uppercase ${
                               isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200 text-zinc-900'
@@ -731,8 +1113,7 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
                           />
                         </div>
 
-                        {/* Luas */}
-                        <div className="w-[30%] lg:w-[12%]">
+                        <div className="w-[12%]">
                           <input 
                             className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 bg-white font-bold ${
                               isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200 text-zinc-900'
@@ -748,20 +1129,18 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
                           />
                         </div>
 
-                        {/* Asal Usul */}
-                        <div className="w-full lg:flex-1">
+                        <div className="flex-1">
                           <textarea 
                             className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 bg-white font-medium min-h-[50px] resize-y ${
                               isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200 text-zinc-900'
                             }`} 
-                            placeholder="Asal-Usul / Keterangan Lengkap..." 
+                            placeholder="Keterangan..." 
                             value={row.asal_usul || ''} 
                             onChange={e => updateRow(i, 'asal_usul', e.target.value)}
                             disabled={isVoid}
                           />
                         </div>
 
-                        {/* BUTTON CORE */}
                         {hasId && (
                           <button 
                             onClick={() => handleToggleVoid(row.id!, isVoid)}
@@ -771,7 +1150,6 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
                                 ? 'text-emerald-500 hover:bg-emerald-50' 
                                 : 'text-zinc-300 hover:text-amber-500 hover:bg-amber-50'
                             }`}
-                            title={isVoid ? 'Aktifkan kembali' : 'Coret persil (tidak berlaku)'}
                           >
                             {voidLoading === row.id ? (
                               <Loader2 size={18} className="animate-spin" />
@@ -781,45 +1159,44 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
                           </button>
                         )}
 
-                        {/* Tombol Hapus */}
-                            {rows.length > 1 && (
-                              <button 
-                                onClick={() => setRows(rows.filter((_, idx) => idx !== i))} 
-                                className={`p-2 rounded-xl transition-all ${
-                                  isVoid 
-                                    ? 'text-zinc-200 cursor-not-allowed' 
-                                    : 'text-zinc-300 hover:text-rose-500 hover:bg-rose-50'
-                                }`}
-                                disabled={isVoid}
-                                title={isVoid ? 'Tidak bisa menghapus persil yang sudah dicoret' : 'Hapus persil'}
-                              >
-                                <Trash2 size={18}/>
-                              </button>
-                            )}
+                        {rows.length > 1 && (
+                          <button 
+                            onClick={() => setRows(rows.filter((_, idx) => idx !== i))} 
+                            disabled={isVoid}
+                            className={`p-2 rounded-xl transition-all ${
+                              isVoid 
+                                ? 'text-zinc-200 cursor-not-allowed' 
+                                : 'text-zinc-300 hover:text-rose-500 hover:bg-rose-50'
+                            }`}
+                          >
+                            <Trash2 size={18}/>
+                          </button>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
         </div>
 
         {/* FOOTER */}
-        <div className="p-6 lg:p-10 border-t border-zinc-50 bg-white flex shrink-0 justify-end gap-6 items-center">
+        <div className="p-4 lg:p-10 border-t border-zinc-50 bg-white flex shrink-0 justify-end gap-4 items-center">
           <button 
             type="button" 
             onClick={onClose} 
-            className="text-xs font-black text-zinc-400 uppercase tracking-widest hover:text-zinc-600 transition-all"
+            className="text-xs font-black text-zinc-400 uppercase tracking-widest hover:text-zinc-600"
           >
             Batal
           </button>
           <button 
             onClick={handleSave} 
             disabled={loading} 
-            className="w-full lg:w-auto px-12 py-4 bg-zinc-900 text-white rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-zinc-900/20 active:scale-95 transition-all flex justify-center items-center gap-2 hover:bg-zinc-800"
+            className="px-8 lg:px-12 py-3 lg:py-4 bg-zinc-900 text-white rounded-xl lg:rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-zinc-900/20 active:scale-95 transition-all flex items-center gap-2 hover:bg-zinc-800"
           >
-            {loading ? <Loader2 className="animate-spin" size={18}/> : editData ? 'Update Kohir' : 'Simpan Data'}
+            {loading ? <Loader2 className="animate-spin" size={16}/> : null}
+            {loading ? 'MENYIMPAN...' : editData ? 'UPDATE' : 'SIMPAN'}
           </button>
         </div>
       </div>
@@ -827,17 +1204,17 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
       {/* MODAL CROPPER */}
       {showCropper && previewUrl && (
         <div className="fixed inset-0 z-[110] bg-zinc-900/90 backdrop-blur-sm flex flex-col items-center justify-center p-4">
-          <div className="bg-white p-6 lg:p-10 rounded-[2.5rem] max-w-3xl w-full shadow-2xl shadow-black">
-            <h3 className="text-xs font-black uppercase tracking-widest mb-6 text-center text-zinc-400">Sesuaikan Area Scan AI</h3>
-            <div className="max-h-[50vh] overflow-auto mb-8 bg-zinc-50 rounded-2xl border flex justify-center">
+          <div className="bg-white p-4 lg:p-6 rounded-2xl lg:rounded-[2.5rem] max-w-3xl w-full">
+            <h3 className="text-xs font-black uppercase tracking-widest mb-4 text-center text-zinc-400">Sesuaikan Area Scan AI</h3>
+            <div className="max-h-[50vh] overflow-auto mb-4 bg-zinc-50 rounded-xl border">
               <ReactCrop crop={crop} onChange={c => setCrop(c)}>
                 <img src={previewUrl} onLoad={(e) => setImgRef(e.currentTarget)} className="max-w-full h-auto" alt="To crop" />
               </ReactCrop>
             </div>
-            <div className="flex gap-4">
+            <div className="flex gap-3">
               <button 
                 onClick={() => setShowCropper(false)} 
-                className="flex-1 py-4 text-xs font-black uppercase text-zinc-400 hover:text-zinc-600 transition-all"
+                className="flex-1 py-3 text-xs font-black uppercase text-zinc-400 hover:text-zinc-600 border border-zinc-200 rounded-xl"
               >
                 Batal
               </button>
@@ -853,9 +1230,9 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
                     alert(err);
                   }
                 }} 
-                className="flex-1 py-4 bg-zinc-900 text-white rounded-2xl text-xs font-black uppercase shadow-lg shadow-zinc-200 hover:bg-zinc-800 transition-all"
+                className="flex-1 py-3 bg-zinc-900 text-white rounded-xl text-xs font-black uppercase"
               >
-                Proses Area Ini
+                Proses
               </button>
             </div>
           </div>
@@ -865,24 +1242,24 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
       {/* MODAL PROMPT TAMBAH DATA BARU */}
       {showAddPrompt && (
         <div className="fixed inset-0 z-[120] bg-zinc-900/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2rem] max-w-md w-full p-8 shadow-2xl">
-            <div className="flex items-center gap-3 mb-6 text-amber-600">
-              <AlertCircle size={24} />
+          <div className="bg-white rounded-2xl lg:rounded-[2rem] max-w-md w-full p-6 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4 text-amber-600">
+              <AlertCircle size={20} />
               <h3 className="text-sm font-black uppercase tracking-widest">Tambah Data Baru?</h3>
             </div>
-            <p className="text-zinc-600 mb-8 text-sm">
+            <p className="text-zinc-600 mb-6 text-sm">
               Anda sudah berada di akhir daftar kohir. Apakah Anda ingin menambah data kohir baru?
             </p>
-            <div className="flex gap-4">
+            <div className="flex gap-3">
               <button
                 onClick={() => setShowAddPrompt(false)}
-                className="flex-1 py-4 text-xs font-black uppercase text-zinc-400 hover:text-zinc-600 transition-all border border-zinc-200 rounded-2xl"
+                className="flex-1 py-3 text-xs font-black uppercase text-zinc-400 hover:text-zinc-600 border border-zinc-200 rounded-xl"
               >
                 Kembali
               </button>
               <button
                 onClick={handleAddNewFromPrompt}
-                className="flex-1 py-4 bg-zinc-900 text-white rounded-2xl text-xs font-black uppercase shadow-lg hover:bg-zinc-800 transition-all"
+                className="flex-1 py-3 bg-zinc-900 text-white rounded-xl text-xs font-black uppercase shadow-lg hover:bg-zinc-800"
               >
                 Tambah Baru
               </button>
