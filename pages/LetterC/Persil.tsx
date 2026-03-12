@@ -109,17 +109,15 @@ export const Persil = () => {
     }))
     .filter(kec => kec.desas.length > 0);
 
-  // FILTER HANYA BERDASARKAN NO PERSIL
+  // FILTER EXACT MATCH - HANYA PERSIL YANG SAMA PERSIS
   const filteredPersils = persilList.filter(p => {
-    const noPersil = String(p.nomor_persil || "").toLowerCase();
-    const cari = searchTerm.toLowerCase();
+    const noPersil = String(p.nomor_persil || "").trim();
+    const cari = searchTerm.trim();
     
-    // Hanya filter berdasarkan nomor persil
-    const matchesSearch = noPersil.includes(cari);
+    // Exact match - harus sama persis
+    const matchesSearch = cari === '' ? true : noPersil === cari;
     
     const matchesFilter = filterJenis === 'Semua' || p.jenis_tanah === filterJenis;
-    
-    // Filter berdasarkan showVoid
     const matchesVoid = showVoid ? true : !p.is_void;
     
     return matchesSearch && matchesFilter && matchesVoid;
@@ -325,7 +323,7 @@ export const Persil = () => {
             <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-400" size={20}/>
             <input 
               className="w-full pl-16 pr-6 py-4 lg:py-5 bg-zinc-50/50 border border-zinc-100 rounded-xl lg:rounded-[1.5rem] text-sm outline-none focus:bg-white focus:border-zinc-900 transition-all" 
-              placeholder="Cari No. Persil..."
+              placeholder="Cari No. Persil (exact match)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -350,7 +348,7 @@ export const Persil = () => {
           ) : filteredPersils.length === 0 ? (
             <div className="text-center p-20">
               <p className="text-zinc-300 font-bold uppercase text-[10px] tracking-widest">
-                {error ? 'Error memuat data' : 'Tidak ada data persil'}
+                {error ? 'Error memuat data' : `Tidak ada persil dengan nomor "${searchTerm}"`}
               </p>
             </div>
           ) : (
