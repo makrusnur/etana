@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { 
-  MapPin, Loader2, Search, Layers, ChevronRight, Hash, Building2, Eye, EyeOff, Menu, X, ChevronDown
+  MapPin, Loader2, Search, Layers, ChevronRight, Hash, Building2, Eye, EyeOff, Menu, X, ChevronDown,
+  FileText, Download
 } from 'lucide-react';
 import { supabase } from '../../services/db';
 import { Kecamatan, Desa, LetterCPersil } from '../../types';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface PersilWithOwner extends LetterCPersil {
   letter_c: {
@@ -16,6 +19,7 @@ interface PersilWithOwner extends LetterCPersil {
 export const Persil = () => {
   // --- States ---
   const [loading, setLoading] = useState(false);
+  const [printLoading, setPrintLoading] = useState(false);
   const [kecamatans, setKecamatans] = useState<Kecamatan[]>([]);
   const [desas, setDesas] = useState<Desa[]>([]);
   const [persilList, setPersilList] = useState<PersilWithOwner[]>([]);
@@ -27,7 +31,7 @@ export const Persil = () => {
   const [searchDesa, setSearchDesa] = useState(''); 
   const [searchTerm, setSearchTerm] = useState(''); 
   const [filterJenis, setFilterJenis] = useState('Semua');
-  const [showVoid, setShowVoid] = useState(true);
+  const [showVoid, setShowVoid] = useState(false);
   const [showDesaModal, setShowDesaModal] = useState(false);
 
   // --- 1. Fetch Data Wilayah ---
@@ -46,7 +50,7 @@ export const Persil = () => {
     fetchRegions();
   }, []);
 
-  // --- 2. Fetch Data Persil dengan query OPTIMAL ---
+  // --- 2. Fetch Data Persil ---
   useEffect(() => {
     const fetchPersils = async () => {
       if (!selectedDesaId) {
@@ -58,7 +62,6 @@ export const Persil = () => {
       setError(null);
       
       try {
-        // Query OPTIMAL: langsung filter desa di query
         const { data, error } = await supabase
           .from('letter_c_persil')
           .select(`
@@ -70,17 +73,15 @@ export const Persil = () => {
             )
           `)
           .eq('letter_c.desa_id', selectedDesaId)
-          .order('nomor_persil'); // SORTING LANGSUNG
+          .order('nomor_persil');
 
         if (error) throw error;
 
         if (data && data.length > 0) {
-          // Normalisasi data
           const normalized = data.map((item: any) => ({
             ...item,
             letter_c: Array.isArray(item.letter_c) ? item.letter_c[0] : item.letter_c
           }));
-          
           setPersilList(normalized);
         } else {
           setPersilList([]);
@@ -109,14 +110,11 @@ export const Persil = () => {
     }))
     .filter(kec => kec.desas.length > 0);
 
-  // FILTER EXACT MATCH - HANYA PERSIL YANG SAMA PERSIS
   const filteredPersils = persilList.filter(p => {
     const noPersil = String(p.nomor_persil || "").trim();
     const cari = searchTerm.trim();
     
-    // Exact match - harus sama persis
     const matchesSearch = cari === '' ? true : noPersil === cari;
-    
     const matchesFilter = filterJenis === 'Semua' || p.jenis_tanah === filterJenis;
     const matchesVoid = showVoid ? true : !p.is_void;
     
@@ -124,6 +122,131 @@ export const Persil = () => {
   });
 
   const selectedDesa = desas.find(d => d.id === selectedDesaId);
+  const selectedKecamatan = kecamatans.find(k => k.id === selectedDesa?.kecamatan_id);
+
+  // --- 4. Fungsi Print PDF ---
+  const handlePrintPDF = async () => {
+    if (filteredPersils.length === 0) {
+      alert('Tidak ada data persil untuk dicetak');
+      return;
+    }
+
+    try {
+      setPrintLoading(true);
+      
+      const desa = desas.find(d => d.id === selectedDesaId);
+      const kecamatan = kecamatans.find(k => k.id === desa?.kecamatan_id);
+      
+      if (!desa || !kecamatan) {
+        alert("Data desa tidak ditemukan");
+        return;
+      }
+
+      // Buat dokumen PDF
+      const doc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // Kop Surat
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('DAFTAR PERSIL', doc.internal.pageSize.width / 2, 15, { align: 'center' });
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`BUKU LETTER C DESA ${desa.nama.toUpperCase()}`, doc.internal.pageSize.width / 2, 22, { align: 'center' });
+      
+      // Garis pemisah
+      doc.setLineWidth(0.5);
+      doc.line(10, 27, doc.internal.pageSize.width - 10, 27);
+
+      // Info desa
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Desa:', 15, 35);
+      doc.text('Kecamatan:', 15, 40);
+      doc.text('Kabupaten:', 15, 45);
+      doc.text('Provinsi:', 15, 50);
+      doc.text('Tanggal Cetak:', 15, 55);
+
+      doc.setFont('helvetica', 'normal');
+      doc.text(`: ${desa.nama}`, 45, 35);
+      doc.text(`: ${kecamatan.nama}`, 45, 40);
+      doc.text(`: PASURUAN`, 45, 45);
+      doc.text(`: JAWA TIMUR`, 45, 50);
+      doc.text(`: ${new Date().toLocaleDateString('id-ID', { 
+        day: 'numeric', 
+        month: 'long', 
+        year: 'numeric' 
+      })}`, 45, 55);
+
+      // Data tabel
+      const tableData = filteredPersils.map((p, index) => [
+        index + 1,
+        p.nomor_persil || '-',
+        p.letter_c?.nomor_c || '-',
+        p.letter_c?.nama_pemilik || '-',
+        p.jenis_tanah || '-',
+        p.klas_desa || '-',
+        (p.luas_meter || 0).toLocaleString('id-ID'),
+        p.asal_usul || '-',
+        p.is_void ? 'DICORET' : 'AKTIF'
+      ]);
+
+      // Buat tabel
+      autoTable(doc, {
+        head: [['No.', 'No. Persil', 'No. Kohir', 'Nama Pemilik', 'Jenis', 'Klas', 'Luas (m²)', 'Keterangan', 'Status']],
+        body: tableData,
+        startY: 65,
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+          lineColor: [0, 0, 0],
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: [240, 240, 240],
+          textColor: [0, 0, 0],
+          fontStyle: 'bold',
+          halign: 'center'
+        },
+        columnStyles: {
+          0: { cellWidth: 10 },
+          1: { cellWidth: 20 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 40 },
+          4: { cellWidth: 20 },
+          5: { cellWidth: 15 },
+          6: { cellWidth: 20 },
+          7: { cellWidth: 30 },
+          8: { cellWidth: 15 }
+        },
+        alternateRowStyles: {
+          fillColor: [250, 250, 250]
+        }
+      });
+
+      // Footer
+      const finalY = (doc as any).lastAutoTable.finalY || 200;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Total Data: ${filteredPersils.length} Persil`, doc.internal.pageSize.width - 20, finalY + 10, { align: 'right' });
+      
+      doc.setFont('helvetica', 'italic');
+      doc.text('Dokumen ini dicetak secara sistem', doc.internal.pageSize.width / 2, finalY + 20, { align: 'center' });
+
+      // Download PDF
+      doc.save(`DAFTAR_PERSIL_${desa.nama}_${new Date().getTime()}.pdf`);
+
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Gagal mencetak PDF');
+    } finally {
+      setPrintLoading(false);
+    }
+  };
 
   // Mobile Modal Pilih Desa
   const DesaModal = () => (
@@ -208,7 +331,7 @@ export const Persil = () => {
         </div>
       </div>
 
-      {/* Mobile Modal Pilih Desa */}
+      {/* Mobile Modal */}
       {showDesaModal && <DesaModal />}
 
       {/* Desktop Sidebar */}
@@ -273,6 +396,22 @@ export const Persil = () => {
           </div>
           
           <div className="flex flex-col lg:flex-row gap-2 w-full lg:w-auto">
+            {/* Tombol PDF */}
+            {selectedDesaId && filteredPersils.length > 0 && (
+              <button
+                onClick={handlePrintPDF}
+                disabled={printLoading}
+                className="flex items-center justify-center gap-2 px-5 py-2 bg-red-600 text-white text-[10px] font-black uppercase rounded-xl hover:bg-red-700 transition-all disabled:opacity-50"
+              >
+                {printLoading ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <FileText size={14} />
+                )}
+                PDF ({filteredPersils.length})
+              </button>
+            )}
+            
             {/* Toggle Button */}
             <button
               onClick={() => setShowVoid(!showVoid)}
@@ -301,7 +440,7 @@ export const Persil = () => {
           </div>
         </div>
 
-        {/* MOBILE: Tombol Ganti Desa */}
+        {/* Mobile: Ganti Desa */}
         {selectedDesaId && (
           <div className="lg:hidden p-3 border-b border-zinc-100">
             <button
@@ -353,151 +492,84 @@ export const Persil = () => {
             </div>
           ) : (
             <>
-              {/* Mobile Cards */}
-              <div className="lg:hidden space-y-3">
+              {/* List Persil */}
+              <div className="space-y-2">
                 {filteredPersils.map(p => {
                   const isVoid = p.is_void === true;
                   return (
-                    <div key={p.id} className={`bg-white border border-zinc-100 rounded-xl p-4 shadow-sm ${isVoid ? 'opacity-50' : ''}`}>
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <span className={`font-black text-lg ${isVoid ? 'line-through text-zinc-400' : 'text-zinc-900'}`}>
-                            {p.nomor_persil || '-'}
-                          </span>
-                          {isVoid && (
-                            <span className="ml-2 text-[8px] font-black text-red-500 uppercase bg-red-50 px-1.5 py-0.5 rounded">
-                              Dicoret
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isVoid ? 'bg-zinc-300' : 'bg-zinc-200'}`}>
-                            <Hash size={12} className="text-zinc-500"/>
+                    <div key={p.id} className={`group bg-white border ${isVoid ? 'border-red-100 bg-red-50/30' : 'border-zinc-100'} rounded-xl transition-all`}>
+                      <div className="p-4 lg:p-5">
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                          {/* Left */}
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isVoid ? 'bg-zinc-300' : 'bg-zinc-100'}`}>
+                              <Hash size={18} className="text-zinc-500" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className={`font-black text-xl ${isVoid ? 'line-through text-zinc-400' : 'text-zinc-900'}`}>
+                                  {p.nomor_persil || '-'}
+                                </span>
+                                {isVoid && (
+                                  <span className="text-[8px] font-black text-red-500 uppercase bg-red-100 px-1.5 py-0.5 rounded">
+                                    Dicoret
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-zinc-500">
+                                C.{p.letter_c?.nomor_c || '-'} • {p.letter_c?.nama_pemilik || '-'}
+                              </p>
+                            </div>
                           </div>
-                          <span className={`font-black text-lg ${isVoid ? 'line-through text-zinc-400' : 'text-zinc-800'}`}>
-                            {p.letter_c?.nomor_c ? `C.${p.letter_c.nomor_c}` : '-'}
-                          </span>
+
+                          {/* Right */}
+                          <div className="flex flex-wrap items-center gap-3 lg:gap-4">
+                            <span className={`text-xs font-bold px-3 py-1.5 rounded-lg ${
+                              p.jenis_tanah === 'Sawah' ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-orange-700'
+                            }`}>
+                              {p.jenis_tanah || '-'}
+                            </span>
+                            <span className="text-sm font-bold text-zinc-400 bg-zinc-100 px-3 py-1.5 rounded-lg">
+                              {p.klas_desa || '-'}
+                            </span>
+                            <span className="font-bold text-zinc-800">
+                              {p.luas_meter?.toLocaleString('id-ID') || '0'} m²
+                            </span>
+                          </div>
                         </div>
-                      </div>
-
-                      <p className={`font-bold text-zinc-800 text-sm mb-2 ${isVoid ? 'line-through text-zinc-400' : ''}`}>
-                        {p.letter_c?.nama_pemilik || "Tanpa Nama"}
-                      </p>
-
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className={`text-[9px] font-black px-2 py-1 rounded-md uppercase ${
-                          isVoid ? 'bg-zinc-200 text-zinc-500' :
-                          p.jenis_tanah === 'Sawah' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'
-                        }`}>
-                          {p.jenis_tanah || '-'}
-                        </span>
-                        <span className={`text-sm font-bold px-2 py-0.5 rounded-md ${
-                          isVoid ? 'bg-zinc-200 text-zinc-500' : 'bg-zinc-100 text-zinc-500'
-                        }`}>
-                          {p.klas_desa || '-'}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-end items-center gap-2">
-                        <span className={`font-black text-xl ${isVoid ? 'line-through text-zinc-400' : 'text-zinc-900'}`}>
-                          {p.luas_meter ? p.luas_meter.toLocaleString('id-ID') : '0'}
-                        </span>
-                        <span className="text-[10px] font-bold text-zinc-400">m²</span>
+                        
+                        {p.asal_usul && (
+                          <div className="mt-3 pt-3 border-t border-zinc-100">
+                            <p className="text-xs text-zinc-500 italic">Keterangan: {p.asal_usul}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Desktop Table */}
-              <div className="hidden lg:block overflow-x-auto">
-                <table className="w-full text-left border-separate border-spacing-y-2">
-                  <thead>
-                    <tr className="text-[11px] font-black text-zinc-300 uppercase tracking-[0.2em]">
-                      <th className="pb-4 px-6">No. Persil</th>
-                      <th className="pb-4">No. Kohir</th>
-                      <th className="pb-4">Nama Pemilik</th>
-                      <th className="pb-4">Jenis & Klas</th>
-                      <th className="pb-4 text-right px-6">Luas Tanah</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredPersils.map(p => {
-                      const isVoid = p.is_void === true;
-                      return (
-                        <tr key={p.id} className={`group transition-all ${isVoid ? 'opacity-50' : ''}`}>
-                          <td className={`py-6 px-6 bg-zinc-50/50 rounded-l-[1.5rem] font-black text-xl transition-all group-hover:bg-zinc-900 group-hover:text-white ${
-                            isVoid ? 'line-through text-zinc-400' : 'text-zinc-900'
-                          }`}>
-                            {p.nomor_persil || '-'}
-                            {isVoid && (
-                              <span className="ml-2 text-[8px] font-black text-red-500 uppercase bg-red-50 px-1.5 py-0.5 rounded">
-                                Dicoret
-                              </span>
-                            )}
-                          </td>
-
-                          <td className="py-6 bg-zinc-50/50 group-hover:bg-zinc-50 transition-colors">
-                            <div className="flex items-center gap-2">
-                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                                isVoid ? 'bg-zinc-300' : 'bg-zinc-200 group-hover:bg-zinc-300'
-                              }`}>
-                                <Hash size={12} className="text-zinc-500"/>
-                              </div>
-                              <span className={`font-black text-lg ${isVoid ? 'text-zinc-400 line-through' : 'text-zinc-800'}`}>
-                                {p.letter_c?.nomor_c ? `C.${p.letter_c.nomor_c}` : '-'}
-                              </span>
-                            </div>
-                          </td>
-
-                          <td className="py-6 bg-zinc-50/50 group-hover:bg-zinc-50 transition-colors">
-                            <div className={`font-black uppercase tracking-tight text-base leading-none ${
-                              isVoid ? 'text-zinc-400 line-through' : 'text-zinc-800'
-                            }`}>
-                              {p.letter_c?.nama_pemilik || "Tanpa Nama"}
-                            </div>
-                          </td>
-
-                          <td className="py-6 bg-zinc-50/50 group-hover:bg-zinc-50 transition-colors">
-                            <div className="flex items-center gap-2">
-                              <span className={`text-[9px] font-black px-2 py-1 rounded-md uppercase ${
-                                isVoid ? 'bg-zinc-200 text-zinc-500' :
-                                p.jenis_tanah === 'Sawah' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'
-                              }`}>
-                                {p.jenis_tanah || '-'}
-                              </span>
-                              <span className={`text-sm font-bold px-2 py-0.5 rounded-md ${
-                                isVoid ? 'bg-zinc-200 text-zinc-500' : 'bg-zinc-100 text-zinc-500'
-                              }`}>
-                                {p.klas_desa || '-'}
-                              </span>
-                            </div>
-                          </td>
-
-                          <td className={`py-6 px-6 bg-zinc-50/50 rounded-r-[1.5rem] text-right group-hover:bg-zinc-50 transition-colors ${
-                            isVoid ? 'line-through text-zinc-400' : ''
-                          }`}>
-                            <div className="flex items-center justify-end gap-2">
-                              <span className="font-black text-xl text-zinc-900">
-                                {p.luas_meter ? p.luas_meter.toLocaleString('id-ID') : '0'}
-                              </span>
-                              <span className="text-[10px] font-bold text-zinc-400">m²</span>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
               {/* Info jumlah data */}
-              <div className="mt-4 text-xs text-zinc-400 font-bold px-2 lg:px-6">
-                Menampilkan {filteredPersils.length} dari {persilList.length} persil
-                {!showVoid && persilList.filter(p => p.is_void).length > 0 && (
-                  <span className="ml-2">
-                    ( {persilList.filter(p => p.is_void).length} persil dicoret )
-                  </span>
+              <div className="mt-6 text-xs text-zinc-400 font-medium px-2 flex justify-between items-center">
+                <span>
+                  Menampilkan {filteredPersils.length} dari {persilList.length} persil
+                  {!showVoid && persilList.filter(p => p.is_void).length > 0 && (
+                    <span className="ml-2 text-amber-600">
+                      ⚡ {persilList.filter(p => p.is_void).length} dicoret
+                    </span>
+                  )}
+                </span>
+                
+                {/* Tombol PDF Mobile */}
+                {filteredPersils.length > 0 && (
+                  <button
+                    onClick={handlePrintPDF}
+                    disabled={printLoading}
+                    className="lg:hidden flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-xl"
+                  >
+                    {printLoading ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                    PDF
+                  </button>
                 )}
               </div>
             </>

@@ -1,16 +1,15 @@
 import { useState, useEffect } from 'react';
 import { 
   Plus, MapPin, User, FolderPlus, Loader2, X, Trash2, Search, Layers, Edit3, Camera, ImageIcon, 
-  Ban, ChevronLeft, ChevronRight, AlertCircle, Menu, ChevronDown, Printer
+  Ban, ChevronLeft, ChevronRight, AlertCircle, Menu, ChevronDown, Printer, FileText
 } from 'lucide-react';
 import { supabase } from '../../services/db'; 
 import { processLetterC } from '../../services/ocr';
 import { Kecamatan, Desa, LetterC, LetterCPersil } from '../../types';
 import ReactCrop, { Crop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
-import { saveAs } from 'file-saver';
-import PizZip from 'pizzip';
-import Docxtemplater from 'docxtemplater';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface FormTambahCProps {
   selectedDesaId: string;
@@ -88,132 +87,162 @@ export const DataLetterC = () => {
     }
   };
 
-  // Fungsi untuk mencetak kutipan Letter C
-  const handlePrintKutipan = async (kohir: LetterC) => {
-    try {
-      setPrintLoading(kohir.id);
-      
-      // Ambil data desa dan kecamatan
-      const desa = desas.find(d => d.id === selectedDesaId);
-      const kecamatan = kecamatans.find(k => k.id === desa?.kecamatan_id);
-      
-      if (!desa || !kecamatan) {
-        alert("Data desa tidak ditemukan");
-        return;
-      }
-
-      // Ambil data persil untuk kohir ini
-      const { data: persils } = await supabase
-        .from('letter_c_persil')
-        .select('*')
-        .eq('letter_c_id', kohir.id)
-        .order('nomor_persil');
-
-      // Kelompokkan persil berdasarkan jenis tanah
-      const persilSawah = persils?.filter(p => p.jenis_tanah === 'Sawah') || [];
-      const persilKering = persils?.filter(p => p.jenis_tanah === 'Tanah Kering') || [];
-
-      // Siapkan data untuk template (placeholder pendek)
-      const dataForTemplate: Record<string, any> = {
-        desa: desa.nama.toUpperCase(),
-        kec: kecamatan.nama.toUpperCase(),
-        nama: kohir.nama_pemilik.toUpperCase(),
-        no_c: kohir.nomor_c,
-        alamat: kohir.alamat_pemilik || '-',
-        tempat: 'Jepara',
-        tgl: new Date().toLocaleDateString('id-ID', { 
-          day: 'numeric', 
-          month: 'long', 
-          year: 'numeric' 
-        }),
-        petinggi: 'ABDUL BASIR, S.Kom.I' // Bisa diambil dari data desa nanti
-      };
-
-      // Data persil SAWAH (kiri) - maksimal 10 baris
-      for (let i = 0; i < 10; i++) {
-        const idx = i + 1;
-        if (i < persilSawah.length) {
-          const p = persilSawah[i];
-          dataForTemplate[`ps${idx}`] = p.nomor_persil || '';
-          dataForTemplate[`ks${idx}`] = p.klas_desa || '';
-          dataForTemplate[`ls${idx}`] = p.luas_meter || 0;
-          dataForTemplate[`ket${idx}`] = p.asal_usul || '';
-        } else {
-          dataForTemplate[`ps${idx}`] = '';
-          dataForTemplate[`ks${idx}`] = '';
-          dataForTemplate[`ls${idx}`] = '';
-          dataForTemplate[`ket${idx}`] = '';
-        }
-      }
-
-      // Data persil TANAH KERING (kanan) - maksimal 10 baris
-      for (let i = 0; i < 10; i++) {
-        const idx = i + 1;
-        if (i < persilKering.length) {
-          const p = persilKering[i];
-          dataForTemplate[`pk${idx}`] = p.nomor_persil || '';
-          dataForTemplate[`kk${idx}`] = p.klas_desa || '';
-          dataForTemplate[`lk${idx}`] = p.luas_meter || 0;
-          dataForTemplate[`ketk${idx}`] = p.asal_usul || '';
-        } else {
-          dataForTemplate[`pk${idx}`] = '';
-          dataForTemplate[`kk${idx}`] = '';
-          dataForTemplate[`lk${idx}`] = '';
-          dataForTemplate[`ketk${idx}`] = '';
-        }
-      }
-
-      // Generate Word document
-      await generateKutipanWord(dataForTemplate);
-      
-    } catch (error) {
-      console.error('Error printing:', error);
-      alert('Gagal mencetak dokumen');
-    } finally {
-      setPrintLoading(null);
+  // Fungsi untuk mencetak PDF per kohir
+  // Fungsi untuk mencetak PDF per kohir
+const handlePrintPDF = async (kohir: LetterC) => {
+  try {
+    setPrintLoading(kohir.id);
+    
+    // Ambil data desa dan kecamatan
+    const desa = desas.find(d => d.id === selectedDesaId);
+    const kecamatan = kecamatans.find(k => k.id === desa?.kecamatan_id);
+    
+    if (!desa || !kecamatan) {
+      alert("Data desa tidak ditemukan");
+      return;
     }
-  };
 
-  // Fungsi untuk generate Word document
-  const generateKutipanWord = async (data: any) => {
-    try {
-      // Load template file dari public folder
-      const response = await fetch('../../public/templates/kutipan-letter-c.docx');
-      if (!response.ok) {
-        throw new Error('Template file tidak ditemukan');
-      }
-      
-      const templateBlob = await response.blob();
-      const arrayBuffer = await templateBlob.arrayBuffer();
-      
-      // Inisialisasi PizZip dan Docxtemplater
-      const zip = new PizZip(arrayBuffer);
-      const doc = new Docxtemplater(zip, {
-        paragraphLoop: true,
-        linebreaks: true,
-        delimiters: { start: '{', end: '}' },
-        nullGetter: () => ''
+    // Ambil data persil untuk kohir ini
+    const { data: persils } = await supabase
+      .from('letter_c_persil')
+      .select('*')
+      .eq('letter_c_id', kohir.id)
+      .order('nomor_persil');
+
+    // Buat dokumen PDF
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    // Kop Surat
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('KUTIPAN LETTER C', doc.internal.pageSize.width / 2, 15, { align: 'center' });
+    
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Desa ${desa.nama.toUpperCase()} - Kecamatan ${kecamatan.nama.toUpperCase()}`, doc.internal.pageSize.width / 2, 22, { align: 'center' });
+    
+    // Garis pemisah
+    doc.setLineWidth(0.5);
+    doc.line(10, 27, doc.internal.pageSize.width - 10, 27);
+
+    // Info pemilik
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Data Pemilik:', 15, 35);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    
+    doc.text(`Nomor Kohir: C.${kohir.nomor_c}`, 25, 42);
+    doc.text(`Nama Pemilik: ${kohir.nama_pemilik}`, 25, 48);
+    doc.text(`Alamat: ${kohir.alamat_pemilik || '-'}`, 25, 54);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text('Tanggal Cetak:', 120, 42);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${new Date().toLocaleDateString('id-ID', { 
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric' 
+    })}`, 150, 42);
+
+    // Garis pemisah
+    doc.setLineWidth(0.3);
+    doc.line(10, 60, doc.internal.pageSize.width - 10, 60);
+
+    // Tabel Persil
+    if (persils && persils.length > 0) {
+      const tableData = persils.map((p, index) => [
+        index + 1,
+        p.nomor_persil || '-',
+        p.jenis_tanah || '-',
+        p.klas_desa || '-',
+        (p.luas_meter || 0).toLocaleString('id-ID'),
+        p.asal_usul || '-',
+        p.is_void ? 'DICORET' : 'AKTIF'
+      ]);
+
+      autoTable(doc, {
+        head: [['No.', 'No. Persil', 'Jenis', 'Klas', 'Luas (m²)', 'Keterangan', 'Status']],
+        body: tableData,
+        startY: 65,
+        styles: {
+          fontSize: 9,
+          cellPadding: 3,
+          lineColor: [0, 0, 0],
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: [80, 80, 80],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          halign: 'center'
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245]
+        },
+        columnStyles: {
+          0: { cellWidth: 10 },
+          1: { cellWidth: 25 },
+          2: { cellWidth: 25 },
+          3: { cellWidth: 15 },
+          4: { cellWidth: 20 },
+          5: { cellWidth: 50 },
+          6: { cellWidth: 15 }
+        }
       });
-
-      // Render data
-      doc.render(data);
-
-      // Generate blob
-      const generatedBlob = doc.getZip().generate({
-        type: 'blob',
-        compression: 'DEFLATE',
-        compressionOptions: { level: 9 }
-      });
-
-      // Download file
-      const fileName = `KUTIPAN_C_${data.no_c}_${new Date().getTime()}.docx`;
-      saveAs(generatedBlob, fileName);
-
-    } catch (error) {
-      console.error('Error generating document:', error);
-      throw error;
+    } else {
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'italic');
+      doc.text('Tidak ada data persil', doc.internal.pageSize.width / 2, 75, { align: 'center' });
     }
-  };
+
+    // TANDA TANGAN
+    const finalY = (doc as any).lastAutoTable?.finalY || 100;
+    
+    // Garis pemisah sebelum tanda tangan
+    doc.setLineWidth(0.3);
+    doc.line(10, finalY + 15, doc.internal.pageSize.width - 10, finalY + 15);
+    
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TANDA TANGAN', doc.internal.pageSize.width / 2, finalY + 25, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    
+    // Tanda Tangan Kiri (Kepala Desa)
+    const jabatanKades = desa.jenis_kades || 'Kepala Desa';
+    doc.text(`${jabatanKades} ${desa.nama}`, 40, finalY + 40);
+    doc.text('( ____________________ )', 40, finalY + 50);
+    
+    // Tanda Tangan Kanan (Pemohon)
+    doc.text('Pemohon / Pemilik', doc.internal.pageSize.width - 70, finalY + 40);
+    doc.text('( ____________________ )', doc.internal.pageSize.width - 70, finalY + 50);
+    
+    // Tanggal cetak di tengah bawah
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'italic');
+    doc.text(`Dicetak pada: ${new Date().toLocaleDateString('id-ID', { 
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric' 
+    })}`, doc.internal.pageSize.width / 2, finalY + 70, { align: 'center' });
+
+    // Download PDF
+    doc.save(`KUTIPAN_C_${kohir.nomor_c}_${new Date().getTime()}.pdf`);
+
+  } catch (error) {
+    console.error('Error printing PDF:', error);
+    alert('Gagal mencetak PDF');
+  } finally {
+    setPrintLoading(null);
+  }
+};
 
   // Filter kecamatan yang memiliki desa sesuai search
   const filteredKecamatans = kecamatans
@@ -483,17 +512,17 @@ export const DataLetterC = () => {
                           </a>
                         )}
                         
-                        {/* TOMBOL PRINT */}
+                        {/* TOMBOL PRINT PDF (warna merah) */}
                         <button 
-                          onClick={() => handlePrintKutipan(k)} 
+                          onClick={() => handlePrintPDF(k)} 
                           disabled={printLoading === k.id}
-                          className="p-3 text-zinc-300 hover:text-green-700 hover:bg-green-50 rounded-xl border border-transparent hover:border-green-100 transition-all disabled:opacity-50"
-                          title="Cetak Kutipan Letter C"
+                          className="p-3 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl border border-transparent hover:border-red-200 transition-all disabled:opacity-50"
+                          title="Cetak PDF"
                         >
                           {printLoading === k.id ? (
                             <Loader2 size={18} className="animate-spin" />
                           ) : (
-                            <Printer size={18} />
+                            <FileText size={18} />
                           )}
                         </button>
                         
