@@ -72,8 +72,7 @@ export const Persil = () => {
               desa_id
             )
           `)
-          .eq('letter_c.desa_id', selectedDesaId)
-          .order('nomor_persil');
+          .eq('letter_c.desa_id', selectedDesaId);
 
         if (error) throw error;
 
@@ -82,7 +81,21 @@ export const Persil = () => {
             ...item,
             letter_c: Array.isArray(item.letter_c) ? item.letter_c[0] : item.letter_c
           }));
-          setPersilList(normalized);
+          
+          // Sorting: pertama berdasarkan nomor_persil, lalu berdasarkan nomor_c
+          const sorted = normalized.sort((a, b) => {
+            // Sort by nomor_persil (ascending)
+            const persilA = parseInt(a.nomor_persil) || 0;
+            const persilB = parseInt(b.nomor_persil) || 0;
+            if (persilA !== persilB) return persilA - persilB;
+            
+            // If same nomor_persil, sort by nomor_c (ascending)
+            const kohirA = parseInt(a.letter_c?.nomor_c) || 0;
+            const kohirB = parseInt(b.letter_c?.nomor_c) || 0;
+            return kohirA - kohirB;
+          });
+          
+          setPersilList(sorted);
         } else {
           setPersilList([]);
         }
@@ -110,6 +123,7 @@ export const Persil = () => {
     }))
     .filter(kec => kec.desas.length > 0);
 
+  // Filter berdasarkan nomor persil (exact match)
   const filteredPersils = persilList.filter(p => {
     const noPersil = String(p.nomor_persil || "").trim();
     const cari = searchTerm.trim();
@@ -182,7 +196,7 @@ export const Persil = () => {
         year: 'numeric' 
       })}`, 45, 55);
 
-      // Data tabel
+      // Data tabel - sudah terfilter dan terurut
       const tableData = filteredPersils.map((p, index) => [
         index + 1,
         p.nomor_persil || '-',
@@ -492,7 +506,7 @@ export const Persil = () => {
             </div>
           ) : (
             <>
-              {/* List Persil */}
+              {/* List Persil - sudah terurut */}
               <div className="space-y-2">
                 {filteredPersils.map(p => {
                   const isVoid = p.is_void === true;
