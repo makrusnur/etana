@@ -1,13 +1,217 @@
+// src/pages/PbbManager.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Edit2,Printer, Map as MapIcon, Table as TableIcon,
+  Edit2, Printer, Map as MapIcon, Table as TableIcon,
   Search, Plus, Save, X, LayoutDashboard, 
   ChevronRight, Building2, Map, Users, Settings2,
-  Trash2, Loader2, Home, FileText, Globe, TrendingUp
+  Trash2, Loader2, Home, FileText, Globe, TrendingUp,
+  Upload, Image as ImageIcon, ZoomIn, ZoomOut, Move, CheckCircle
 } from 'lucide-react';
 import { supabase } from '../../services/db';
 import { PBB_OPTIONS, sanitizePbbPayload } from '../../types';
-import LandMap from '../../components/LandMap';
+
+// ==========================================
+// KOMPONEN PETA DESA INTERAKTIF
+// ==========================================
+interface DesaMapPickerProps {
+  desaId: string;
+  desaName: string;
+  petaUrl?: string;
+  petaWidth?: number;
+  petaHeight?: number;
+  petaBounds?: { minLng: number; maxLng: number; minLat: number; maxLat: number };
+  onLocationSelect: (lat: number, lng: number, pixelX: number, pixelY: number) => void;
+  initialLat?: number;
+  initialLng?: number;
+}
+
+const DesaMapPicker: React.FC<DesaMapPickerProps> = ({
+  desaId,
+  desaName,
+  petaUrl,
+  petaWidth,
+  petaHeight,
+  petaBounds,
+  onLocationSelect,
+  initialLat,
+  initialLng
+}) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [selectedPixel, setSelectedPixel] = useState<{ x: number; y: number } | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  // Konversi pixel ke koordinat dunia
+  const pixelToLatLng = (x: number, y: number) => {
+    if (!petaBounds || !petaWidth || !petaHeight) {
+      return { lat: -7.6448, lng: 112.9061 };
+    }
+    const lng = petaBounds.minLng + (x / petaWidth) * (petaBounds.maxLng - petaBounds.minLng);
+    const lat = petaBounds.minLat + (y / petaHeight) * (petaBounds.maxLat - petaBounds.minLat);
+    return { lat, lng };
+  };
+
+  // Konversi koordinat dunia ke pixel
+  const latLngToPixel = (lat: number, lng: number) => {
+    if (!petaBounds || !petaWidth || !petaHeight) {
+      return { x: 0, y: 0 };
+    }
+    const x = ((lng - petaBounds.minLng) / (petaBounds.maxLng - petaBounds.minLng)) * petaWidth;
+    const y = ((lat - petaBounds.minLat) / (petaBounds.maxLat - petaBounds.minLat)) * petaHeight;
+    return { x, y };
+  };
+
+  // Gambar peta ke canvas
+  const drawMap = () => {
+    if (!canvasRef.current || !petaUrl) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const img = new Image();
+    img.onload = () => {
+      canvas.width = petaWidth || img.width;
+      canvas.height = petaHeight || img.height;
+      
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.save();
+      ctx.translate(pan.x, pan.y);
+      ctx.scale(zoom, zoom);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      
+      // Gambar titik yang sudah ada (jika ada)
+      if (initialLat && initialLng && petaBounds) {
+        const pixel = latLngToPixel(initialLat, initialLng);
+        ctx.beginPath();
+        ctx.arc(pixel.x, pixel.y, 8 / zoom, 0, 2 * Math.PI);
+        ctx.fillStyle = '#ef4444';
+        ctx.fill();
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2 / zoom;
+        ctx.stroke();
+      }
+      
+      // Gambar titik yang dipilih
+      if (selectedPixel) {
+        ctx.beginPath();
+        ctx.arc(selectedPixel.x, selectedPixel.y, 10 / zoom, 0, 2 * Math.PI);
+        ctx.fillStyle = '#f59e0b';
+        ctx.fill();
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 3 / zoom;
+        ctx.stroke();
+      }
+      
+      ctx.restore();
+      setImageLoaded(true);
+    };
+    img.src = petaUrl;
+  };
+
+  useEffect(() => {
+    if (petaUrl) {
+      drawMap();
+    }
+  }, [petaUrl, selectedPixel, zoom, pan, initialLat, initialLng]);
+
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!canvasRef.current || !petaBounds || !petaWidth || !petaHeight) return;
+    
+    const rect = canvasRef.current.getBoundingClientRect();
+    const scaleX = canvasRef.current.width / rect.width;
+    const scaleY = canvasRef.current.height / rect.height;
+    
+    const canvasX = (e.clientX - rect.left) * scaleX;
+    const canvasY = (e.clientY - rect.top) * scaleY;
+    
+    const originalX = (canvasX - pan.x) / zoom;
+    const originalY = (canvasY - pan.y) / zoom;
+    
+    // Batasi dalam area gambar
+    const clampedX = Math.max(0, Math.min(petaWidth, originalX));
+    const clampedY = Math.max(0, Math.min(petaHeight, originalY));
+    
+    setSelectedPixel({ x: clampedX, y: clampedY });
+    
+    const { lat, lng } = pixelToLatLng(clampedX, clampedY);
+    onLocationSelect(lat, lng, clampedX, clampedY);
+  };
+
+  const handleZoomIn = () => setZoom(Math.min(zoom * 1.2, 5));
+  const handleZoomOut = () => setZoom(Math.max(zoom / 1.2, 0.5));
+  
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+  };
+  
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+  };
+  
+  const handleMouseUp = () => setIsDragging(false);
+
+  if (!petaUrl) {
+    return (
+      <div className="h-[400px] bg-slate-100 rounded-2xl flex flex-col items-center justify-center">
+        <ImageIcon size={48} className="text-slate-300 mb-3" />
+        <p className="text-sm text-slate-500 font-medium">Belum ada peta untuk desa ini</p>
+        <p className="text-xs text-slate-400 mt-1">Upload peta desa di menu <strong>Master Wilayah</strong></p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-between items-center">
+        <div className="text-xs text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full">
+          🖱️ Klik pada peta untuk menentukan lokasi NOP
+        </div>
+        <div className="flex gap-1">
+          <button onClick={handleZoomIn} className="p-1.5 hover:bg-slate-100 rounded-lg transition" title="Perbesar">
+            <ZoomIn size={14}/>
+          </button>
+          <button onClick={handleZoomOut} className="p-1.5 hover:bg-slate-100 rounded-lg transition" title="Perkecil">
+            <ZoomOut size={14}/>
+          </button>
+        </div>
+      </div>
+      <div 
+        className="relative border rounded-xl overflow-hidden bg-slate-100 shadow-inner"
+        style={{ height: '420px' }}
+      >
+        <canvas
+          ref={canvasRef}
+          className="w-full h-full cursor-crosshair"
+          onClick={handleCanvasClick}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          style={{ cursor: isDragging ? 'grabbing' : 'crosshair' }}
+        />
+        {selectedPixel && (
+          <div className="absolute bottom-2 right-2 bg-black/80 text-white px-2 py-1 rounded text-[10px] font-mono">
+            Pixel: ({Math.round(selectedPixel.x)}, {Math.round(selectedPixel.y)})
+          </div>
+        )}
+      </div>
+      {petaBounds && (
+        <div className="text-[9px] text-slate-400 text-center bg-slate-50 py-2 rounded-lg">
+          Rentang koordinat: {petaBounds.minLng.toFixed(4)}° - {petaBounds.maxLng.toFixed(4)}° BT | 
+          {petaBounds.minLat.toFixed(4)}° - {petaBounds.maxLat.toFixed(4)}° LS
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==========================================
+// MAIN PbbManager COMPONENT
+// ==========================================
 
 export const PbbManager = () => {
   const [loading, setLoading] = useState(false);
@@ -23,9 +227,17 @@ export const PbbManager = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  
+  // State untuk data peta desa
+  const [desaPeta, setDesaPeta] = useState<{
+    url?: string;
+    width?: number;
+    height?: number;
+    bounds?: { minLng: number; maxLng: number; minLat: number; maxLat: number };
+  }>({});
 
   const initialForm: any = {
-    tahun_pajak: '2026',
+    tahun_pajak: new Date().getFullYear().toString(),
     tgl_rekam: new Date().toISOString().split('T')[0],
     nop: '', nama_wp: '', nik: '', npwp: '', pekerjaan: 'SWASTA', status_wp: 'PEMILIK',
     jalan_op: '', blok_op: '', rt_op: '', rw_op: '',
@@ -38,65 +250,86 @@ export const PbbManager = () => {
     f_pagar_panjang: '', f_pagar_bahan: 'BATA/BATAKO',
     f_paving_luas: '', f_lift_penumpang: '', f_lift_barang: '',
     f_pemadam_hydrant: false, f_pemadam_sprinkler: false, f_pemadam_alarm: false,
-    latitude: '',longitude: ''
+    latitude: '', longitude: ''
   };
 
-
-  const [isEdit, setIsEdit] = useState(false); // Tambahkan ini
   const [formData, setFormData] = useState(initialForm);
 
-  // Fungsi ini tetap menggunakan nama aslinya agar tidak error di bagian lain
-const fetchWilayah = async () => {
-  try {
-    // A. Ambil Data Wilayah (Tetap seperti kode awal Bapak)
-    const { data: kec } = await supabase.from('kecamatan').select('*').order('nama');
-    const { data: des } = await supabase.from('desa').select('*').order('nama');
-    setKecamatans(kec || []);
-    setDesas(des || []);
+  // Ambil data wilayah dan statistik
+  const fetchWilayah = async () => {
+    try {
+      const { data: kec } = await supabase.from('kecamatan').select('*').order('nama');
+      const { data: des } = await supabase.from('desa').select('*').order('nama');
+      setKecamatans(kec || []);
+      setDesas(des || []);
 
-    // B. Hitung Statistik Real (Hanya ambil kolom yg perlu saja agar ringan)
-    const { data: records } = await supabase
-      .from('pbb_records')
-      .select('luas_bumi, desa_id');
+      const { data: records } = await supabase
+        .from('pbb_records')
+        .select('luas_bumi, desa_id');
 
-    if (records) {
-      const total = records.length;
-      const totalLuas = records.reduce((acc, curr) => acc + (Number(curr.luas_bumi) || 0), 0);
-      
-      // Menggunakan Set untuk menghitung desa mana saja yang sudah ada datanya (Unique)
-      const uniqueDesas = new Set(records.map(r => r.desa_id)).size;
-
-      setStats({
-        totalNop: total,
-        avgLuas: total > 0 ? Math.round(totalLuas / total) : 0,
-        desaAktif: uniqueDesas
-      });
+      if (records) {
+        const total = records.length;
+        const totalLuas = records.reduce((acc, curr) => acc + (Number(curr.luas_bumi) || 0), 0);
+        const uniqueDesas = new Set(records.map(r => r.desa_id)).size;
+        setStats({
+          totalNop: total,
+          avgLuas: total > 0 ? Math.round(totalLuas / total) : 0,
+          desaAktif: uniqueDesas
+        });
+      }
+    } catch (error) {
+      console.error("Gagal sinkronisasi data:", error);
     }
-  } catch (error) {
-    console.error("Gagal sinkronisasi data:", error);
-  }
-};
-
-// Pemanggilan saat halaman pertama kali dibuka
-useEffect(() => {
-  fetchWilayah();
-}, []);
+  };
 
   useEffect(() => {
-    // Ambil ID dari URL (Contoh: #/pbb?edit=12)
+    fetchWilayah();
+  }, []);
+
+  // Ambil data peta desa saat selectedDesa berubah
+  // Di PbbManager.tsx, ganti useEffect yang mengambil peta_desa
+useEffect(() => {
+  if (selectedDesa) {
+    const loadDesaPeta = async () => {
+      try {
+        // Hanya ambil kolom yang ada
+        const { data, error } = await supabase
+          .from('desa')
+          .select('dwg_url, peta_width, peta_height')
+          .eq('id', selectedDesa.id)
+          .single();
+        
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error loading peta:', error);
+        }
+        
+        if (data) {
+          setDesaPeta({
+            url: data.dwg_url,
+            width: data.peta_width || 800,
+            height: data.peta_height || 600
+          });
+        }
+      } catch (err) {
+        console.error('Error:', err);
+      }
+    };
+    loadDesaPeta();
+  }
+}, [selectedDesa]);
+
+  // Handle edit dari URL
+  useEffect(() => {
     const hashParts = window.location.hash.split('?');
     const params = new URLSearchParams(hashParts.length > 1 ? hashParts[1] : '');
     const editId = params.get('edit');
   
-    // Jika tidak ada ID yang mau diedit, jangan lakukan apa-apa
     if (!editId) return;
   
     const initiateEdit = async () => {
       try {
-        // 1. Cari dulu di data yang sudah ter-load (pbbRecords)
         let target = pbbRecords.find(r => String(r.id) === String(editId));
   
-        // 2. Kalau tidak ada (karena beda desa), tarik paksa langsung ke database
         if (!target) {
           const { data, error } = await supabase
             .from('pbb_records')
@@ -108,21 +341,15 @@ useEffect(() => {
           target = data;
         }
   
-        // 3. Masukkan ke Form jika data ditemukan
         if (target) {
           setFormData({
-            ...initialForm, // Template field lengkap
-            ...target,      // Timpa dengan data dari DB
+            ...initialForm,
+            ...target,
             latitude: target.latitude?.toString() || '',
             longitude: target.longitude?.toString() || ''
           });
-  
-          // Nyalakan semua trigger untuk buka modal
           setEditingId(editId);
-          setIsEdit(true);
           setIsModalOpen(true);
-  
-          // Bersihkan URL agar tidak looping saat refresh
           window.history.replaceState(null, '', '#/pbb');
         }
       } catch (err) {
@@ -131,8 +358,8 @@ useEffect(() => {
     };
   
     initiateEdit();
-  }, [pbbRecords, window.location.hash]); // Pantau perubahan data dan URL
-    
+  }, [pbbRecords]);
+
   const fetchRecords = async (desaId: string) => {
     setLoading(true);
     const { data } = await supabase.from('pbb_records').select('*').eq('desa_id', desaId).order('created_at', { ascending: false });
@@ -147,11 +374,9 @@ useEffect(() => {
     
     let error;
     if (editingId) {
-      // Jika ada editingId, lakukan UPDATE
       const { error: err } = await supabase.from('pbb_records').update(cleanData).eq('id', editingId);
       error = err;
     } else {
-      // Jika tidak ada, lakukan INSERT
       const { error: err } = await supabase.from('pbb_records').insert([{
         ...cleanData,
         desa_id: selectedDesa.id,
@@ -162,9 +387,10 @@ useEffect(() => {
 
     if (!error) {
       setIsModalOpen(false);
-      setEditingId(null); // Reset mode edit
+      setEditingId(null);
       setFormData(initialForm);
       fetchRecords(selectedDesa.id);
+      fetchWilayah();
     } else {
       alert("Error: " + error.message);
     }
@@ -175,15 +401,24 @@ useEffect(() => {
     if (!confirm("Hapus data ini?")) return;
     await supabase.from('pbb_records').delete().eq('id', id);
     fetchRecords(selectedDesa.id);
+    fetchWilayah();
   };
-  // Fungsi untuk memicu Mode Edit
+
   const handleEdit = (record: any) => {
     setEditingId(record.id);
-    setFormData({ ...record }); // Mengisi form dengan data yang akan diedit
+    setFormData({ ...record });
     setIsModalOpen(true);
   };
 
-  // Fungsi Cetak SPOP Pasuruan
+  // Handler untuk lokasi dari peta
+  const handleLocationFromMap = (lat: number, lng: number, pixelX: number, pixelY: number) => {
+    setFormData({
+      ...formData,
+      latitude: lat.toString(),
+      longitude: lng.toString()
+    });
+  };
+
   const handlePrint = (r: any) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -211,7 +446,7 @@ useEffect(() => {
           <div class="section">
             <div class="title">A. LETAK OBJEK PAJAK</div>
             <p>Jalan/Blok: ${r.jalan_op || '-'} / ${r.blok_op || '-'}</p>
-            <p>RT/RW: ${r.rt_op}/${r.rw_op} | Desa: ${selectedDesa.nama}</p>
+            <p>RT/RW: ${r.rt_op}/${r.rw_op} | Desa: ${selectedDesa?.nama || '-'}</p>
           </div>
           <div class="section">
             <div class="title">B. DATA SUBJEK PAJAK</div>
@@ -244,7 +479,7 @@ useEffect(() => {
   return (
     <div className="flex h-screen bg-[#F8FAFC] text-slate-900 font-sans antialiased overflow-hidden">
       
-      {/* SIDEBAR: ELEGANT & MINIMAL */}
+      {/* SIDEBAR */}
       <aside className="w-72 bg-white border-r border-slate-200 flex flex-col">
         <div className="p-6 space-y-4">
           <div className="flex items-center gap-3 px-2 mb-6">
@@ -262,16 +497,17 @@ useEffect(() => {
           </button>
 
           <div className="relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={14}/>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14}/>
             <input 
               className="w-full pl-10 pr-4 py-2.5 bg-slate-100 border-transparent border rounded-xl text-xs font-medium focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 outline-none transition-all" 
               placeholder="Cari desa..." 
-              value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-6 scrollbar-thin">
+        <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-6">
           {kecamatans.map(kec => (
             <div key={kec.id} className="space-y-1">
               <div className="px-3 py-2">
@@ -283,7 +519,10 @@ useEffect(() => {
                   onClick={() => { setSelectedDesa(desa); fetchRecords(desa.id); }}
                   className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-between group ${selectedDesa?.id === desa.id ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
-                  {desa.nama}
+                  <span className="flex items-center gap-2">
+                    {desa.peta_url && <CheckCircle size={12} className="text-emerald-500" />}
+                    {desa.nama}
+                  </span>
                   <ChevronRight size={14} className={`transition-transform ${selectedDesa?.id === desa.id ? 'translate-x-0' : '-translate-x-2 opacity-0 group-hover:opacity-100'}`} />
                 </button>
               ))}
@@ -294,18 +533,14 @@ useEffect(() => {
 
       <main className="flex-1 flex flex-col overflow-hidden">
         {!selectedDesa ? (
-          /* ============================================================
-            DASHBOARD RINGKASAN (Tampil jika belum pilih desa)
-            ============================================================ */
+          /* DASHBOARD RINGKASAN */
           <div className="flex-1 overflow-y-auto p-10 space-y-10 bg-[#F8FAFC]">
             <header>
               <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Manajemen Pajak Daerah</h2>
               <p className="text-slate-400 text-sm mt-1 font-medium">Data real-time dari database PBB-P2.</p>
             </header>
 
-            {/* 3 KARTU UTAMA DENGAN DATA REAL */}
             <div className="grid grid-cols-3 gap-8">
-              {/* Kartu 01: Total NOP */}
               <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6">
                 <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center"><FileText size={28}/></div>
                 <div>
@@ -313,8 +548,6 @@ useEffect(() => {
                   <p className="text-3xl font-black text-slate-900">{stats.totalNop.toLocaleString('id-ID')}</p>
                 </div>
               </div>
-
-              {/* Kartu 02: Desa Aktif */}
               <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6">
                 <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center"><Globe size={28}/></div>
                 <div>
@@ -322,8 +555,6 @@ useEffect(() => {
                   <p className="text-3xl font-black text-slate-900">{stats.desaAktif} <span className="text-sm font-bold text-slate-300">Desa</span></p>
                 </div>
               </div>
-
-              {/* Kartu 03: Rata-rata Luas */}
               <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6">
                 <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-3xl flex items-center justify-center"><MapIcon size={28}/></div>
                 <div>
@@ -333,14 +564,12 @@ useEffect(() => {
               </div>
             </div>
 
-            {/* BAR CHART (GRAFIK) DAN LIST DESA */}
             <div className="grid grid-cols-5 gap-8">
               <div className="col-span-3 bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
                 <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-10 flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-indigo-500"></div> Grafik Aktivitas Input
                 </h3>
                 <div className="h-56 flex items-end gap-5">
-                  {/* Ini nanti bisa kita buat real juga grafiknya */}
                   {[30, 45, 25, 60, 75, 50, 40, 90, 100, 85].map((h, i) => (
                     <div key={i} className="flex-1 bg-slate-50 rounded-t-2xl relative group cursor-help">
                       <div className="absolute bottom-0 left-0 right-0 bg-indigo-500/20 group-hover:bg-indigo-600 rounded-t-2xl transition-all" style={{ height: `${h}%` }}></div>
@@ -348,13 +577,15 @@ useEffect(() => {
                   ))}
                 </div>
               </div>
-
               <div className="col-span-2 bg-slate-900 p-10 rounded-[3rem] text-white">
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-8">Daftar Desa</h3>
                 <div className="space-y-4">
                   {desas.slice(0, 6).map((d) => (
                     <div key={d.id} className="flex items-center justify-between py-2 border-b border-white/5">
-                      <span className="text-sm font-bold uppercase">{d.nama}</span>
+                      <span className="text-sm font-bold uppercase flex items-center gap-2">
+                        {d.peta_url && <CheckCircle size={12} className="text-emerald-400" />}
+                        {d.nama}
+                      </span>
                       <ChevronRight size={14} className="text-slate-600" />
                     </div>
                   ))}
@@ -363,6 +594,7 @@ useEffect(() => {
             </div>
           </div>
         ) : (
+          /* DAFTAR NOP PER DESA */
           <div className="flex-1 flex flex-col p-8">
             <header className="flex justify-between items-end mb-10">
               <div>
@@ -370,6 +602,11 @@ useEffect(() => {
                   <span className="bg-indigo-50 px-2 py-1 rounded">MODUL PBB-P2</span>
                   <ChevronRight size={12}/>
                   <span className="text-slate-400">{selectedDesa.nama}</span>
+                  {desaPeta.url && (
+                    <span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded flex items-center gap-1">
+                      <CheckCircle size={10}/> Peta Tersedia
+                    </span>
+                  )}
                 </div>
                 <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Daftar Objek Pajak</h2>
               </div>
@@ -412,23 +649,18 @@ useEffect(() => {
                           </div>
                         </td>
                         <td className="px-8 py-5 text-right">
-                        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {/* TOMBOL PRINT */}
-                          <button onClick={() => handlePrint(r)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl" title="Cetak SPOP">
-                            <Printer size={16}/>
-                          </button>
-                          
-                          {/* TOMBOL EDIT */}
-                          <button onClick={() => handleEdit(r)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl" title="Edit Data">
-                            <Edit2 size={16}/>
-                          </button>
-                          
-                          {/* TOMBOL HAPUS */}
-                          <button onClick={() => handleDelete(r.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl">
-                            <Trash2 size={16}/>
-                          </button>
-                        </div>
-                      </td>
+                          <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => handlePrint(r)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl" title="Cetak SPOP">
+                              <Printer size={16}/>
+                            </button>
+                            <button onClick={() => handleEdit(r)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl" title="Edit Data">
+                              <Edit2 size={16}/>
+                            </button>
+                            <button onClick={() => handleDelete(r.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl">
+                              <Trash2 size={16}/>
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -445,24 +677,25 @@ useEffect(() => {
         )}
       </main>
 
-      {/* MODAL: CLEAN 2-COLUMN GRID */}
-      {isModalOpen && (
+      {/* MODAL FORM - DENGAN PETA INTERAKTIF */}
+      {isModalOpen && selectedDesa && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-6xl h-[90vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
             
-            <div className="px-10 py-6 border-b border-slate-100 flex justify-between items-center">
+            <div className="px-10 py-6 border-b border-slate-100 flex justify-between items-center shrink-0">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-indigo-600 text-white rounded-2xl"><Building2 size={24}/></div>
                 <div>
                   <h3 className="font-bold text-slate-900 text-lg">{editingId ? 'Update Data SPOP' : 'Formulir SPOP Digital'}</h3>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Pendataan Objek & Subjek Pajak</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Desa: {selectedDesa.nama}</p>
                 </div>
               </div>
               <button onClick={() => setIsModalOpen(false)} className="p-3 hover:bg-slate-100 rounded-full transition-all"><X size={20}/></button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-10 space-y-12 scrollbar-hide">
+            <div className="flex-1 overflow-y-auto p-10 space-y-12">
               
+              {/* SECTION 1: NOP & LOKASI */}
               <section className="space-y-6">
                 <div className="flex items-center gap-3">
                   <span className="text-[10px] bg-slate-900 text-white w-6 h-6 flex items-center justify-center rounded-lg font-black italic">01</span>
@@ -470,7 +703,7 @@ useEffect(() => {
                 </div>
                 <div className="grid grid-cols-1 gap-6">
                   <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200/60">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Digit Nomor Objek Pajak</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Digit Nomor Objek Pajak (18 digit)</label>
                     <DigitInput 
                       length={18} value={formData.nop} 
                       onChange={(v: string) => setFormData({...formData, nop: v})} 
@@ -486,6 +719,7 @@ useEffect(() => {
                 </div>
               </section>
 
+              {/* SECTION 2: SUBJEK PAJAK */}
               <section className="space-y-6">
                 <div className="flex items-center gap-3">
                   <span className="text-[10px] bg-slate-900 text-white w-6 h-6 flex items-center justify-center rounded-lg font-black italic">02</span>
@@ -504,6 +738,7 @@ useEffect(() => {
                 </div>
               </section>
 
+              {/* SECTION 3: BUMI & BANGUNAN */}
               <div className="grid grid-cols-2 gap-10">
                 <section className="p-8 bg-indigo-50/50 rounded-3xl border border-indigo-100/50 space-y-6">
                   <h4 className="flex items-center gap-2 font-bold text-xs uppercase tracking-widest text-indigo-900"><Map size={14}/> Detail Bumi</h4>
@@ -525,6 +760,7 @@ useEffect(() => {
                 </section>
               </div>
 
+              {/* SECTION 4: FASILITAS */}
               <section className="p-8 border border-slate-100 rounded-3xl space-y-8">
                 <h4 className="flex items-center gap-2 font-bold text-xs uppercase tracking-widest text-slate-800"><Settings2 size={14}/> Rincian Fasilitas (LSPOP)</h4>
                 <div className="grid grid-cols-4 gap-4">
@@ -544,63 +780,49 @@ useEffect(() => {
                   <Checkbox label="Sistem Sprinkler" checked={formData.f_pemadam_sprinkler} onChange={(v: boolean) => setFormData({...formData, f_pemadam_sprinkler: v})} />
                   <Checkbox label="Fire Alarm" checked={formData.f_pemadam_alarm} onChange={(v: boolean) => setFormData({...formData, f_pemadam_alarm: v})} />
                 </div>
-                {/* BAGIAN INPUT LOKASI DI DALAM POP-UP (PALING BAWAH) */}
-                <div className="mt-8 pt-8 border-t border-slate-200">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="bg-emerald-100 text-emerald-600 p-2 rounded-xl">
-                      <MapIcon size={20} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-900">Lokasi Objek Pajak</h3>
-                      <p className="text-[10px] text-slate-500 font-medium">Klik pada peta untuk memasukkan lokasi baru</p>
-                    </div>
-                  </div>
+              </section>
 
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Latitude</label>
-                      <input 
-                        type="text"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                        value={formData.latitude}
-                        onChange={(e) => setFormData({...formData, latitude: e.target.value})}
-                        placeholder="-7.xxxxx"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Longitude</label>
-                      <input 
-                        type="text"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                        value={formData.longitude}
-                        onChange={(e) => setFormData({...formData, longitude: e.target.value})}
-                        placeholder="112.xxxxx"
-                      />
-                    </div>
+              {/* SECTION 5: LOKASI OBJEK PAJAK - MENGGUNAKAN PETA DESA */}
+              <section className="mt-8 pt-8 border-t border-slate-200">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="bg-emerald-100 text-emerald-600 p-2 rounded-xl">
+                    <MapIcon size={20} />
                   </div>
-
-                  {/* WADAH PETA */}
-                  <div className="h-[300px] w-full rounded-2xl overflow-hidden border border-slate-200 shadow-inner bg-slate-100">
-                    <LandMap 
-                      latitude={parseFloat(formData.latitude) || -7.6448} 
-                      longitude={parseFloat(formData.longitude) || 112.9061} 
-                      onChange={(lat, lng) => {
-                        setFormData({
-                          ...formData,
-                          latitude: lat.toString(),
-                          longitude: lng.toString()
-                        });
-                      }}
-                    />
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Lokasi Objek Pajak</h3>
+                    <p className="text-[10px] text-slate-500 font-medium">
+                      Klik pada peta desa untuk menentukan lokasi bidang tanah
+                    </p>
                   </div>
-                  <p className="mt-2 text-[9px] text-slate-400 italic text-center">
-                    *Geser peta dan klik tepat di lokasi bidang tanah untuk akurasi data
-                  </p>
                 </div>
+
+                {/* Tampilkan koordinat yang dipilih */}
+                {(formData.latitude || formData.longitude) && (
+                  <div className="mb-4 p-3 bg-slate-50 rounded-xl text-xs font-mono border border-slate-200">
+                    📍 Koordinat: {parseFloat(formData.latitude || '0').toFixed(6)}°, {parseFloat(formData.longitude || '0').toFixed(6)}°
+                  </div>
+                )}
+
+                {/* Peta Desa Interaktif */}
+                <DesaMapPicker
+                  desaId={selectedDesa?.id || ''}
+                  desaName={selectedDesa?.nama || ''}
+                  petaUrl={desaPeta.url}
+                  petaWidth={desaPeta.width}
+                  petaHeight={desaPeta.height}
+                  petaBounds={desaPeta.bounds}
+                  onLocationSelect={handleLocationFromMap}
+                  initialLat={parseFloat(formData.latitude) || undefined}
+                  initialLng={parseFloat(formData.longitude) || undefined}
+                />
+                
+                <p className="mt-3 text-[9px] text-slate-400 italic text-center">
+                  *Geser dan zoom peta, klik tepat di lokasi bidang tanah untuk menentukan koordinat
+                </p>
               </section>
             </div>
 
-            <div className="px-10 py-6 border-t border-slate-100 flex justify-end gap-4 bg-slate-50/50">
+            <div className="px-10 py-6 border-t border-slate-100 flex justify-end gap-4 bg-slate-50/50 shrink-0">
               <button onClick={() => setIsModalOpen(false)} className="px-6 py-3 text-xs font-bold text-slate-400 hover:text-slate-600 transition-all">BATAL</button>
               <button 
                 onClick={handleSave} 
@@ -619,7 +841,7 @@ useEffect(() => {
 };
 
 // ==========================================
-// SUB-COMPONENTS (RE-DESIGNED)
+// SUB-COMPONENTS
 // ==========================================
 
 const DigitInput = ({ length, value, onChange, format }: any) => {
@@ -655,7 +877,7 @@ const DigitInput = ({ length, value, onChange, format }: any) => {
 const Input = ({ label, ...props }: any) => (
   <div className="flex flex-col gap-1.5">
     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">{label}</label>
-    <input {...props} className="px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 transition-all placeholder:text-slate-200" onChange={e => props.onChange(e.target.value)} />
+    <input {...props} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 transition-all placeholder:text-slate-200" onChange={e => props.onChange(e.target.value)} />
   </div>
 );
 
@@ -679,3 +901,5 @@ const Checkbox = ({ label, checked, onChange }: any) => (
     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest group-hover:text-slate-900 transition-all">{label}</span>
   </label>
 );
+
+export default PbbManager;
