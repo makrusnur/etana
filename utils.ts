@@ -217,3 +217,11 @@ export const formatTanggalID = (isoDate: string): string => {
   };
   return date.toLocaleDateString('id-ID', options);
 };
+
+export const getHari = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '';
+  const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  return days[date.getDay()];
+};

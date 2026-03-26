@@ -16,6 +16,7 @@ import { MapMonitoring } from './pages/MapMonitoring';
 import { PtslHalaman } from './pages/PtslMassal';
 import { LetterCMain } from './pages/LetterC';
 import { MutasiC } from './pages/LetterC/MutasiC';
+import { UploadShpPage } from './pages/UploadShpPage';
 
 // --- MODUL PBB (Satu Pintu ke PbbManager) ---
 import { PbbMainPage } from './pages/PbbModul';
@@ -62,6 +63,7 @@ const AppContent: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             {/* RUTE MODUL LETTER C */}
             <Route path="/letter-c/mutasi" element={<MutasiC />} />
             <Route path="/letter-c/*" element={<LetterCMain/>} />
+            <Route path="/upload-shp" element={<UploadShpPage />} />
             
             {/* REDIRECT JIKA RUTE TIDAK ADA */}
             <Route path="*" element={<Navigate to="/" replace />} />

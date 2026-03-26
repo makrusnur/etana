@@ -20,6 +20,7 @@
     "jszip-utils": "^0.1.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.460.0",
+    "ogr2ogr": "^6.0.1",
     "pizzip": "^3.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -27,6 +28,7 @@
     "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.1.0",
     "react-signature-canvas": "^1.1.0-alpha.2",
+    "shapefile": "^0.6.6",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

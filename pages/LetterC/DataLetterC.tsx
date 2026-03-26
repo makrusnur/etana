@@ -157,7 +157,7 @@ export const DataLetterC = () => {
           p.klas_desa || '-',
           (p.luas_meter || 0).toLocaleString('id-ID'),
           p.asal_usul || '-',
-          p.is_void ? 'DICORET' : 'AKTIF'
+          p.is_void ? 'TIDAK AKTIF' : 'AKTIF'
         ]);
 
         autoTable(doc, {
