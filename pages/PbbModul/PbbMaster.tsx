@@ -51,7 +51,7 @@ export const PbbMaster = () => {
 
   const addKecamatan = async () => {
     if (!newKec.trim()) return;
-    await supabase.from('kecamatan').insert([{ nama: newKec.toUpperCase() }]);
+    await supabase.from('kecamatan').insert([{ nama: newKec }]);
     setNewKec('');
     loadData();
   };
@@ -59,7 +59,7 @@ export const PbbMaster = () => {
   const addDesa = async () => {
     if (!newDesa.nama.trim() || !newDesa.kecId) return;
     await supabase.from('desa').insert([{ 
-      nama: newDesa.nama.toUpperCase(), 
+      nama: newDesa.nama, 
       kecamatan_id: newDesa.kecId 
     }]);
     setNewDesa({ nama: '', kecId: '' });

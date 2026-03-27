@@ -138,7 +138,7 @@ export const Persil = () => {
   const selectedDesa = desas.find(d => d.id === selectedDesaId);
   const selectedKecamatan = kecamatans.find(k => k.id === selectedDesa?.kecamatan_id);
 
-  // --- 4. Fungsi Print PDF ---
+  // --- 4. Fungsi Print PDF dengan Page Number ---
   const handlePrintPDF = async () => {
     if (filteredPersils.length === 0) {
       alert('Tidak ada data persil untuk dicetak');
@@ -163,40 +163,47 @@ export const Persil = () => {
         format: 'a4'
       });
 
-      // Kop Surat
-      doc.setFontSize(18);
-      doc.setFont('helvetica', 'bold');
-      doc.text('DAFTAR PERSIL', doc.internal.pageSize.width / 2, 15, { align: 'center' });
+      // Variabel untuk page numbering
+      let currentPage = 1;
+      let totalPages = 0;
       
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`BUKU LETTER C DESA ${desa.nama.toUpperCase()}`, doc.internal.pageSize.width / 2, 22, { align: 'center' });
+      // Hitung total halaman terlebih dahulu
+      // Buat dokumen sementara untuk menghitung jumlah halaman
+      const tempDoc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      });
       
-      // Garis pemisah
-      doc.setLineWidth(0.5);
-      doc.line(10, 27, doc.internal.pageSize.width - 10, 27);
-
+      // Kop Surat untuk perhitungan
+      tempDoc.setFontSize(18);
+      tempDoc.setFont('helvetica', 'bold');
+      tempDoc.text('DAFTAR PERSIL', tempDoc.internal.pageSize.width / 2, 15, { align: 'center' });
+      tempDoc.setFontSize(12);
+      tempDoc.text(`BUKU LETTER C DESA ${desa.nama.toUpperCase()}`, tempDoc.internal.pageSize.width / 2, 22, { align: 'center' });
+      tempDoc.setLineWidth(0.5);
+      tempDoc.line(10, 27, tempDoc.internal.pageSize.width - 10, 27);
+      
       // Info desa
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Desa:', 15, 35);
-      doc.text('Kecamatan:', 15, 40);
-      doc.text('Kabupaten:', 15, 45);
-      doc.text('Provinsi:', 15, 50);
-      doc.text('Tanggal Cetak:', 15, 55);
-
-      doc.setFont('helvetica', 'normal');
-      doc.text(`: ${desa.nama}`, 45, 35);
-      doc.text(`: ${kecamatan.nama}`, 45, 40);
-      doc.text(`: PASURUAN`, 45, 45);
-      doc.text(`: JAWA TIMUR`, 45, 50);
-      doc.text(`: ${new Date().toLocaleDateString('id-ID', { 
+      tempDoc.setFontSize(10);
+      tempDoc.setFont('helvetica', 'bold');
+      tempDoc.text('Desa:', 15, 35);
+      tempDoc.text('Kecamatan:', 15, 40);
+      tempDoc.text('Kabupaten:', 15, 45);
+      tempDoc.text('Provinsi:', 15, 50);
+      tempDoc.text('Tanggal Cetak:', 15, 55);
+      tempDoc.setFont('helvetica', 'normal');
+      tempDoc.text(`: ${desa.nama}`, 45, 35);
+      tempDoc.text(`: ${kecamatan.nama}`, 45, 40);
+      tempDoc.text(`: PASURUAN`, 45, 45);
+      tempDoc.text(`: JAWA TIMUR`, 45, 50);
+      tempDoc.text(`: ${new Date().toLocaleDateString('id-ID', { 
         day: 'numeric', 
         month: 'long', 
         year: 'numeric' 
       })}`, 45, 55);
-
-      // Data tabel - sudah terfilter dan terurut
+      
+      // Data tabel
       const tableData = filteredPersils.map((p, index) => [
         index + 1,
         p.nomor_persil || '-',
@@ -208,9 +215,9 @@ export const Persil = () => {
         p.asal_usul || '-',
         p.is_void ? 'DICORET' : 'AKTIF'
       ]);
-
-      // Buat tabel
-      autoTable(doc, {
+      
+      // Hitung jumlah halaman dengan autoTable
+      autoTable(tempDoc, {
         head: [['No.', 'No. Persil', 'No. Kohir', 'Nama Pemilik', 'Jenis', 'Klas', 'Luas (m²)', 'Keterangan', 'Status']],
         body: tableData,
         startY: 65,
@@ -239,20 +246,129 @@ export const Persil = () => {
         },
         alternateRowStyles: {
           fillColor: [250, 250, 250]
+        },
+        margin: { top: 65, bottom: 20 }
+      });
+      
+      // Dapatkan total halaman dari dokumen sementara
+      totalPages = (tempDoc as any).lastAutoTable?.pageCount || 1;
+      
+      // Sekarang buat dokumen utama dengan page numbering
+      const finalDoc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      // Fungsi untuk menambahkan header dan footer dengan page number
+      const addHeaderAndFooter = (doc: jsPDF, pageNum: number, totalPages: number) => {
+        // Header (kop surat) - hanya ditambahkan di halaman pertama
+        if (pageNum === 1) {
+          doc.setFontSize(18);
+          doc.setFont('helvetica', 'bold');
+          doc.text('DAFTAR PERSIL', doc.internal.pageSize.width / 2, 15, { align: 'center' });
+          
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'normal');
+          doc.text(`BUKU LETTER C DESA ${desa.nama.toUpperCase()}`, doc.internal.pageSize.width / 2, 22, { align: 'center' });
+          
+          // Garis pemisah
+          doc.setLineWidth(0.5);
+          doc.line(10, 27, doc.internal.pageSize.width - 10, 27);
+          
+          // Info desa
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Desa:', 15, 35);
+          doc.text('Kecamatan:', 15, 40);
+          doc.text('Kabupaten:', 15, 45);
+          doc.text('Provinsi:', 15, 50);
+          doc.text('Tanggal Cetak:', 15, 55);
+          
+          doc.setFont('helvetica', 'normal');
+          doc.text(`: ${desa.nama}`, 45, 35);
+          doc.text(`: ${kecamatan.nama}`, 45, 40);
+          doc.text(`: PASURUAN`, 45, 45);
+          doc.text(`: JAWA TIMUR`, 45, 50);
+          doc.text(`: ${new Date().toLocaleDateString('id-ID', { 
+            day: 'numeric', 
+            month: 'long', 
+            year: 'numeric' 
+          })}`, 45, 55);
+        } else {
+          // Untuk halaman selanjutnya, tambahkan header sederhana
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'italic');
+          doc.text(`BUKU LETTER C DESA ${desa.nama.toUpperCase()} (Lanjutan)`, doc.internal.pageSize.width / 2, 10, { align: 'center' });
+          doc.setLineWidth(0.3);
+          doc.line(10, 12, doc.internal.pageSize.width - 10, 12);
+        }
+        
+        // Footer dengan page number
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        const pageNumberText = `Halaman ${pageNum} dari ${totalPages}`;
+        doc.text(pageNumberText, doc.internal.pageSize.width - 20, doc.internal.pageSize.height - 10, { align: 'right' });
+        
+        // Tambahkan tanggal cetak di footer kiri
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'italic');
+        const dateText = `Dicetak: ${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID')}`;
+        doc.text(dateText, 10, doc.internal.pageSize.height - 10);
+      };
+      
+      // Generate tabel dengan page numbering
+      const startY = 65;
+      
+      autoTable(finalDoc, {
+        head: [['No.', 'No. Persil', 'No. Kohir', 'Nama Pemilik', 'Jenis', 'Klas', 'Luas (m²)', 'Keterangan', 'Status']],
+        body: tableData,
+        startY: startY,
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+          lineColor: [0, 0, 0],
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: [240, 240, 240],
+          textColor: [0, 0, 0],
+          fontStyle: 'bold',
+          halign: 'center'
+        },
+        columnStyles: {
+          0: { cellWidth: 10 },
+          1: { cellWidth: 20 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 40 },
+          4: { cellWidth: 20 },
+          5: { cellWidth: 15 },
+          6: { cellWidth: 20 },
+          7: { cellWidth: 30 },
+          8: { cellWidth: 15 }
+        },
+        alternateRowStyles: {
+          fillColor: [250, 250, 250]
+        },
+        margin: { top: startY, bottom: 20 },
+        didDrawPage: (data) => {
+          // Tambahkan header dan footer setiap halaman
+          const pageNum = data.pageNumber;
+          addHeaderAndFooter(finalDoc, pageNum, totalPages);
         }
       });
-
-      // Footer
-      const finalY = (doc as any).lastAutoTable.finalY || 200;
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`Total Data: ${filteredPersils.length} Persil`, doc.internal.pageSize.width - 20, finalY + 10, { align: 'right' });
       
-      doc.setFont('helvetica', 'italic');
-      doc.text('Dokumen ini dicetak secara sistem', doc.internal.pageSize.width / 2, finalY + 20, { align: 'center' });
-
+      // Tambahkan total data di halaman terakhir
+      const finalY = (finalDoc as any).lastAutoTable.finalY || 200;
+      finalDoc.setFontSize(9);
+      finalDoc.setFont('helvetica', 'bold');
+      finalDoc.text(`Total Data: ${filteredPersils.length} Persil`, finalDoc.internal.pageSize.width - 20, finalY + 10, { align: 'right' });
+      
+      finalDoc.setFont('helvetica', 'italic');
+      finalDoc.text('Dokumen ini dicetak secara sistem', finalDoc.internal.pageSize.width / 2, finalY + 20, { align: 'center' });
+      
       // Download PDF
-      doc.save(`DAFTAR_PERSIL_${desa.nama}_${new Date().getTime()}.pdf`);
+      finalDoc.save(`DAFTAR_PERSIL_${desa.nama}_${new Date().getTime()}.pdf`);
 
     } catch (error) {
       console.error('Error generating PDF:', error);
