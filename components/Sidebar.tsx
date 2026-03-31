@@ -6,7 +6,7 @@ import {
   Users, FileText, Map, Home, Settings, LogOut, ChevronLeft, ChevronRight, 
   Menu, X, Navigation, Landmark, Book, Repeat, LayoutDashboard, ArrowLeftCircle, 
   Database, ChevronDown, ChevronUp, Printer, BookAIcon, Files, FolderOpen, 
-  Layers, ClipboardList, Upload, MapPin, Box
+  Layers, ClipboardList, Upload, MapPin, Box, Globe
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -198,7 +198,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
               <MobileMenuItem to="/templates" icon={<Printer size={18}/>} label="Automation" onClick={() => setIsMobileOpen(false)} />
             </MobileMenuGroup>
 
-            {/* KELOMPOK BUKU C DESA */}
+            {/* KELOMPOK BUKU C DESA - DENGAN PETA PERSIL */}
             <MobileMenuGroup 
               title="BUKU C DESA" 
               icon={<Book size={20} />}
@@ -209,6 +209,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
               <MobileMenuItem to="/letter-c/data" icon={<Book size={18}/>} label="Kohir" onClick={() => setIsMobileOpen(false)} />
               <MobileMenuItem to="/letter-c/persil" icon={<Landmark size={18}/>} label="Persil" onClick={() => setIsMobileOpen(false)} />
               <MobileMenuItem to="/letter-c/mutasi" icon={<Repeat size={18}/>} label="Mutasi" onClick={() => setIsMobileOpen(false)} />
+              {/* MENU PETA PERSIL - DITAMBAHKAN DI BUKU C DESA */}
+              <MobileMenuItem to="/peta-persil" icon={<Map size={18}/>} label="Peta Persil & Kohir" onClick={() => setIsMobileOpen(false)} />
             </MobileMenuGroup>
 
             {/* KELOMPOK PBB / SPPT */}
@@ -222,7 +224,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
               <MobileMenuItem to="/pbb/masterdata" icon={<Settings size={18}/>} label="Master Data" onClick={() => setIsMobileOpen(false)} />
             </MobileMenuGroup>
 
-            {/* KELOMPOK LAINNYA - dengan Upload SHP */}
+            {/* KELOMPOK LAINNYA */}
             <MobileMenuGroup 
               title="LAINNYA" 
               icon={<Layers size={20} />}
@@ -276,7 +278,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
             <SubMenuItem to="/templates" icon={<Printer size={14} />} label="Automation" />
           </MenuGroupDesktop>
 
-          {/* KELOMPOK 2: BUKU C DESA */}
+          {/* KELOMPOK 2: BUKU C DESA - DENGAN PETA PERSIL */}
           <MenuGroupDesktop
             title="BUKU C DESA"
             icon={<Book size={16} />}
@@ -288,6 +290,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
             <SubMenuItem to="/letter-c/data" icon={<Book size={14} />} label="Kohir" />
             <SubMenuItem to="/letter-c/persil" icon={<Landmark size={14} />} label="Persil" />
             <SubMenuItem to="/letter-c/mutasi" icon={<Repeat size={14} />} label="Mutasi" />
+            {/* MENU PETA PERSIL - DITAMBAHKAN DI BUKU C DESA */}
+            <SubMenuItem to="/letter-c/peta-persil" icon={<Map size={14} />} label="Peta Persil & Kohir" />
           </MenuGroupDesktop>
 
           {/* KELOMPOK 3: PBB / SPPT */}
@@ -302,7 +306,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
             <SubMenuItem to="/pbb/masterdata" icon={<Settings size={14} />} label="Master Data" />
           </MenuGroupDesktop>
 
-          {/* KELOMPOK 4: LAINNYA - dengan Upload SHP */}
+          {/* KELOMPOK 4: LAINNYA */}
           <MenuGroupDesktop
             title="LAINNYA"
             icon={<Layers size={16} />}
@@ -311,6 +315,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
             collapsed={isCollapsed}
           >
             <SubMenuItem to="/map-monitoring" icon={<Navigation size={14} />} label="Map Monitoring" />
+            <SubMenuItem to="/upload-shp" icon={<Upload size={14} />} label="Upload SHP" />
             <SubMenuItem to="/ptsl" icon={<FileText size={14} />} label="PTSL Massal" />
           </MenuGroupDesktop>
         </nav>

@@ -16,6 +16,9 @@ import { MapMonitoring } from './pages/MapMonitoring';
 import { PtslHalaman } from './pages/PtslMassal';
 import { LetterCMain } from './pages/LetterC';
 import { MutasiC } from './pages/LetterC/MutasiC';
+import { Persil } from './pages/LetterC/Persil';
+import { DataLetterC } from './pages/LetterC/DataLetterC';
+import { PetaPersil } from './pages/LetterC/PetaPersil';
 
 // --- MODUL PBB (Satu Pintu ke PbbManager) ---
 import { PbbMainPage } from './pages/PbbModul';
@@ -48,21 +51,26 @@ const AppContent: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             : 'max-w-7xl mx-auto px-4 lg:px-0'
         }`}>
           <Routes>
+            {/* Dashboard & Data Umum */}
             <Route path="/" element={<Dashboard />} />
             <Route path="/identities" element={<Identities />} />
             <Route path="/lands" element={<LandDataPage />} />
             <Route path="/files" element={<FilesPage />} />
             <Route path="/templates" element={<TemplatesPage />} />
+            
+            {/* Monitoring & PTSL */}
             <Route path="/map-monitoring" element={<MapMonitoring />} />
             <Route path="/ptsl" element={<PtslHalaman />} />
             
-            {/* RUTE MODUL PBB BARU */}
+            {/* MODUL PBB */}
             <Route path="/pbb/*" element={<PbbMainPage />} />
             
-            {/* RUTE MODUL LETTER C */}
+            {/* MODUL LETTER C - URUTAN PENTING: Spesifik dulu baru wildcard */}
+            <Route path="/letter-c/data" element={<DataLetterC />} />
+            <Route path="/letter-c/persil" element={<Persil />} />
             <Route path="/letter-c/mutasi" element={<MutasiC />} />
-            <Route path="/letter-c/*" element={<LetterCMain/>} />
-            
+            <Route path="/letter-c/peta-persil" element={<PetaPersil />} />
+            <Route path="/letter-c/*" element={<LetterCMain />} />
             
             {/* REDIRECT JIKA RUTE TIDAK ADA */}
             <Route path="*" element={<Navigate to="/" replace />} />
