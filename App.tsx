@@ -39,11 +39,11 @@ const AppContent: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
       <Sidebar onLogout={onLogout} />
       
       {/* Main Content Area */}
-      <main className={`w-full transition-all duration-500 ease-in-out ${
-        isFullLayout 
-          ? 'lg:pl-64 h-screen overflow-hidden' // Full screen tanpa scroll luar
-          : 'lg:pl-64 lg:pr-8 pt-20 lg:pt-8 pb-8'
-      }`}>
+      <main className={`w-full transition-all duration-500 ${
+          isFullLayout 
+            ? 'lg:pl-64 h-screen relative' // Hapus overflow-hidden di sini jika masih macet
+            : 'lg:pl-64 lg:pr-8 pt-20 lg:pt-8 pb-8'
+        }`}>
         
         <div className={`h-full ${
           isFullLayout 

@@ -1,761 +1,312 @@
-// pages/LetterC/PetaPersil.tsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
-  MapPin, Loader2, Search, Layers, Trash2, AlertCircle,
-  ZoomIn, ZoomOut, Navigation, X, Eye, EyeOff
+  MapPin, Loader2, Layers, AlertCircle, CheckCircle2, Navigation, Plus, Search, X, Info
 } from 'lucide-react';
 import { supabase } from '../../services/db';
-import { Kecamatan, Desa, LetterC, LetterCPersil } from '../../types';
-import { MapContainer, TileLayer, FeatureGroup, Polygon, useMap } from 'react-leaflet';
+import { Desa } from '../../types';
+import { MapContainer, TileLayer, FeatureGroup, Polygon, useMap, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
+import * as turf from '@turf/turf'; 
 import 'leaflet/dist/leaflet.css';
 
-// Fix Leaflet icon issue
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
-
-// Koordinat Kabupaten Pasuruan
-const DEFAULT_CENTER: [number, number] = [-7.7307, 112.8365];
-const DEFAULT_ZOOM = 10;
-
-// Interface untuk polygon
-interface PolygonData {
-  id: string;
-  jenis: 'persil' | 'kohir';
-  refId: string;
-  refNomor: string;
-  refNama: string;
-  coordinates: [number, number][][];
-  color: string;
-  fillColor: string;
+// Fix Icon Marker Leaflet
+if (typeof window !== 'undefined') {
+  delete (L.Icon.Default.prototype as any)._getIconUrl;
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  });
 }
 
-// Komponen untuk mengontrol peta dari luar
-const MapController = ({ center, zoom }: { center: [number, number]; zoom: number }) => {
+const PASURUAN_CENTER: [number, number] = [-7.7307, 112.8365];
+
+// Komponen untuk menggerakkan peta (FlyTo)
+const MapController = ({ center }: { center: [number, number] }) => {
   const map = useMap();
-  
-  useEffect(() => {
-    if (map) {
-      map.setView(center, zoom);
+  useEffect(() => { 
+    if (map && center) {
+      map.flyTo(center, 18, { duration: 1.5 });
+      setTimeout(() => map.invalidateSize(), 500);
     }
-  }, [map, center, zoom]);
-  
+  }, [map, center]);
   return null;
 };
 
-// Komponen untuk inisialisasi Leaflet Draw (menggunakan global L dari CDN)
-const DrawControl = ({ 
-  onCreated, 
-  drawMode,
-  isActive 
-}: { 
-  onCreated: (layer: any) => void;
-  drawMode: 'persil' | 'kohir' | null;
-  isActive: boolean;
-}) => {
+// Komponen Alat Gambar Persil/Kohir
+const DrawTool = ({ onCreated, isActive, color }: any) => {
   const map = useMap();
-  const drawControlRef = useRef<any>(null);
-  const [isDrawReady, setIsDrawReady] = useState(false);
-
-  // Cek apakah Leaflet Draw sudah tersedia dari window
-  useEffect(() => {
-    const checkDraw = () => {
-      // Leaflet Draw akan menambahkan L.Control.Draw ke global L
-      const LGlobal = (window as any).L;
-      if (LGlobal && LGlobal.Control && LGlobal.Control.Draw) {
-        setIsDrawReady(true);
-      } else {
-        setTimeout(checkDraw, 100);
-      }
-    };
-    checkDraw();
-  }, []);
+  const drawerRef = useRef<any>(null);
 
   useEffect(() => {
-    if (!map || !isDrawReady) return;
-
-    // Hapus draw control yang lama jika ada
-    if (drawControlRef.current) {
-      map.removeControl(drawControlRef.current);
-      drawControlRef.current = null;
+    if (!map || !isActive) {
+      if (drawerRef.current) drawerRef.current.disable();
+      return;
     }
 
-    // Hanya aktifkan draw control jika isActive true dan drawMode dipilih
-    if (!isActive || !drawMode) return;
-
-    // Warna berdasarkan mode
-    const color = drawMode === 'persil' ? '#3b82f6' : '#10b981';
-    const fillColor = drawMode === 'persil' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)';
-
-    // Ambil Draw dari window.L
     const LGlobal = (window as any).L;
-    const DrawControlClass = LGlobal.Control.Draw;
+    if (!LGlobal?.Draw?.Polygon) return;
 
-    const drawControl = new DrawControlClass({
-      position: 'topright',
-      draw: {
-        rectangle: false,
-        circle: false,
-        circlemarker: false,
-        marker: false,
-        polyline: false,
-        polygon: {
-          allowIntersection: false,
-          showArea: true,
-          shapeOptions: {
-            color: color,
-            fillColor: fillColor,
-            fillOpacity: 0.3,
-            weight: 3
-          }
-        }
-      },
-      edit: {
-        featureGroup: null,
-        edit: false,
-        remove: false
-      }
+    // Inisialisasi Mode Gambar Polygon
+    drawerRef.current = new LGlobal.Draw.Polygon(map, {
+      shapeOptions: { color, weight: 3, fillOpacity: 0.4 },
+      allowIntersection: false,
+      showArea: true
     });
 
-    drawControlRef.current = drawControl;
-    map.addControl(drawControl);
-
-    return () => {
-      if (drawControlRef.current) {
-        map.removeControl(drawControlRef.current);
-        drawControlRef.current = null;
-      }
-    };
-  }, [map, drawMode, isActive, isDrawReady]);
-
-  // Event listener untuk polygon yang dibuat
-  useEffect(() => {
-    if (!map || !isActive || !isDrawReady) return;
+    drawerRef.current.enable();
 
     const handleCreated = (e: any) => {
       onCreated(e.layer);
+      if (drawerRef.current) drawerRef.current.disable();
     };
 
     map.on('draw:created', handleCreated);
 
     return () => {
+      if (drawerRef.current) drawerRef.current.disable();
       map.off('draw:created', handleCreated);
     };
-  }, [map, isActive, isDrawReady, onCreated]);
+  }, [map, isActive, color, onCreated]);
 
   return null;
 };
 
 export const PetaPersil = () => {
-  // States
   const [loading, setLoading] = useState(false);
-  const [kecamatans, setKecamatans] = useState<Kecamatan[]>([]);
   const [desas, setDesas] = useState<Desa[]>([]);
-  const [selectedDesaId, setSelectedDesaId] = useState<string | null>(
-    localStorage.getItem('last_selected_desa_id') || null
-  );
+  const [selectedDesaId, setSelectedDesaId] = useState<string | null>(localStorage.getItem('last_selected_desa_id'));
   const [selectedDesa, setSelectedDesa] = useState<Desa | null>(null);
-  const [selectedKecamatan, setSelectedKecamatan] = useState<Kecamatan | null>(null);
-  const [showDesaModal, setShowDesaModal] = useState(false);
-  const [searchDesa, setSearchDesa] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   
-  // State untuk peta
-  const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_CENTER);
-  const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM);
-  
-  // State untuk data
-  const [kohirList, setKohirList] = useState<LetterC[]>([]);
-  const [persilList, setPersilList] = useState<LetterCPersil[]>([]);
-  const [polygons, setPolygons] = useState<PolygonData[]>([]);
-  
-  // State untuk mode menggambar
+  const [polygons, setPolygons] = useState<any[]>([]);
   const [drawMode, setDrawMode] = useState<'persil' | 'kohir' | null>(null);
-  const [tempPolygon, setTempPolygon] = useState<[number, number][][] | null>(null);
+  const [activeListTab, setActiveListTab] = useState<'persil' | 'kohir'>('persil');
+  const [mapCenter, setMapCenter] = useState<[number, number]>(PASURUAN_CENTER);
+  
+  const [showDesaModal, setShowDesaModal] = useState(false);
   const [showRefModal, setShowRefModal] = useState(false);
+  const [refList, setRefList] = useState<any[]>([]);
   const [selectedRefId, setSelectedRefId] = useState<string>('');
-  
-  // State untuk layer visibility
-  const [showKohirLayer, setShowKohirLayer] = useState(true);
-  const [showPersilLayer, setShowPersilLayer] = useState(true);
-  
-  // Ref untuk FeatureGroup
-  const featureGroupRef = useRef<L.FeatureGroup>(null);
+  const [tempPolygon, setTempPolygon] = useState<any>(null);
+  const [msg, setMsg] = useState<{type: 'error' | 'success', text: string} | null>(null);
 
-  // Fetch wilayah
+  // Load Daftar Desa
   useEffect(() => {
-    const fetchRegions = async () => {
-      try {
-        const { data: kec } = await supabase.from('kecamatan').select('*').order('nama');
-        const { data: des } = await supabase.from('desa').select('*').order('nama');
-        if (kec) setKecamatans(kec);
-        if (des) setDesas(des);
-      } catch (err: any) {
-        console.error("Error fetching regions:", err.message);
-        setError("Gagal memuat data wilayah");
+    const init = async () => {
+      const { data } = await supabase.from('desa').select('*').order('nama');
+      if (data) {
+        setDesas(data);
+        if (selectedDesaId) setSelectedDesa(data.find(d => d.id === selectedDesaId) || null);
       }
     };
-    fetchRegions();
-  }, []);
-
-  // Fetch data kohir dan persil berdasarkan desa
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!selectedDesaId) return;
-      
-      try {
-        // Fetch kohir
-        const { data: kohirData } = await supabase
-          .from('letter_c')
-          .select('*')
-          .eq('desa_id', selectedDesaId)
-          .order('nomor_c');
-        
-        if (kohirData) setKohirList(kohirData);
-        
-        // Fetch persil
-        const { data: persilData } = await supabase
-          .from('letter_c_persil')
-          .select('*, letter_c(nomor_c, nama_pemilik)')
-          .eq('letter_c_id', selectedDesaId);
-        
-        if (persilData) setPersilList(persilData);
-        
-        // Fetch polygon yang sudah tersimpan
-        await fetchPolygons();
-        
-      } catch (err: any) {
-        console.error("Error fetching data:", err);
-      }
-    };
-    
-    fetchData();
+    init();
   }, [selectedDesaId]);
 
-  // Fetch polygon dari database
-  const fetchPolygons = async () => {
+  // Ambil Data Polygon dari Database (JSONB)
+  const fetchData = useCallback(async () => {
     if (!selectedDesaId) return;
-    
+    setLoading(true);
     try {
-      const loadedPolygons: PolygonData[] = [];
-      
-      // Fetch polygon persil
-      const { data: persilPolygons } = await supabase
-        .from('polygon_persil')
-        .select('*')
-        .eq('desa_id', selectedDesaId);
-      
-      if (persilPolygons) {
-        for (const p of persilPolygons) {
-          const persil = persilList.find(ps => ps.id === p.persil_id);
-          let coordinates: [number, number][][] = [];
-          try {
-            if (p.geometry && p.geometry.coordinates) {
-              coordinates = p.geometry.coordinates.map((ring: number[][]) =>
-                ring.map((coord: number[]) => [coord[1], coord[0]] as [number, number])
-              );
-            }
-          } catch (err) {
-            console.error("Error parsing coordinates:", err);
-          }
-          
-          loadedPolygons.push({
-            id: p.id,
-            jenis: 'persil',
-            refId: p.persil_id,
-            refNomor: persil?.nomor_persil || '-',
-            refNama: persil?.letter_c?.nama_pemilik || '-',
-            coordinates,
-            color: '#3b82f6',
-            fillColor: 'rgba(59, 130, 246, 0.2)'
-          });
-        }
-      }
-      
-      // Fetch polygon kohir
-      const { data: kohirPolygons } = await supabase
-        .from('polygon_kohir')
-        .select('*')
-        .eq('desa_id', selectedDesaId);
-      
-      if (kohirPolygons) {
-        for (const k of kohirPolygons) {
-          const kohir = kohirList.find(kh => kh.id === k.kohir_id);
-          let coordinates: [number, number][][] = [];
-          try {
-            if (k.geometry && k.geometry.coordinates) {
-              coordinates = k.geometry.coordinates.map((ring: number[][]) =>
-                ring.map((coord: number[]) => [coord[1], coord[0]] as [number, number])
-              );
-            }
-          } catch (err) {
-            console.error("Error parsing coordinates:", err);
-          }
-          
-          loadedPolygons.push({
-            id: k.id,
-            jenis: 'kohir',
-            refId: k.kohir_id,
-            refNomor: kohir?.nomor_c || '-',
-            refNama: kohir?.nama_pemilik || '-',
-            coordinates,
-            color: '#10b981',
-            fillColor: 'rgba(16, 185, 129, 0.2)'
-          });
-        }
-      }
-      
-      setPolygons(loadedPolygons);
-      
-    } catch (err: any) {
-      console.error("Error fetching polygons:", err);
-    }
-  };
+      const [resP, resK] = await Promise.all([
+        supabase.from('polygon_persil').select('id, geometry, letter_c_persil(nomor_persil, letter_c(nama_pemilik))').eq('desa_id', selectedDesaId),
+        supabase.from('polygon_kohir').select('id, geometry, letter_c(nomor_c, nama_pemilik)').eq('desa_id', selectedDesaId)
+      ]);
 
-  // Handle polygon created
-  const handleCreated = useCallback((layer: any) => {
-    const latLngs = layer.getLatLngs()[0];
-    const coordinates = latLngs.map((ll: L.LatLng) => [ll.lat, ll.lng] as [number, number]);
-    coordinates.push(coordinates[0]);
+      const list: any[] = [];
+      resP.data?.forEach(p => {
+        if (p.geometry) list.push({
+          id: p.id, type: 'persil', label: p.letter_c_persil?.nomor_persil, nama: p.letter_c_persil?.letter_c?.nama_pemilik,
+          coords: p.geometry.coordinates[0].map((c: any) => [c[1], c[0]]), color: '#3b82f6'
+        });
+      });
+      resK.data?.forEach(k => {
+        if (k.geometry) list.push({
+          id: k.id, type: 'kohir', label: k.letter_c?.nomor_c, nama: k.letter_c?.nama_pemilik,
+          coords: k.geometry.coordinates[0].map((c: any) => [c[1], c[0]]), color: '#10b981'
+        });
+      });
+      setPolygons(list);
+    } catch (e) { console.error(e); } finally { setLoading(false); }
+  }, [selectedDesaId]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Saat selesai menggambar di peta
+  const onDrawCreated = async (layer: any) => {
+    const latlngs = layer.getLatLngs()[0];
+    const coords = latlngs.map((l: any) => [l.lat, l.lng]);
+    setTempPolygon(coords);
     
-    setTempPolygon([coordinates]);
+    // Ambil data referensi untuk dihubungkan ke gambar
+    const table = drawMode === 'persil' ? 'letter_c_persil' : 'letter_c';
+    const query = drawMode === 'persil' ? 'id, nomor_persil, letter_c(nama_pemilik)' : 'id, nomor_c, nama_pemilik';
+    const { data } = await supabase.from(table).select(query).eq('desa_id', selectedDesaId);
     
-    if (featureGroupRef.current) {
-      featureGroupRef.current.clearLayers();
-    }
-    
-    setDrawMode(null);
+    setRefList(data || []);
     setShowRefModal(true);
-  }, []);
+  };
 
-  // Simpan polygon ke database
-  const savePolygon = async () => {
-    if (!selectedDesaId || !selectedRefId || !tempPolygon) {
-      setError('Lengkapi data terlebih dahulu');
-      return;
-    }
-    
+  // Simpan ke Database
+  const handleSave = async () => {
+    if (!selectedRefId || !tempPolygon) return;
     setLoading(true);
-    
     try {
-      const coordinates = tempPolygon[0].map(point => [point[1], point[0]]);
-      coordinates.push(coordinates[0]);
-      
-      const geometry = {
+      const geojson = {
         type: "Polygon",
-        coordinates: [coordinates]
+        coordinates: [[...tempPolygon.map((p: any) => [p[1], p[0]]), [tempPolygon[0][1], tempPolygon[0][0]]]]
       };
-      
-      if (drawMode === 'persil') {
-        const { data, error } = await supabase
-          .from('polygon_persil')
-          .insert({
-            desa_id: selectedDesaId,
-            persil_id: selectedRefId,
-            geometry: geometry
-          })
-          .select()
-          .single();
-        
-        if (error) throw error;
-        
-        const persil = persilList.find(p => p.id === selectedRefId);
-        const newPolygon: PolygonData = {
-          id: data.id,
-          jenis: 'persil',
-          refId: selectedRefId,
-          refNomor: persil?.nomor_persil || '-',
-          refNama: persil?.letter_c?.nama_pemilik || '-',
-          coordinates: tempPolygon,
-          color: '#3b82f6',
-          fillColor: 'rgba(59, 130, 246, 0.2)'
-        };
-        
-        setPolygons([...polygons, newPolygon]);
-        
-      } else if (drawMode === 'kohir') {
-        const { data, error } = await supabase
-          .from('polygon_kohir')
-          .insert({
-            desa_id: selectedDesaId,
-            kohir_id: selectedRefId,
-            geometry: geometry
-          })
-          .select()
-          .single();
-        
-        if (error) throw error;
-        
-        const kohir = kohirList.find(k => k.id === selectedRefId);
-        const newPolygon: PolygonData = {
-          id: data.id,
-          jenis: 'kohir',
-          refId: selectedRefId,
-          refNomor: kohir?.nomor_c || '-',
-          refNama: kohir?.nama_pemilik || '-',
-          coordinates: tempPolygon,
-          color: '#10b981',
-          fillColor: 'rgba(16, 185, 129, 0.2)'
-        };
-        
-        setPolygons([...polygons, newPolygon]);
-      }
-      
-      setSuccess('Polygon berhasil disimpan');
-      setTimeout(() => setSuccess(null), 3000);
-      
-      setShowRefModal(false);
-      setTempPolygon(null);
-      setSelectedRefId('');
-      
-    } catch (err: any) {
-      console.error("Error saving polygon:", err);
-      setError('Gagal menyimpan: ' + err.message);
-      setTimeout(() => setError(null), 3000);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Hapus polygon
-  const deletePolygon = async (id: string, jenis: 'persil' | 'kohir') => {
-    if (!confirm('Yakin ingin menghapus polygon ini?')) return;
-    
-    setLoading(true);
-    
-    try {
-      const table = jenis === 'persil' ? 'polygon_persil' : 'polygon_kohir';
-      const { error } = await supabase
-        .from(table)
-        .delete()
-        .eq('id', id);
-      
+      const isP = drawMode === 'persil';
+      const { error } = await supabase.from(isP ? 'polygon_persil' : 'polygon_kohir').insert({
+        desa_id: selectedDesaId, 
+        [isP ? 'persil_polygon_id' : 'kohir_id']: selectedRefId, // Sesuaikan dengan kolom DB Anda
+        geometry: geojson
+      });
       if (error) throw error;
-      
-      setPolygons(polygons.filter(p => p.id !== id));
-      setSuccess('Polygon berhasil dihapus');
-      setTimeout(() => setSuccess(null), 3000);
-      
-    } catch (err: any) {
-      console.error("Error deleting polygon:", err);
-      setError('Gagal menghapus: ' + err.message);
-      setTimeout(() => setError(null), 3000);
-    } finally {
-      setLoading(false);
-    }
+      setMsg({ type: 'success', text: 'Peta Bidang Tersimpan!' });
+      setShowRefModal(false); setDrawMode(null); fetchData();
+    } catch (e: any) { setMsg({ type: 'error', text: e.message }); }
+    finally { setLoading(false); setTimeout(() => setMsg(null), 3000); }
   };
-
-  const visiblePolygons = polygons.filter(p => {
-    if (p.jenis === 'persil') return showPersilLayer;
-    if (p.jenis === 'kohir') return showKohirLayer;
-    return true;
-  });
-
-  const filteredKecamatans = kecamatans
-    .map(kec => ({
-      ...kec,
-      desas: desas.filter(d => 
-        d.kecamatan_id === kec.id && 
-        d.nama.toLowerCase().includes(searchDesa.toLowerCase())
-      )
-    }))
-    .filter(kec => kec.desas.length > 0);
-
-  const DesaModal = () => (
-    <div className="fixed inset-0 bg-black/50 z-[100] flex items-end lg:items-center justify-center" onClick={() => setShowDesaModal(false)}>
-      <div className="bg-white w-full max-w-lg rounded-t-2xl lg:rounded-2xl max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="p-4 border-b flex justify-between items-center bg-white sticky top-0">
-          <h3 className="font-bold text-lg">Pilih Desa</h3>
-          <button onClick={() => setShowDesaModal(false)} className="p-2 hover:bg-zinc-100 rounded-full">
-            <X size={20} />
-          </button>
-        </div>
-        
-        <div className="p-4 border-b">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18}/>
-            <input 
-              className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm" 
-              placeholder="Cari desa..."
-              value={searchDesa}
-              onChange={(e) => setSearchDesa(e.target.value)}
-              autoFocus
-            />
-          </div>
-        </div>
-        
-        <div className="overflow-y-auto p-4 max-h-[60vh]">
-          {filteredKecamatans.length === 0 ? (
-            <div className="p-4 text-center text-zinc-400 text-sm">Tidak ada kecamatan</div>
-          ) : (
-            filteredKecamatans.map(k => (
-              <div key={k.id} className="mb-6">
-                <h4 className="text-xs font-bold text-zinc-500 mb-2 px-2">{k.nama}</h4>
-                <div className="space-y-1">
-                  {k.desas.map(d => (
-                    <button
-                      key={d.id}
-                      onClick={() => {
-                        setSelectedDesaId(d.id);
-                        localStorage.setItem('last_selected_desa_id', d.id);
-                        setSelectedDesa(d);
-                        setSelectedKecamatan(k);
-                        setShowDesaModal(false);
-                        setSearchDesa('');
-                        setMapCenter(DEFAULT_CENTER);
-                        setMapZoom(DEFAULT_ZOOM);
-                        setPolygons([]);
-                      }}
-                      className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all flex items-center justify-between ${
-                        selectedDesaId === d.id 
-                          ? 'bg-zinc-900 text-white' 
-                          : 'hover:bg-zinc-100 text-zinc-700'
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <MapPin size={16} className={selectedDesaId === d.id ? 'text-white' : 'text-zinc-400'} />
-                        {d.nama}
-                      </span>
-                      {selectedDesaId === d.id && (
-                        <span className="text-xs bg-white text-zinc-900 px-2 py-1 rounded-full">Dipilih</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
-  const RefModal = () => (
-    <div className="fixed inset-0 bg-black/50 z-[110] flex items-center justify-center" onClick={() => setShowRefModal(false)}>
-      <div className="bg-white w-full max-w-md rounded-2xl p-6" onClick={e => e.stopPropagation()}>
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold">
-            Pilih {drawMode === 'persil' ? 'Persil' : 'Kohir'}
-          </h3>
-          <button onClick={() => setShowRefModal(false)} className="p-1 hover:bg-zinc-100 rounded-full">
-            <X size={20} />
-          </button>
-        </div>
-        
-        <div className="space-y-3 max-h-[400px] overflow-y-auto">
-          {drawMode === 'persil' ? (
-            persilList.length === 0 ? (
-              <p className="text-center text-zinc-500 py-4">Belum ada data persil. Silakan tambahkan persil terlebih dahulu.</p>
-            ) : (
-              persilList.map(p => {
-                const kohir = kohirList.find(k => k.id === p.letter_c_id);
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => {
-                      setSelectedRefId(p.id);
-                      savePolygon();
-                    }}
-                    className="w-full text-left p-3 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-all"
-                  >
-                    <div className="font-medium">Persil No. {p.nomor_persil}</div>
-                    <div className="text-sm text-zinc-500">{p.jenis_tanah} • {p.luas_meter}m²</div>
-                    {kohir && (
-                      <div className="text-xs text-zinc-400 mt-1">Kohir: {kohir.nomor_c} - {kohir.nama_pemilik}</div>
-                    )}
-                  </button>
-                );
-              })
-            )
-          ) : (
-            kohirList.length === 0 ? (
-              <p className="text-center text-zinc-500 py-4">Belum ada data kohir. Silakan tambahkan kohir terlebih dahulu.</p>
-            ) : (
-              kohirList.map(k => (
-                <button
-                  key={k.id}
-                  onClick={() => {
-                    setSelectedRefId(k.id);
-                    savePolygon();
-                  }}
-                  className="w-full text-left p-3 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-all"
-                >
-                  <div className="font-medium">Kohir No. {k.nomor_c}</div>
-                  <div className="text-sm text-zinc-500">{k.nama_pemilik}</div>
-                  <div className="text-xs text-zinc-400 mt-1">{k.alamat_pemilik || '-'}</div>
-                </button>
-              ))
-            )
-          )}
-        </div>
-        
-        {loading && (
-          <div className="mt-4 flex justify-center">
-            <Loader2 className="animate-spin text-zinc-500" />
-          </div>
-        )}
-      </div>
-    </div>
-  );
 
   return (
-    <div className="flex flex-col h-full bg-[#F8F9FA]">
-      <div className="p-4 lg:p-6 border-b border-zinc-200 bg-white shadow-sm">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-          <div>
-            <h2 className="text-2xl lg:text-3xl font-black tracking-tight">
-              Peta {selectedDesa ? selectedDesa.nama : "Persil & Kohir"}
-            </h2>
-            <p className="text-sm text-zinc-500 mt-1">
-              {selectedDesa ? `Kec. ${selectedKecamatan?.nama || '-'}` : "Pilih desa untuk mulai menggambar"}
-            </p>
-          </div>
-          
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowDesaModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white text-sm font-medium rounded-xl hover:bg-zinc-800 transition-all"
-            >
-              <MapPin size={16} />
-              {selectedDesa ? selectedDesa.nama : "Pilih Desa"}
-            </button>
-          </div>
-        </div>
-        
-        {success && (
-          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-            {success}
-          </div>
-        )}
-        {error && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            {error}
-          </div>
-        )}
-      </div>
-
-      {selectedDesaId && (
-        <div className="p-4 bg-white border-b border-zinc-200 flex flex-wrap gap-3">
-          <button
-            onClick={() => setDrawMode(drawMode === 'persil' ? null : 'persil')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-              drawMode === 'persil' ? 'bg-blue-600 text-white' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
-            }`}
-          >
-            <div className="w-4 h-4 rounded-sm bg-blue-500"></div>
-            Gambar Persil
-          </button>
-          
-          <button
-            onClick={() => setDrawMode(drawMode === 'kohir' ? null : 'kohir')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-              drawMode === 'kohir' ? 'bg-emerald-600 text-white' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
-            }`}
-          >
-            <div className="w-4 h-4 rounded-sm bg-emerald-500"></div>
-            Gambar Kohir
-          </button>
-          
-          {drawMode && (
-            <div className="ml-2 px-3 py-2 bg-yellow-50 text-yellow-700 rounded-xl text-sm flex items-center gap-2">
-              <AlertCircle size={16} />
-              Mode menggambar aktif: {drawMode === 'persil' ? 'Persil (Biru)' : 'Kohir (Hijau)'}
-            </div>
-          )}
-          
-          <div className="flex-1"></div>
-          
-          <div className="flex gap-2">
-            <button onClick={() => setMapZoom(z => Math.min(z + 1, 18))} className="p-2 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50">
-              <ZoomIn size={18} />
-            </button>
-            <button onClick={() => setMapZoom(z => Math.max(z - 1, 5))} className="p-2 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50">
-              <ZoomOut size={18} />
-            </button>
-            <button onClick={() => { setMapCenter(DEFAULT_CENTER); setMapZoom(DEFAULT_ZOOM); }} className="p-2 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50">
-              <Navigation size={18} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {selectedDesaId && polygons.length > 0 && (
-        <div className="p-3 bg-white border-b border-zinc-200 flex gap-4 text-sm">
-          <button onClick={() => setShowKohirLayer(!showKohirLayer)} className="flex items-center gap-2">
-            {showKohirLayer ? <Eye size={16} /> : <EyeOff size={16} />}
-            <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-            <span>Kohir ({polygons.filter(p => p.jenis === 'kohir').length})</span>
-          </button>
-          <button onClick={() => setShowPersilLayer(!showPersilLayer)} className="flex items-center gap-2">
-            {showPersilLayer ? <Eye size={16} /> : <EyeOff size={16} />}
-            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-            <span>Persil ({polygons.filter(p => p.jenis === 'persil').length})</span>
-          </button>
-        </div>
-      )}
-
-      <div className="flex-1 relative bg-zinc-100" style={{ minHeight: 'calc(100vh - 280px)' }}>
-        {!selectedDesaId ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <Layers size={64} className="text-zinc-300" />
-            <p className="mt-4 text-zinc-400 font-medium">Pilih desa untuk mulai menggambar peta</p>
-            <button onClick={() => setShowDesaModal(true)} className="mt-4 bg-zinc-900 text-white px-6 py-3 rounded-xl text-sm font-black uppercase">
-              Pilih Desa
-            </button>
-          </div>
-        ) : (
-          <MapContainer center={mapCenter} zoom={mapZoom} style={{ width: '100%', height: '100%' }} className="z-0">
-            <MapController center={mapCenter} zoom={mapZoom} />
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-              url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-              subdomains="abcd"
-              maxZoom={19}
-            />
-            <DrawControl onCreated={handleCreated} drawMode={drawMode} isActive={drawMode !== null} />
-            <FeatureGroup ref={featureGroupRef}>
-              {visiblePolygons.map(polygon => (
-                <Polygon
-                  key={polygon.id}
-                  positions={polygon.coordinates}
-                  pathOptions={{ color: polygon.color, fillColor: polygon.fillColor, fillOpacity: 0.3, weight: 3 }}
-                  eventHandlers={{ click: () => alert(`${polygon.jenis === 'persil' ? '📦 Persil' : '👤 Kohir'}\nNo: ${polygon.refNomor}\nNama: ${polygon.refNama}`) }}
-                />
-              ))}
-            </FeatureGroup>
-          </MapContainer>
-        )}
-      </div>
+    <div className="flex flex-col lg:flex-row h-[100dvh] lg:h-full bg-slate-50 overflow-hidden relative">
       
-      {selectedDesaId && polygons.length > 0 && (
-        <div className="p-4 border-t border-zinc-200 bg-white max-h-[200px] overflow-y-auto">
-          <h4 className="text-sm font-bold mb-3">Daftar Polygon</h4>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
-            {polygons.map(polygon => (
-              <div key={polygon.id} className={`flex items-center justify-between p-3 rounded-lg border-l-4 ${polygon.jenis === 'persil' ? 'border-blue-500 bg-blue-50/30' : 'border-emerald-500 bg-emerald-50/30'}`}>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${polygon.jenis === 'persil' ? 'bg-blue-500' : 'bg-emerald-500'}`}></div>
-                    <span className="text-sm font-medium">{polygon.jenis === 'persil' ? '📦 Persil' : '👤 Kohir'} No. {polygon.refNomor}</span>
-                  </div>
-                  <div className="text-xs text-zinc-500 mt-1 truncate">{polygon.refNama}</div>
-                </div>
-                <button onClick={() => deletePolygon(polygon.id, polygon.jenis)} className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all">
-                  <Trash2 size={16} />
-                </button>
+      {/* SIDEBAR KIRI */}
+      <div className="w-full lg:w-[380px] bg-white border-r shadow-xl z-[1001] flex flex-col h-1/2 lg:h-full">
+        <div className="p-5 border-b bg-slate-900 text-white">
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="font-black text-sm tracking-widest flex items-center gap-2">
+              <Layers size={18} className="text-blue-400"/> ETANA MAPS
+            </h1>
+            <button onClick={() => setShowDesaModal(true)} className="p-2 hover:bg-white/10 rounded-lg transition-all"><Search size={18}/></button>
+          </div>
+          <div className="bg-white/10 rounded-xl p-3 border border-white/10">
+            <p className="text-[10px] font-bold text-blue-300 uppercase">Wilayah Aktif</p>
+            <p className="text-sm font-black truncate">{selectedDesa?.nama || 'Pilih Desa...'}</p>
+          </div>
+        </div>
+
+        <div className="flex border-b text-[10px] font-black tracking-widest">
+          <button onClick={() => setActiveListTab('persil')} className={`flex-1 py-4 ${activeListTab === 'persil' ? 'border-b-4 border-blue-600 text-blue-600' : 'text-slate-400'}`}>PERSIL</button>
+          <button onClick={() => setActiveListTab('kohir')} className={`flex-1 py-4 ${activeListTab === 'kohir' ? 'border-b-4 border-emerald-600 text-emerald-600' : 'text-slate-400'}`}>KOHIR</button>
+        </div>
+
+        <div className="p-4 bg-slate-50 flex justify-between items-center border-b">
+          <span className="text-[10px] font-bold text-slate-400">TERPETAKAN: {polygons.filter(p => p.type === activeListTab).length}</span>
+          <button onClick={() => setDrawMode(activeListTab)} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-white font-bold text-[10px] shadow-lg ${activeListTab === 'persil' ? 'bg-blue-600' : 'bg-emerald-600'}`}>
+            <Plus size={14}/> TAMBAH
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {polygons.filter(p => p.type === activeListTab).map(p => (
+            <div key={p.id} onClick={() => setMapCenter(p.coords[0])} className="p-4 bg-white border rounded-2xl hover:border-blue-500 cursor-pointer transition-all shadow-sm group">
+              <div className="flex justify-between items-start mb-2">
+                <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${p.type === 'persil' ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                  {p.type === 'persil' ? `P.${p.label}` : `C.${p.label}`}
+                </span>
+                <Navigation size={12} className="text-slate-300 group-hover:text-blue-500"/>
               </div>
-            ))}
+              <p className="text-xs font-bold text-slate-800 uppercase">{p.nama}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* AREA PETA KANAN */}
+      <div className="flex-1 relative overflow-hidden h-1/2 lg:h-full">
+        {drawMode && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none">
+            <div className="bg-red-600 text-white px-6 py-2 rounded-full font-black text-[10px] flex items-center gap-3 animate-pulse shadow-2xl pointer-events-auto">
+              MODE GAMBAR {drawMode.toUpperCase()} AKTIF - KLIK PETA UNTUK MEMBUAT SUDUT
+              <button onClick={() => setDrawMode(null)} className="bg-white/20 p-1 rounded-full"><X size={14}/></button>
+            </div>
+          </div>
+        )}
+
+        <MapContainer center={PASURUAN_CENTER} zoom={18} maxZoom={21} zoomControl={false} style={{ height: '100%', width: '100%' }}>
+          <TileLayer url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}" maxZoom={21} />
+          <TileLayer url="https://mt1.google.com/vt/lyrs=h&x={x}&y={y}&z={z}" maxZoom={21} />
+          
+          <MapController center={mapCenter} />
+          <DrawTool isActive={!!drawMode} color={drawMode === 'persil' ? '#3b82f6' : '#10b981'} onCreated={onDrawCreated} />
+          
+          <FeatureGroup>
+            {polygons.map(p => {
+              // Hitung Luas Otomatis
+              const turfPoly = turf.polygon([[...p.coords.map((c: any) => [c[1], c[0]]), [p.coords[0][1], p.coords[0][0]]]]);
+              const luas = turf.area(turfPoly).toFixed(1);
+
+              return (
+                <Polygon 
+                  key={p.id} 
+                  positions={p.coords} 
+                  pathOptions={{ color: p.color, fillColor: p.color, fillOpacity: 0.3, weight: 2 }}
+                  eventHandlers={{
+                    mouseover: (e) => { e.target.setStyle({ fillOpacity: 0.6, weight: 4, color: '#fff' }); },
+                    mouseout: (e) => { e.target.setStyle({ fillOpacity: 0.3, weight: 2, color: p.color }); }
+                  }}
+                >
+                  <Tooltip sticky direction="top" opacity={1}>
+                    <div className="p-1 min-w-[120px] font-sans">
+                      <p className="text-[9px] font-black text-slate-400 uppercase mb-1">{p.type === 'persil' ? 'Data Persil' : 'Data Kohir'}</p>
+                      <p className="text-xs font-black text-slate-800 uppercase mb-2">{p.nama}</p>
+                      <div className="flex gap-1">
+                        <span className="bg-slate-800 text-white px-1.5 py-0.5 rounded text-[9px] font-bold">{p.type === 'persil' ? 'P.' : 'C.'}{p.label}</span>
+                        <span className="bg-blue-600 text-white px-1.5 py-0.5 rounded text-[9px] font-bold italic">{luas} m²</span>
+                      </div>
+                    </div>
+                  </Tooltip>
+                </Polygon>
+              );
+            })}
+          </FeatureGroup>
+        </MapContainer>
+      </div>
+
+      {/* MODAL DESA & MODAL LINK DATA (Sama seperti sebelumnya dengan styling diperketat) */}
+      {showRefModal && (
+        <div className="fixed inset-0 bg-black/60 z-[2000] flex items-end lg:items-center justify-center backdrop-blur-sm">
+          <div className="bg-white w-full lg:max-w-md rounded-t-[2rem] lg:rounded-[2rem] p-8 animate-in slide-in-from-bottom duration-300">
+            <h3 className="font-black text-lg mb-1">HUBUNGKAN BIDANG</h3>
+            <p className="text-[10px] font-bold text-slate-400 mb-6 uppercase tracking-widest">Pilih pemilik dari buku Letter C</p>
+            <select className="w-full p-4 bg-slate-100 rounded-2xl mb-8 text-sm font-bold border-none outline-none focus:ring-2 ring-blue-500" onChange={(e) => setSelectedRefId(e.target.value)}>
+              <option value="">-- PILIH NAMA --</option>
+              {refList.map(r => (
+                <option key={r.id} value={r.id}>
+                  {drawMode === 'persil' ? `P.${r.nomor_persil} - ${r.letter_c?.nama_pemilik}` : `C.${r.nomor_c} - ${r.nama_pemilik}`}
+                </option>
+              ))}
+            </select>
+            <div className="flex gap-3">
+              <button onClick={() => setShowRefModal(false)} className="flex-1 py-4 bg-slate-100 rounded-2xl font-black text-xs uppercase text-slate-500">Batal</button>
+              <button onClick={handleSave} disabled={!selectedRefId} className="flex-[2] py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest disabled:opacity-50">SIMPAN DATABASE</button>
+            </div>
           </div>
         </div>
       )}
-      
-      {showDesaModal && <DesaModal />}
-      {showRefModal && <RefModal />}
+
+      {showDesaModal && (
+        <div className="fixed inset-0 bg-black/60 z-[2000] flex items-center justify-center backdrop-blur-sm">
+          <div className="bg-white w-full max-w-sm rounded-[2rem] p-8 animate-in zoom-in duration-200">
+            <h3 className="font-black text-center mb-6 italic tracking-tighter">PILIH DESA</h3>
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
+              {desas.map(d => (
+                <button key={d.id} onClick={() => { setSelectedDesaId(d.id); setSelectedDesa(d); localStorage.setItem('last_selected_desa_id', d.id); setShowDesaModal(false); }}
+                  className={`w-full text-left p-4 rounded-xl text-xs font-bold border ${selectedDesaId === d.id ? 'bg-blue-600 text-white' : 'bg-slate-50 border-slate-100'}`}>
+                  {d.nama}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {msg && (
+        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 rounded-full shadow-2xl z-[3000] text-white flex items-center gap-3 font-black text-[10px] tracking-widest animate-in slide-in-from-bottom duration-300 ${msg.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+          {msg.type === 'success' ? <CheckCircle2 size={18}/> : <AlertCircle size={18}/>} {msg.text.toUpperCase()}
+        </div>
+      )}
     </div>
   );
 };

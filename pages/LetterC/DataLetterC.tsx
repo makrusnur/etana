@@ -91,7 +91,6 @@ export const DataLetterC = () => {
   const handlePrintPDF = async (kohir: LetterC) => {
     try {
       setPrintLoading(kohir.id);
-      
       const desa = desas.find(d => d.id === selectedDesaId);
       const kecamatan = kecamatans.find(k => k.id === desa?.kecamatan_id);
       
@@ -99,56 +98,48 @@ export const DataLetterC = () => {
         alert("Data desa tidak ditemukan");
         return;
       }
-
+  
       const { data: persils } = await supabase
         .from('letter_c_persil')
         .select('*')
         .eq('letter_c_id', kohir.id)
         .order('nomor_persil');
-
+  
       const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4'
       });
-
-      // Kop Surat
-      doc.setFontSize(18);
-      doc.setFont('helvetica', 'bold');
-      doc.text('KUTIPAN LETTER C', doc.internal.pageSize.width / 2, 15, { align: 'center' });
-      
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Desa ${desa.nama.toUpperCase()} - Kecamatan ${kecamatan.nama.toUpperCase()}`, doc.internal.pageSize.width / 2, 22, { align: 'center' });
-      
-      doc.setLineWidth(0.5);
-      doc.line(10, 27, doc.internal.pageSize.width - 10, 27);
-
-      // Info pemilik
+  
+      const pageWidth = doc.internal.pageSize.width;
+      const pageHeight = doc.internal.pageSize.height;
+  
+      // --- FUNGSI HEADER (Agar muncul jika ada halaman baru) ---
+      const drawHeader = () => {
+        doc.setFontSize(18);
+        doc.setFont('helvetica', 'bold');
+        doc.text('KUTIPAN LETTER C', pageWidth / 2, 15, { align: 'center' });
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Desa ${desa.nama.toUpperCase()} - Kecamatan ${kecamatan.nama.toUpperCase()}`, pageWidth / 2, 22, { align: 'center' });
+        doc.setLineWidth(0.5);
+        doc.line(10, 27, pageWidth - 10, 27);
+      };
+  
+      drawHeader(); // Gambar header halaman pertama
+  
+      // Data Pemilik
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
       doc.text('Data Pemilik:', 15, 35);
-      
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
-      
       doc.text(`Nomor Kohir: C.${kohir.nomor_c}`, 25, 42);
       doc.text(`Nama Pemilik: ${kohir.nama_pemilik}`, 25, 48);
       doc.text(`Alamat: ${kohir.alamat_pemilik || '-'}`, 25, 54);
-      
-      doc.setFont('helvetica', 'bold');
-      doc.text('Tanggal Cetak:', 120, 42);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`${new Date().toLocaleDateString('id-ID', { 
-        day: 'numeric', 
-        month: 'long', 
-        year: 'numeric' 
-      })}`, 150, 42);
-
-      doc.setLineWidth(0.3);
-      doc.line(10, 60, doc.internal.pageSize.width - 10, 60);
-
-      // Tabel Persil
+      doc.line(10, 60, pageWidth - 10, 60);
+  
+      // --- TABEL DENGAN LOGIKA MULTI-HALAMAN ---
       if (persils && persils.length > 0) {
         const tableData = persils.map((p, index) => [
           index + 1,
@@ -159,75 +150,56 @@ export const DataLetterC = () => {
           p.asal_usul || '-',
           p.is_void ? 'TIDAK AKTIF' : 'AKTIF'
         ]);
-
+  
         autoTable(doc, {
           head: [['No.', 'No. Persil', 'Jenis', 'Klas', 'Luas (m²)', 'Keterangan', 'Status']],
           body: tableData,
           startY: 65,
-          styles: {
-            fontSize: 9,
-            cellPadding: 3,
-            lineColor: [0, 0, 0],
-            lineWidth: 0.1,
-          },
-          headStyles: {
-            fillColor: [80, 80, 80],
-            textColor: [255, 255, 255],
-            fontStyle: 'bold',
-            halign: 'center'
-          },
-          alternateRowStyles: {
-            fillColor: [245, 245, 245]
-          },
-          columnStyles: {
-            0: { cellWidth: 10 },
-            1: { cellWidth: 25 },
-            2: { cellWidth: 25 },
-            3: { cellWidth: 15 },
-            4: { cellWidth: 20 },
-            5: { cellWidth: 50 },
-            6: { cellWidth: 15 }
+          margin: { bottom: 70 }, // Jarak aman agar tabel berhenti sebelum area TTD
+          styles: { fontSize: 9, cellPadding: 3, lineColor: [0, 0, 0], lineWidth: 0.1 },
+          headStyles: { fillColor: [80, 80, 80], halign: 'center' },
+          
+          // Fungsi ini dipanggil setiap kali halaman baru dibuat
+          didDrawPage: (data) => {
+            // 1. Gambar Footer waktu di setiap halaman
+            const date = new Date().toLocaleString('id-ID', { 
+              day: 'numeric', month: 'long', year: 'numeric', 
+              hour: '2-digit', minute: '2-digit' 
+            });
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'italic');
+            doc.text(`Dicetak pada: ${date} WIB`, 10, pageHeight - 10);
+  
+            // 2. Jika ini halaman baru (bukan hal 1), gambar Header lagi (Opsional)
+            if (data.pageNumber > 1) {
+              drawHeader();
+            }
           }
         });
-      } else {
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'italic');
-        doc.text('Tidak ada data persil', doc.internal.pageSize.width / 2, 75, { align: 'center' });
       }
-
-      // Tanda Tangan
-      const finalY = (doc as any).lastAutoTable?.finalY || 100;
-      
-      doc.setLineWidth(0.3);
-      doc.line(10, finalY + 15, doc.internal.pageSize.width - 10, finalY + 15);
+  
+      // --- TANDA TANGAN (Hanya di halaman terakhir) ---
+      // Pindah ke halaman terakhir jika tabel sangat panjang
+      const totalPages = (doc as any).internal.getNumberOfPages();
+      doc.setPage(totalPages); 
+  
+      const footerY = pageHeight - 60; // Posisi statis 6cm dari bawah
       
       doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.text('TANDA TANGAN', doc.internal.pageSize.width / 2, finalY + 25, { align: 'center' });
-      
-      doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      
       const jabatanKades = desa.jenis_kades || 'Kepala Desa';
-      doc.text(`${jabatanKades} ${desa.nama}`, 40, finalY + 40);
-      doc.text('( ____________________ )', 40, finalY + 50);
       
-      doc.text('Pemohon / Pemilik', doc.internal.pageSize.width - 70, finalY + 40);
-      doc.text('( ____________________ )', doc.internal.pageSize.width - 70, finalY + 50);
-      
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'italic');
-      doc.text(`Dicetak pada: ${new Date().toLocaleDateString('id-ID', { 
-        day: 'numeric', 
-        month: 'long', 
-        year: 'numeric' 
-      })}`, doc.internal.pageSize.width / 2, finalY + 70, { align: 'center' });
-
-      doc.save(`KUTIPAN_C_${kohir.nomor_c}_${new Date().getTime()}.pdf`);
-
+      // Tanda tangan diletakkan di tengah bawah halaman TERAKHIR
+      doc.text(`${jabatanKades} ${desa.nama}`, pageWidth / 2, footerY, { align: 'center' });
+      doc.text('( ____________________ )', pageWidth / 2, footerY + 30, { align: 'center' });
+  
+      // Preview
+      const pdfUrl = doc.output('bloburl');
+      window.open(pdfUrl, '_blank');
+  
     } catch (error) {
-      console.error('Error printing PDF:', error);
-      alert('Gagal mencetak PDF');
+      console.error('Error:', error);
+      alert('Gagal memproses PDF');
     } finally {
       setPrintLoading(null);
     }
