@@ -405,6 +405,7 @@ export interface LetterC {
   alamat_pemilik?: string;
   image_url?: string;
   created_at?: string;
+  file_krawangan_url: string;
 }
 
 export interface LetterCPersil {
@@ -416,7 +417,9 @@ export interface LetterCPersil {
   klas_desa: string;
   luas_meter: number;
   asal_usul?: string;
+  halaman_krawangan?: number | null;
   created_at?: string;
+  updated_at: string;
 }
 
 export interface Mutasi {

@@ -11,6 +11,9 @@
   },
   "dependencies": {
     "@google/genai": "^1.34.0",
+    "@react-pdf-viewer/core": "^3.12.0",
+    "@react-pdf-viewer/default-layout": "^3.12.0",
+    "@react-pdf-viewer/toolbar": "^3.12.0",
     "@supabase/supabase-js": "^2.45.4",
     "@turf/turf": "^7.3.4",
     "docxtemplater": "^3.67.6",
@@ -28,6 +31,7 @@
     "react-dom": "^19.0.0",
     "react-image-crop": "^11.0.10",
     "react-leaflet": "^5.0.0",
+    "react-pdf": "^10.4.1",
     "react-router-dom": "^7.1.0",
     "react-signature-canvas": "^1.1.0-alpha.2",
     "shapefile": "^0.6.6",

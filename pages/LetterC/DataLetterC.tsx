@@ -530,6 +530,7 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(editData?.image_url || null);
   const [form, setForm] = useState({ nomor_c: '', nama_pemilik: '', alamat_pemilik: '', image_url: '' });
+  const [nomorCError, setNomorCError] = useState<string>(''); // State untuk error nomor duplikat
   const [rows, setRows] = useState<Partial<LetterCPersil>[]>([
     { nomor_persil: '', jenis_tanah: 'Tanah Kering', klas_desa: '', luas_meter: 0, asal_usul: '', is_void: false }
   ]);
@@ -548,6 +549,38 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
   const [imgRef, setImgRef] = useState<HTMLImageElement | null>(null);
   const [showCropper, setShowCropper] = useState(false);
 
+  // Fungsi untuk cek nomor kohir duplikat
+  const checkDuplicateNomorC = async (nomorC: string, excludeId?: string) => {
+    if (!nomorC || !selectedDesaId) return false;
+    
+    let query = supabase
+      .from('letter_c')
+      .select('id, nomor_c')
+      .eq('desa_id', selectedDesaId)
+      .eq('nomor_c', nomorC);
+    
+    if (excludeId) {
+      query = query.neq('id', excludeId);
+    }
+    
+    const { data, error } = await query;
+    if (error) return false;
+    return data && data.length > 0;
+  };
+
+  // Validasi nomor kohir saat input berubah
+  const handleNomorCChange = async (value: string) => {
+    setForm({...form, nomor_c: value});
+    setNomorCError('');
+    
+    if (value && value.trim() !== '') {
+      const isDuplicate = await checkDuplicateNomorC(value.trim(), editData?.id);
+      if (isDuplicate) {
+        setNomorCError(`Nomor Kohir C.${value} sudah terdaftar di desa ini!`);
+      }
+    }
+  };
+
   useEffect(() => {
     if (editData) {
       setForm({
@@ -556,9 +589,11 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
         alamat_pemilik: editData.alamat_pemilik || '',
         image_url: editData.image_url || ''
       });
+      setNomorCError('');
       fetchPersils(editData.id);
     } else {
       setForm({ nomor_c: '', nama_pemilik: '', alamat_pemilik: '', image_url: '' });
+      setNomorCError('');
       setRows([{ nomor_persil: '', jenis_tanah: 'Tanah Kering', klas_desa: '', luas_meter: 0, asal_usul: '', is_void: false }]);
       setPreviewUrl(null);
       setImageFile(null);
@@ -724,7 +759,19 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
   };
 
   const handleSave = async () => {
-    if (!form.nomor_c || !form.nama_pemilik) return;
+    if (!form.nomor_c || !form.nama_pemilik) {
+      alert("Nomor Kohir dan Nama Pemilik wajib diisi!");
+      return;
+    }
+    
+    // Cek duplikat sebelum save
+    const isDuplicate = await checkDuplicateNomorC(form.nomor_c.trim(), editData?.id);
+    if (isDuplicate) {
+      setNomorCError(`Nomor Kohir C.${form.nomor_c} sudah terdaftar di desa ini!`);
+      alert(`Gagal menyimpan: Nomor Kohir C.${form.nomor_c} sudah terdaftar!`);
+      return;
+    }
+    
     setLoading(true);
     try {
       let finalImageUrl = form.image_url;
@@ -798,6 +845,13 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
     }, 100);
   };
 
+  // Style untuk teks yang dicoret tanpa mengubah warna
+  const voidTextStyle = {
+    textDecoration: 'line-through',
+    textDecorationThickness: '2px',
+    textDecorationColor: '#ef4444', // Warna merah untuk garis coret
+  };
+
   return (
     <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-md z-[100] flex items-end lg:items-center justify-center p-0 lg:p-6 text-zinc-900">
       <div className="bg-white w-full max-w-6xl rounded-t-[2.5rem] lg:rounded-[3rem] flex flex-col h-[95vh] lg:h-auto lg:max-h-[92vh] shadow-2xl overflow-hidden shadow-black/50">
@@ -869,369 +923,384 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
         </div>
         
         <div className="flex-1 overflow-y-auto p-4 lg:p-10">
-  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12">
-    
-    {/* IDENTITAS */}
-    <div className={`lg:col-span-4 space-y-6 ${activeMobileTab === 'persil' ? 'hidden lg:block' : ''}`}>
-      <h4 className="hidden lg:flex items-center gap-2 text-zinc-900 font-black text-xs uppercase tracking-widest">
-        <User size={16}/> Identitas Pemilik
-      </h4>
-      
-      <div className="space-y-3">
-        <label className="text-[10px] font-bold text-zinc-400 uppercase">Foto Arsip Letter C</label>
-        <div className="relative group">
-          {previewUrl ? (
-            <div className="relative h-32 lg:h-44 w-full rounded-xl lg:rounded-2xl overflow-hidden border-2 border-zinc-100 shadow-sm">
-              {isScanning && (
-                <div className="absolute inset-0 z-10 bg-zinc-900/60 backdrop-blur-sm flex flex-col items-center justify-center text-white">
-                  <Loader2 className="animate-spin mb-2" size={20}/>
-                  <span className="text-[8px] font-black uppercase">Menganalisis...</span>
-                </div>
-              )}
-              <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-              <button 
-                type="button"
-                onClick={() => { setPreviewUrl(null); setImageFile(null); setForm({...form, image_url: ''})}} 
-                className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600"
-              >
-                <X size={12}/>
-              </button>
-            </div>
-          ) : (
-            <label className="flex flex-col items-center justify-center h-32 lg:h-44 w-full border-2 border-dashed border-zinc-200 rounded-xl lg:rounded-2xl cursor-pointer hover:bg-zinc-50">
-              <Camera className="text-zinc-300 mb-1" size={24}/>
-              <span className="text-[8px] lg:text-[10px] font-bold text-zinc-400 text-center px-2">Klik untuk upload</span>
-              <input 
-                type="file" 
-                accept="image/*" 
-                capture="environment" 
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    setImageFile(file); 
-                    setPreviewUrl(URL.createObjectURL(file));
-                    setShowCropper(true);
-                  }
-                }} 
-              />
-            </label>
-          )}
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <input 
-          className="w-full px-4 lg:px-6 py-3 lg:py-4 bg-zinc-50 border border-zinc-100 rounded-xl lg:rounded-2xl text-sm font-bold" 
-          placeholder="Nomor Kohir (C)" 
-          value={form.nomor_c} 
-          onChange={e => setForm({...form, nomor_c: e.target.value})}
-        />
-        <input 
-          className="w-full px-4 lg:px-6 py-3 lg:py-4 bg-zinc-50 border border-zinc-100 rounded-xl lg:rounded-2xl text-sm font-bold" 
-          placeholder="Nama Lengkap" 
-          value={form.nama_pemilik} 
-          onChange={e => setForm({...form, nama_pemilik: e.target.value})}
-        />
-        <textarea 
-          className="w-full px-4 lg:px-6 py-3 lg:py-4 bg-zinc-50 border border-zinc-100 rounded-xl lg:rounded-2xl text-sm" 
-          placeholder="Alamat Singkat" 
-          rows={2}
-          value={form.alamat_pemilik} 
-          onChange={e => setForm({...form, alamat_pemilik: e.target.value})}
-        />
-      </div>
-    </div>
-
-    {/* RINCIAN PERSIL - DENGAN ICON TOMBOL DI BELAKANG */}
-    <div className={`lg:col-span-8 space-y-4 lg:space-y-6 ${activeMobileTab === 'identitas' ? 'hidden lg:block' : ''}`}>
-      <div className="flex justify-between items-center">
-        <h4 className="hidden lg:flex items-center gap-2 text-zinc-900 font-black text-xs uppercase tracking-widest">
-          <Layers size={16}/> Rincian Persil
-        </h4>
-        <button 
-          onClick={() => setRows([...rows, { nomor_persil: '', jenis_tanah: 'Tanah Kering', klas_desa: '', luas_meter: 0, asal_usul: '', is_void: false }])} 
-          className="text-[10px] font-black text-zinc-900 bg-zinc-100 px-4 lg:px-5 py-2 lg:py-2.5 rounded-lg lg:rounded-xl uppercase hover:bg-zinc-200"
-        >
-          + Tambah
-        </button>
-      </div>
-      
-      {/* HEADER TABEL - TANPA KOLOM CORET */}
-      <div className="hidden lg:flex px-2 pb-2 gap-3 items-center border-b border-zinc-200">
-        <div className="w-[12%]"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">No. Persil</label></div>
-        <div className="w-[18%]"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Jenis</label></div>
-        <div className="w-[10%] text-center"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Klas</label></div>
-        <div className="w-[12%]"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Luas (M²)</label></div>
-        <div className="flex-1"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Asal-Usul / Keterangan</label></div>
-        <div className="w-16"></div> {/* Untuk tombol coret */}
-        {rows.length > 1 && <div className="w-20"></div>}
-      </div>
-
-      <div className="space-y-3">
-        {rows.map((row, i) => {
-          const isVoid = row.is_void === true;
-          const hasId = !!row.id;
-          
-          return (
-            <div key={row.id || i} className={`bg-zinc-50 p-3 rounded-xl border ${isVoid ? 'opacity-50 border-zinc-200' : 'border-transparent'}`}>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12">
+            
+            {/* IDENTITAS */}
+            <div className={`lg:col-span-4 space-y-6 ${activeMobileTab === 'persil' ? 'hidden lg:block' : ''}`}>
+              <h4 className="hidden lg:flex items-center gap-2 text-zinc-900 font-black text-xs uppercase tracking-widest">
+                <User size={16}/> Identitas Pemilik
+              </h4>
               
-              {/* MOBILE LAYOUT - DENGAN ICON TOMBOL DI BELAKANG */}
-              <div className="lg:hidden space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-black text-zinc-400">PERSIL #{i + 1}</span>
-                  <div className="flex gap-1">
-                    {/* TOMBOL CORET - UNTUK SEMUA DATA (BARU & LAMA) */}
-                    {!hasId ? (
-                      // Tombol untuk data baru (toggle coret)
-                      <button
-                        onClick={() => updateRow(i, 'is_void', !isVoid)}
-                        className={`p-2 rounded-lg ${
-                          isVoid ? 'text-emerald-500' : 'text-zinc-400'
-                        }`}
-                        title={isVoid ? 'Aktifkan kembali' : 'Coret persil'}
-                      >
-                        <Ban size={16} />
-                      </button>
-                    ) : (
-                      // Tombol untuk data lama (update ke database)
-                      <button 
-                        onClick={() => handleToggleVoid(row.id!, isVoid)}
-                        disabled={voidLoading === row.id}
-                        className={`p-2 rounded-lg ${
-                          isVoid ? 'text-emerald-500' : 'text-zinc-400'
-                        }`}
-                      >
-                        {voidLoading === row.id ? <Loader2 size={16} className="animate-spin" /> : <Ban size={16} />}
-                      </button>
-                    )}
-                    
-                    {/* Tombol Hapus */}
-                    {rows.length > 1 && (
-                      <button 
-                        onClick={() => setRows(rows.filter((_, idx) => idx !== i))} 
-                        disabled={isVoid}
-                        className={`p-2 rounded-lg ${
-                          isVoid ? 'text-zinc-200 cursor-not-allowed' : 'text-zinc-400 hover:text-rose-500'
-                        }`}
-                      >
-                        <Trash2 size={16}/>
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* No. Persil */}
-                <div>
-                  <label className="text-[8px] font-bold text-zinc-400 block mb-1">No. Persil</label>
-                  <input 
-                    className={`w-full px-3 py-2 text-xs border rounded-lg bg-white ${
-                      isVoid ? 'border-zinc-200 line-through text-zinc-400 bg-zinc-50' : 'border-zinc-200'
-                    }`} 
-                    placeholder="Nomor Persil" 
-                    value={row.nomor_persil || ''} 
-                    onChange={e => updateRow(i, 'nomor_persil', e.target.value)}
-                    disabled={isVoid} 
-                  />
-                </div>
-
-                {/* Jenis Tanah */}
-                <div>
-                  <label className="text-[8px] font-bold text-zinc-400 block mb-1">Jenis Tanah</label>
-                  <select 
-                    className={`w-full px-3 py-2 text-xs border rounded-lg bg-white ${
-                      isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200'
-                    }`}
-                    value={row.jenis_tanah || 'Tanah Kering'} 
-                    onChange={e => updateRow(i, 'jenis_tanah', e.target.value)}
-                    disabled={isVoid}
-                  >
-                    <option value="Tanah Kering">Tanah Kering</option>
-                    <option value="Sawah">Sawah</option>
-                  </select>
-                </div>
-
-                {/* Klasifikasi dan Luas */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[8px] font-bold text-zinc-400 block mb-1">Klas</label>
-                    <input 
-                      className={`w-full px-3 py-2 text-xs border rounded-lg bg-white ${
-                        isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200'
-                      }`} 
-                      placeholder="Klas" 
-                      value={row.klas_desa || ''} 
-                      onChange={e => updateRow(i, 'klas_desa', e.target.value)}
-                      disabled={isVoid}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[8px] font-bold text-zinc-400 block mb-1">Luas (M²)</label>
-                    <input 
-                      className={`w-full px-3 py-2 text-xs border rounded-lg bg-white ${
-                        isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200'
-                      }`} 
-                      placeholder="0" 
-                      type="number" 
-                      value={row.luas_meter === 0 ? '' : row.luas_meter} 
-                      onChange={e => {
-                        const val = e.target.value;
-                        updateRow(i, 'luas_meter', val === '' ? 0 : parseFloat(val));
-                      }}
-                      disabled={isVoid}
-                    />
-                  </div>
-                </div>
-
-                {/* Keterangan */}
-                <div>
-                  <label className="text-[8px] font-bold text-zinc-400 block mb-1">Keterangan</label>
-                  <textarea 
-                    className={`w-full px-3 py-2 text-xs border rounded-lg bg-white min-h-[60px] ${
-                      isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200'
-                    }`} 
-                    placeholder="Keterangan..." 
-                    value={row.asal_usul || ''} 
-                    onChange={e => updateRow(i, 'asal_usul', e.target.value)}
-                    disabled={isVoid}
-                  />
-                </div>
-              </div>
-
-              {/* DESKTOP LAYOUT - DENGAN ICON TOMBOL DI BELAKANG (SETELAH ASAL USUL) */}
-              <div className="hidden lg:flex lg:flex-nowrap gap-3 items-center">
-                {/* Nomor Persil */}
-                <div className="w-[12%]">
-                  <input 
-                    className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 bg-white font-bold ${
-                      isVoid ? 'border-zinc-200 line-through text-zinc-400 bg-zinc-50' : 'border-zinc-200 text-zinc-900'
-                    }`} 
-                    placeholder="Nomor Persil" 
-                    value={row.nomor_persil || ''} 
-                    onChange={e => updateRow(i, 'nomor_persil', e.target.value)}
-                    disabled={isVoid} 
-                  />
-                </div>
-
-                {/* Jenis Tanah */}
-                <div className="w-[18%] relative">
-                  <select 
-                    className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 bg-white font-bold appearance-none cursor-pointer ${
-                      isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200 text-zinc-900'
-                    }`} 
-                    value={row.jenis_tanah || 'Tanah Kering'} 
-                    onChange={e => updateRow(i, 'jenis_tanah', e.target.value)}
-                    disabled={isVoid}
-                  >
-                    <option value="Tanah Kering">Tanah Kering</option>
-                    <option value="Sawah">Sawah</option>
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
-                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path d="M19 9l-7 7-7-7"/></svg>
-                  </div>
-                </div>
-
-                {/* Klasifikasi */}
-                <div className="w-[10%]">
-                  <input 
-                    className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 bg-white font-bold text-center uppercase ${
-                      isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200 text-zinc-900'
-                    }`} 
-                    placeholder="Klas" 
-                    value={row.klas_desa || ''} 
-                    onChange={e => updateRow(i, 'klas_desa', e.target.value)}
-                    disabled={isVoid}
-                  />
-                </div>
-
-                {/* Luas */}
-                <div className="w-[12%]">
-                  <input 
-                    className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 bg-white font-bold ${
-                      isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200 text-zinc-900'
-                    }`} 
-                    placeholder="0" 
-                    type="number" 
-                    value={row.luas_meter === 0 ? '' : row.luas_meter} 
-                    onChange={e => {
-                      const val = e.target.value;
-                      updateRow(i, 'luas_meter', val === '' ? 0 : parseFloat(val));
-                    }}
-                    disabled={isVoid}
-                  />
-                </div>
-
-                {/* Asal Usul */}
-                <div className="flex-1">
-                  <textarea 
-                    className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 bg-white font-medium min-h-[50px] resize-y ${
-                      isVoid ? 'border-zinc-200 line-through text-zinc-400' : 'border-zinc-200 text-zinc-900'
-                    }`} 
-                    placeholder="Asal-Usul / Keterangan..." 
-                    value={row.asal_usul || ''} 
-                    onChange={e => updateRow(i, 'asal_usul', e.target.value)}
-                    disabled={isVoid}
-                  />
-                </div>
-
-                {/* TOMBOL CORET - UNTUK SEMUA DATA (BARU & LAMA) - DILETAKKAN SETELAH ASAL USUL */}
-                <div className="w-16 flex justify-center">
-                  {!hasId ? (
-                    // Tombol untuk data baru (toggle coret)
-                    <button
-                      onClick={() => updateRow(i, 'is_void', !isVoid)}
-                      className={`p-2 rounded-xl transition-all ${
-                        isVoid 
-                          ? 'text-emerald-500 hover:bg-emerald-50' 
-                          : 'text-zinc-300 hover:text-amber-500 hover:bg-amber-50'
-                      }`}
-                      title={isVoid ? 'Aktifkan kembali' : 'Coret persil'}
-                    >
-                      <Ban size={18} />
-                    </button>
-                  ) : (
-                    // Tombol untuk data lama (update ke database)
-                    <button 
-                      onClick={() => handleToggleVoid(row.id!, isVoid)}
-                      disabled={voidLoading === row.id}
-                      className={`p-2 rounded-xl transition-all ${
-                        isVoid 
-                          ? 'text-emerald-500 hover:bg-emerald-50' 
-                          : 'text-zinc-300 hover:text-amber-500 hover:bg-amber-50'
-                      }`}
-                      title={isVoid ? 'Aktifkan kembali' : 'Coret persil (tidak berlaku)'}
-                    >
-                      {voidLoading === row.id ? (
-                        <Loader2 size={18} className="animate-spin" />
-                      ) : (
-                        <Ban size={18} />
+              <div className="space-y-3">
+                <label className="text-[10px] font-bold text-zinc-400 uppercase">Foto Arsip Letter C</label>
+                <div className="relative group">
+                  {previewUrl ? (
+                    <div className="relative h-32 lg:h-44 w-full rounded-xl lg:rounded-2xl overflow-hidden border-2 border-zinc-100 shadow-sm">
+                      {isScanning && (
+                        <div className="absolute inset-0 z-10 bg-zinc-900/60 backdrop-blur-sm flex flex-col items-center justify-center text-white">
+                          <Loader2 className="animate-spin mb-2" size={20}/>
+                          <span className="text-[8px] font-black uppercase">Menganalisis...</span>
+                        </div>
                       )}
-                    </button>
+                      <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                      <button 
+                        type="button"
+                        onClick={() => { setPreviewUrl(null); setImageFile(null); setForm({...form, image_url: ''})}} 
+                        className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600"
+                      >
+                        <X size={12}/>
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center h-32 lg:h-44 w-full border-2 border-dashed border-zinc-200 rounded-xl lg:rounded-2xl cursor-pointer hover:bg-zinc-50">
+                      <Camera className="text-zinc-300 mb-1" size={24}/>
+                      <span className="text-[8px] lg:text-[10px] font-bold text-zinc-400 text-center px-2">Klik untuk upload</span>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        capture="environment" 
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setImageFile(file); 
+                            setPreviewUrl(URL.createObjectURL(file));
+                            setShowCropper(true);
+                          }
+                        }} 
+                      />
+                    </label>
                   )}
                 </div>
+              </div>
 
-                {/* Tombol Hapus */}
-                {rows.length > 1 && (
-                  <button 
-                    onClick={() => setRows(rows.filter((_, idx) => idx !== i))} 
-                    disabled={isVoid}
-                    className={`p-2 rounded-xl transition-all ${
-                      isVoid 
-                        ? 'text-zinc-200 cursor-not-allowed' 
-                        : 'text-zinc-300 hover:text-rose-500 hover:bg-rose-50'
-                    }`}
-                  >
-                    <Trash2 size={18}/>
-                  </button>
-                )}
+              <div className="space-y-3">
+                <div>
+                  <input 
+                    className={`w-full px-4 lg:px-6 py-3 lg:py-4 bg-zinc-50 border rounded-xl lg:rounded-2xl text-sm font-bold ${
+                      nomorCError ? 'border-red-500 ring-1 ring-red-500' : 'border-zinc-100'
+                    }`} 
+                    placeholder="Nomor Kohir (C)" 
+                    value={form.nomor_c} 
+                    onChange={e => handleNomorCChange(e.target.value)}
+                  />
+                  {nomorCError && (
+                    <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                      <AlertCircle size={12} /> {nomorCError}
+                    </p>
+                  )}
+                </div>
+                <input 
+                  className="w-full px-4 lg:px-6 py-3 lg:py-4 bg-zinc-50 border border-zinc-100 rounded-xl lg:rounded-2xl text-sm font-bold" 
+                  placeholder="Nama Lengkap" 
+                  value={form.nama_pemilik} 
+                  onChange={e => setForm({...form, nama_pemilik: e.target.value})}
+                />
+                <textarea 
+                  className="w-full px-4 lg:px-6 py-3 lg:py-4 bg-zinc-50 border border-zinc-100 rounded-xl lg:rounded-2xl text-sm" 
+                  placeholder="Alamat Singkat" 
+                  rows={2}
+                  value={form.alamat_pemilik} 
+                  onChange={e => setForm({...form, alamat_pemilik: e.target.value})}
+                />
               </div>
             </div>
-          );
-        })}
-      </div>
-    </div>
-  </div>
-</div>
+
+            {/* RINCIAN PERSIL - DENGAN TAMPILAN CORET YANG JELAS */}
+            <div className={`lg:col-span-8 space-y-4 lg:space-y-6 ${activeMobileTab === 'identitas' ? 'hidden lg:block' : ''}`}>
+              <div className="flex justify-between items-center">
+                <h4 className="hidden lg:flex items-center gap-2 text-zinc-900 font-black text-xs uppercase tracking-widest">
+                  <Layers size={16}/> Rincian Persil
+                </h4>
+                <button 
+                  onClick={() => setRows([...rows, { nomor_persil: '', jenis_tanah: 'Tanah Kering', klas_desa: '', luas_meter: 0, asal_usul: '', is_void: false }])} 
+                  className="text-[10px] font-black text-zinc-900 bg-zinc-100 px-4 lg:px-5 py-2 lg:py-2.5 rounded-lg lg:rounded-xl uppercase hover:bg-zinc-200"
+                >
+                  + Tambah
+                </button>
+              </div>
+              
+              {/* HEADER TABEL */}
+              <div className="hidden lg:flex px-2 pb-2 gap-3 items-center border-b border-zinc-200">
+                <div className="w-[12%]"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">No. Persil</label></div>
+                <div className="w-[18%]"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Jenis</label></div>
+                <div className="w-[10%] text-center"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Klas</label></div>
+                <div className="w-[12%]"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Luas (M²)</label></div>
+                <div className="flex-1"><label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Asal-Usul / Keterangan</label></div>
+                <div className="w-16"></div>
+                {rows.length > 1 && <div className="w-20"></div>}
+              </div>
+
+              <div className="space-y-3">
+                {rows.map((row, i) => {
+                  const isVoid = row.is_void === true;
+                  const hasId = !!row.id;
+                  
+                  return (
+                    <div key={row.id || i} className={`bg-zinc-50 p-3 rounded-xl border transition-all ${isVoid ? 'border-red-200 bg-red-50/30' : 'border-transparent'}`}>
+                      
+                      {/* MOBILE LAYOUT */}
+                      <div className="lg:hidden space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-black text-zinc-400">PERSIL #{i + 1}</span>
+                          <div className="flex gap-1">
+                            {/* TOMBOL CORET */}
+                            {!hasId ? (
+                              <button
+                                onClick={() => updateRow(i, 'is_void', !isVoid)}
+                                className={`p-2 rounded-lg transition-all ${
+                                  isVoid ? 'text-emerald-500 bg-emerald-50' : 'text-zinc-400 hover:text-amber-500'
+                                }`}
+                                title={isVoid ? 'Aktifkan kembali' : 'Coret persil'}
+                              >
+                                <Ban size={16} />
+                              </button>
+                            ) : (
+                              <button 
+                                onClick={() => handleToggleVoid(row.id!, isVoid)}
+                                disabled={voidLoading === row.id}
+                                className={`p-2 rounded-lg transition-all ${
+                                  isVoid ? 'text-emerald-500 bg-emerald-50' : 'text-zinc-400 hover:text-amber-500'
+                                }`}
+                              >
+                                {voidLoading === row.id ? <Loader2 size={16} className="animate-spin" /> : <Ban size={16} />}
+                              </button>
+                            )}
+                            
+                            {/* Tombol Hapus */}
+                            {rows.length > 1 && (
+                              <button 
+                                onClick={() => setRows(rows.filter((_, idx) => idx !== i))} 
+                                disabled={isVoid}
+                                className={`p-2 rounded-lg transition-all ${
+                                  isVoid ? 'text-zinc-200 cursor-not-allowed' : 'text-zinc-400 hover:text-rose-500'
+                                }`}
+                              >
+                                <Trash2 size={16}/>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* No. Persil */}
+                        <div>
+                          <label className="text-[8px] font-bold text-zinc-400 block mb-1">No. Persil</label>
+                          <input 
+                            className={`w-full px-3 py-2 text-xs border rounded-lg bg-white ${
+                              isVoid ? 'border-red-200 bg-red-50' : 'border-zinc-200'
+                            }`}
+                            style={isVoid ? voidTextStyle : {}}
+                            placeholder="Nomor Persil" 
+                            value={row.nomor_persil || ''} 
+                            onChange={e => updateRow(i, 'nomor_persil', e.target.value)}
+                            disabled={isVoid} 
+                          />
+                        </div>
+
+                        {/* Jenis Tanah */}
+                        <div>
+                          <label className="text-[8px] font-bold text-zinc-400 block mb-1">Jenis Tanah</label>
+                          <select 
+                            className={`w-full px-3 py-2 text-xs border rounded-lg bg-white ${
+                              isVoid ? 'border-red-200 bg-red-50' : 'border-zinc-200'
+                            }`}
+                            style={isVoid ? voidTextStyle : {}}
+                            value={row.jenis_tanah || 'Tanah Kering'} 
+                            onChange={e => updateRow(i, 'jenis_tanah', e.target.value)}
+                            disabled={isVoid}
+                          >
+                            <option value="Tanah Kering">Tanah Kering</option>
+                            <option value="Sawah">Sawah</option>
+                          </select>
+                        </div>
+
+                        {/* Klasifikasi dan Luas */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[8px] font-bold text-zinc-400 block mb-1">Klas</label>
+                            <input 
+                              className={`w-full px-3 py-2 text-xs border rounded-lg bg-white ${
+                                isVoid ? 'border-red-200 bg-red-50' : 'border-zinc-200'
+                              }`}
+                              style={isVoid ? voidTextStyle : {}}
+                              placeholder="Klas" 
+                              value={row.klas_desa || ''} 
+                              onChange={e => updateRow(i, 'klas_desa', e.target.value)}
+                              disabled={isVoid}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[8px] font-bold text-zinc-400 block mb-1">Luas (M²)</label>
+                            <input 
+                              className={`w-full px-3 py-2 text-xs border rounded-lg bg-white ${
+                                isVoid ? 'border-red-200 bg-red-50' : 'border-zinc-200'
+                              }`}
+                              style={isVoid ? voidTextStyle : {}}
+                              placeholder="0" 
+                              type="number" 
+                              value={row.luas_meter === 0 ? '' : row.luas_meter} 
+                              onChange={e => {
+                                const val = e.target.value;
+                                updateRow(i, 'luas_meter', val === '' ? 0 : parseFloat(val));
+                              }}
+                              disabled={isVoid}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Keterangan */}
+                        <div>
+                          <label className="text-[8px] font-bold text-zinc-400 block mb-1">Keterangan</label>
+                          <textarea 
+                            className={`w-full px-3 py-2 text-xs border rounded-lg bg-white min-h-[60px] ${
+                              isVoid ? 'border-red-200 bg-red-50' : 'border-zinc-200'
+                            }`}
+                            style={isVoid ? voidTextStyle : {}}
+                            placeholder="Keterangan..." 
+                            value={row.asal_usul || ''} 
+                            onChange={e => updateRow(i, 'asal_usul', e.target.value)}
+                            disabled={isVoid}
+                          />
+                        </div>
+                      </div>
+
+                      {/* DESKTOP LAYOUT */}
+                      <div className="hidden lg:flex lg:flex-nowrap gap-3 items-center">
+                        {/* Nomor Persil */}
+                        <div className="w-[12%]">
+                          <input 
+                            className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 bg-white font-bold ${
+                              isVoid ? 'border-red-200 bg-red-50' : 'border-zinc-200 text-zinc-900'
+                            }`}
+                            style={isVoid ? voidTextStyle : {}}
+                            placeholder="Nomor Persil" 
+                            value={row.nomor_persil || ''} 
+                            onChange={e => updateRow(i, 'nomor_persil', e.target.value)}
+                            disabled={isVoid} 
+                          />
+                        </div>
+
+                        {/* Jenis Tanah */}
+                        <div className="w-[18%] relative">
+                          <select 
+                            className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 bg-white font-bold appearance-none cursor-pointer ${
+                              isVoid ? 'border-red-200 bg-red-50' : 'border-zinc-200 text-zinc-900'
+                            }`}
+                            style={isVoid ? voidTextStyle : {}}
+                            value={row.jenis_tanah || 'Tanah Kering'} 
+                            onChange={e => updateRow(i, 'jenis_tanah', e.target.value)}
+                            disabled={isVoid}
+                          >
+                            <option value="Tanah Kering">Tanah Kering</option>
+                            <option value="Sawah">Sawah</option>
+                          </select>
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
+                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path d="M19 9l-7 7-7-7"/></svg>
+                          </div>
+                        </div>
+
+                        {/* Klasifikasi */}
+                        <div className="w-[10%]">
+                          <input 
+                            className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 bg-white font-bold text-center uppercase ${
+                              isVoid ? 'border-red-200 bg-red-50' : 'border-zinc-200 text-zinc-900'
+                            }`}
+                            style={isVoid ? voidTextStyle : {}}
+                            placeholder="Klas" 
+                            value={row.klas_desa || ''} 
+                            onChange={e => updateRow(i, 'klas_desa', e.target.value)}
+                            disabled={isVoid}
+                          />
+                        </div>
+
+                        {/* Luas */}
+                        <div className="w-[12%]">
+                          <input 
+                            className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 bg-white font-bold ${
+                              isVoid ? 'border-red-200 bg-red-50' : 'border-zinc-200 text-zinc-900'
+                            }`}
+                            style={isVoid ? voidTextStyle : {}}
+                            placeholder="0" 
+                            type="number" 
+                            value={row.luas_meter === 0 ? '' : row.luas_meter} 
+                            onChange={e => {
+                              const val = e.target.value;
+                              updateRow(i, 'luas_meter', val === '' ? 0 : parseFloat(val));
+                            }}
+                            disabled={isVoid}
+                          />
+                        </div>
+
+                        {/* Asal Usul */}
+                        <div className="flex-1">
+                          <textarea 
+                            className={`w-full px-4 py-3 text-xs border rounded-xl outline-none focus:border-emerald-500 bg-white font-medium min-h-[50px] resize-y ${
+                              isVoid ? 'border-red-200 bg-red-50' : 'border-zinc-200 text-zinc-900'
+                            }`}
+                            style={isVoid ? voidTextStyle : {}}
+                            placeholder="Asal-Usul / Keterangan..." 
+                            value={row.asal_usul || ''} 
+                            onChange={e => updateRow(i, 'asal_usul', e.target.value)}
+                            disabled={isVoid}
+                          />
+                        </div>
+
+                        {/* TOMBOL CORET */}
+                        <div className="w-16 flex justify-center">
+                          {!hasId ? (
+                            <button
+                              onClick={() => updateRow(i, 'is_void', !isVoid)}
+                              className={`p-2 rounded-xl transition-all ${
+                                isVoid 
+                                  ? 'text-emerald-500 bg-emerald-50' 
+                                  : 'text-zinc-300 hover:text-amber-500 hover:bg-amber-50'
+                              }`}
+                              title={isVoid ? 'Aktifkan kembali' : 'Coret persil'}
+                            >
+                              <Ban size={18} />
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => handleToggleVoid(row.id!, isVoid)}
+                              disabled={voidLoading === row.id}
+                              className={`p-2 rounded-xl transition-all ${
+                                isVoid 
+                                  ? 'text-emerald-500 bg-emerald-50' 
+                                  : 'text-zinc-300 hover:text-amber-500 hover:bg-amber-50'
+                              }`}
+                              title={isVoid ? 'Aktifkan kembali' : 'Coret persil (tidak berlaku)'}
+                            >
+                              {voidLoading === row.id ? (
+                                <Loader2 size={18} className="animate-spin" />
+                              ) : (
+                                <Ban size={18} />
+                              )}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Tombol Hapus */}
+                        {rows.length > 1 && (
+                          <button 
+                            onClick={() => setRows(rows.filter((_, idx) => idx !== i))} 
+                            disabled={isVoid}
+                            className={`p-2 rounded-xl transition-all ${
+                              isVoid 
+                                ? 'text-zinc-200 cursor-not-allowed' 
+                                : 'text-zinc-300 hover:text-rose-500 hover:bg-rose-50'
+                            }`}
+                          >
+                            <Trash2 size={18}/>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* FOOTER */}
         <div className="p-4 lg:p-10 border-t border-zinc-50 bg-white flex shrink-0 justify-end gap-4 items-center">
@@ -1244,8 +1313,10 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
           </button>
           <button 
             onClick={handleSave} 
-            disabled={loading} 
-            className="px-8 lg:px-12 py-3 lg:py-4 bg-zinc-900 text-white rounded-xl lg:rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-zinc-900/20 active:scale-95 transition-all flex items-center gap-2 hover:bg-zinc-800"
+            disabled={loading || !!nomorCError} 
+            className={`px-8 lg:px-12 py-3 lg:py-4 bg-zinc-900 text-white rounded-xl lg:rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-zinc-900/20 active:scale-95 transition-all flex items-center gap-2 ${
+              nomorCError ? 'opacity-50 cursor-not-allowed' : 'hover:bg-zinc-800'
+            }`}
           >
             {loading ? <Loader2 className="animate-spin" size={16}/> : null}
             {loading ? 'MENYIMPAN...' : editData ? 'UPDATE' : 'SIMPAN'}

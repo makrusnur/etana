@@ -225,3 +225,20 @@ export const getHari = (dateStr: string): string => {
   const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
   return days[date.getDay()];
 };
+// utils/pdfUtils.ts
+const STORAGE_URL = import.meta.env.VITE_SUPABASE_STORAGE_URL;
+
+export const getPDFUrl = (desaNama: string, fileName: string = 'krawangan.pdf'): string => {
+  // Normalize nama desa (lowercase, remove special chars, replace space with underscore)
+  const normalizedDesa = desaNama
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '_')
+    .replace(/_+/g, '_');
+  
+  return `${STORAGE_URL}${normalizedDesa}/${fileName}`;
+};
+
+// Atau jika struktur folder flat
+export const getPDFUrlSimple = (fileName: string): string => {
+  return `${STORAGE_URL}${fileName}`;
+};
