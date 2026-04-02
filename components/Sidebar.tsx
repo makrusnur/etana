@@ -232,7 +232,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
               onToggle={() => toggleGroup('lainnya')}
             >
               <MobileMenuItem to="/map-monitoring" icon={<Navigation size={18}/>} label="Map Monitoring" onClick={() => setIsMobileOpen(false)} />
-              <MobileMenuItem to="/upload-shp" icon={<Upload size={18}/>} label="Upload SHP" onClick={() => setIsMobileOpen(false)} />
               <MobileMenuItem to="/ptsl" icon={<FileText size={18}/>} label="PTSL Massal" onClick={() => setIsMobileOpen(false)} />
             </MobileMenuGroup>
           </nav>
@@ -315,7 +314,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
             collapsed={isCollapsed}
           >
             <SubMenuItem to="/map-monitoring" icon={<Navigation size={14} />} label="Map Monitoring" />
-            <SubMenuItem to="/upload-shp" icon={<Upload size={14} />} label="Upload SHP" />
             <SubMenuItem to="/ptsl" icon={<FileText size={14} />} label="PTSL Massal" />
           </MenuGroupDesktop>
         </nav>

@@ -1,9 +1,10 @@
-import { useEffect } from 'react'; 
-import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
+import React, { useEffect, useState } from 'react'; 
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, Polygon, FeatureGroup } from 'react-leaflet';
 import { LatLngTuple, LeafletMouseEvent } from 'leaflet';
 import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
-// 1. Icon Default (Biru Standar) untuk Mode Input/Entri Data
+// 1. Icon Default (Biru Standar)
 const DefaultIcon = L.icon({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
@@ -24,10 +25,13 @@ interface LandMapProps {
   latitude: number;
   longitude: number;
   onChange?: (lat: number, lng: number) => void;
-  allRecords?: any[];    
+  allRecords?: any[];     
   berkasRecords?: any[]; 
+  // Tambahan props untuk polygon persil
+  polygonRecords?: any[]; 
 }
 
+// Handler Klik Peta (Tetap dari kode awal)
 function MapClickHandler({ onChange }: { onChange?: (lat: number, lng: number) => void }) {
   useMapEvents({
     click(e: LeafletMouseEvent) {
@@ -37,6 +41,7 @@ function MapClickHandler({ onChange }: { onChange?: (lat: number, lng: number) =
   return null;
 }
 
+// Fungsi Recenter (Tetap dari kode awal)
 function RecenterMap({ coords }: { coords: LatLngTuple }) {
   const map = useMap();
   useEffect(() => {
@@ -46,22 +51,29 @@ function RecenterMap({ coords }: { coords: LatLngTuple }) {
   return null;
 }
 
-export default function LandMap({ latitude, longitude, onChange, allRecords, berkasRecords }: LandMapProps) {
+export default function LandMap({ 
+  latitude, 
+  longitude, 
+  onChange, 
+  allRecords, 
+  berkasRecords,
+  polygonRecords = [] // Data polygon dari tabel polygon_persil/kohir
+}: LandMapProps) {
   
-  // Logic agar koordinat selalu valid (Fallback ke Pasuruan)
   const position: LatLngTuple = [
     latitude && !isNaN(Number(latitude)) ? Number(latitude) : -7.6448, 
     longitude && !isNaN(Number(longitude)) ? Number(longitude) : 112.9061
   ];
 
   return (
-    <div className="w-full h-full min-h-[350px] rounded-[2rem] overflow-hidden border border-slate-300 shadow-inner relative z-0">
+    <div className="w-full h-full min-h-[500px] rounded-[2rem] overflow-hidden border border-slate-300 shadow-inner relative z-0">
       <MapContainer 
         center={position} 
         zoom={18} 
         maxZoom={21} 
         style={{ height: "100%", width: "100%" }}
       >
+        {/* Layer Satelit & Label */}
         <TileLayer 
           url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}" 
           maxZoom={21} 
@@ -73,7 +85,46 @@ export default function LandMap({ latitude, longitude, onChange, allRecords, ber
           maxNativeZoom={20} 
         />
         
-        {/* Render Marker PBB (Hijau) */}
+        {/* --- BAGIAN 1: POLYGON (BIDANG TANAH) --- */}
+        <FeatureGroup>
+          {polygonRecords.map((poly) => {
+            // Pastikan data geometry ada dan valid
+            if (!poly.geometry || !poly.geometry.coordinates) return null;
+            
+            // Konversi GeoJSON [lng, lat] ke Leaflet [lat, lng]
+            const leafletCoords = poly.geometry.coordinates[0].map((c: any) => [c[1], c[0]]);
+            
+            return (
+              <Polygon 
+                key={`poly-${poly.id}`} 
+                positions={leafletCoords}
+                pathOptions={{
+                  color: poly.type === 'persil' ? '#3b82f6' : '#10b981',
+                  fillColor: poly.type === 'persil' ? '#3b82f6' : '#10b981',
+                  fillOpacity: 0.3,
+                  weight: 2
+                }}
+              >
+                <Popup>
+                  <div className="font-sans p-1">
+                    <p className="text-[10px] font-black text-slate-400 uppercase">
+                      {poly.type === 'persil' ? 'BIDANG PERSIL' : 'BIDANG KOHIR'}
+                    </p>
+                    <p className="font-bold text-sm text-slate-900 uppercase mt-1">
+                      {poly.nama || 'Tanpa Nama'}
+                    </p>
+                    <p className="text-[11px] text-blue-600 font-bold">
+                      No: {poly.label}
+                    </p>
+                  </div>
+                </Popup>
+              </Polygon>
+            );
+          })}
+        </FeatureGroup>
+
+        {/* --- BAGIAN 2: MARKER (PIN/TITIK) --- */}
+        {/* Render Marker PBB (Hijau) - Tetap dari kode awal */}
         {allRecords && allRecords.map((r) => r.latitude && r.longitude && (
           <Marker key={`pbb-${r.id}`} position={[r.latitude, r.longitude]} icon={createDotIcon('#10b981')}>
             <Popup minWidth={200}>
@@ -86,7 +137,7 @@ export default function LandMap({ latitude, longitude, onChange, allRecords, ber
           </Marker>
         ))}
 
-        {/* Render Marker Berkas (Biru) */}
+        {/* Render Marker Berkas (Biru) - Tetap dari kode awal */}
         {berkasRecords && berkasRecords.map((b) => b.latitude && b.longitude && (
           <Marker key={`berkas-${b.id}`} position={[b.latitude, b.longitude]} icon={createDotIcon('#3b82f6')}>
             <Popup minWidth={200}>
@@ -98,7 +149,7 @@ export default function LandMap({ latitude, longitude, onChange, allRecords, ber
           </Marker>
         ))}
 
-        {/* Marker untuk Mode Input (Pin Besar) */}
+        {/* Marker untuk Mode Input (Pin Besar) - Tetap dari kode awal */}
         {!allRecords && !berkasRecords && (
           <Marker position={position}>
             <Popup>
@@ -114,7 +165,7 @@ export default function LandMap({ latitude, longitude, onChange, allRecords, ber
         
         <MapClickHandler onChange={onChange} />
         <RecenterMap coords={position} />
-      </MapContainer> {/* <-- SUDAH DIPERBAIKI DI SINI */}
+      </MapContainer>
     </div>
   );
 }
