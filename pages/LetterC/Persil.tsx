@@ -40,17 +40,15 @@ export const Persil = () => {
   const [selectedPageNumber, setSelectedPageNumber] = useState<number | null>(null);
   const [pdfSearchKeyword, setPdfSearchKeyword] = useState<string | null>(null);
   const [isSplitView, setIsSplitView] = useState(true);
+  const [pdfLoading, setPdfLoading] = useState(false);
   
-  // Map untuk menyimpan URL krawangan per desa
-  const [desaKrawanganMap, setDesaKrawanganMap] = useState<Record<string, string>>({});
-
-  // Get storage URL from env
-  const storageUrl = import.meta.env.VITE_SUPABASE_STORAGE_URL;
-  const pdfFilename = import.meta.env.VITE_PDF_FILENAME;
-
   // selectedDesa dihitung dari state
   const selectedDesa = desas.find(d => d.id === selectedDesaId);
   const selectedKecamatan = kecamatans.find(k => k.id === selectedDesa?.kecamatan_id);
+
+  // Base URL dari env
+  const pdfBaseUrl = import.meta.env.VITE_PDF_BASE_URL;
+  const pdfFilename = import.meta.env.VITE_PDF_FILENAME;
 
   // --- Fetch Data Wilayah ---
   useEffect(() => {
@@ -67,78 +65,6 @@ export const Persil = () => {
     };
     fetchRegions();
   }, []);
-
-  // --- Fetch URL Krawangan dari database ---
-  // --- Fetch URL Krawangan dari database ---
-useEffect(() => {
-  const fetchDesaKrawangan = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('desa')
-        .select('id, nama, krawangan_url');
-      
-      if (error) throw error;
-      
-      if (data) {
-        const map: Record<string, string> = {};
-        
-        for (const desa of data) {
-          let pdfUrl = null;
-          
-          // Priority 1: Gunakan krawangan_url dari database jika ada
-          if (desa.krawangan_url) {
-            // Jika URL sudah lengkap
-            if (desa.krawangan_url.startsWith('http')) {
-              pdfUrl = desa.krawangan_url;
-            } 
-            // Jika hanya path/filename
-            else {
-              // Coba berbagai kemungkinan path
-              const possibleUrls = [
-                `${storageUrl}${desa.krawangan_url}`,
-                `${storageUrl}${encodeURIComponent(desa.krawangan_url)}`,
-                `https://xrtdbatsycdhbbkxcpjs.supabase.co/storage/v1/object/public/krawangan-desa-genengwaru/${desa.krawangan_url}`,
-              ];
-              
-              // Coba URL pertama yang valid
-              for (const url of possibleUrls) {
-                try {
-                  const response = await fetch(url, { method: 'HEAD' });
-                  if (response.ok) {
-                    pdfUrl = url;
-                    break;
-                  }
-                } catch (err) {
-                  console.log(`URL not accessible: ${url}`);
-                }
-              }
-              
-              // Jika tidak ada yang berhasil, gunakan URL default
-              if (!pdfUrl) {
-                pdfUrl = possibleUrls[0];
-              }
-            }
-          }
-          
-          // Priority 2: Fallback ke env untuk desa Genengwaru
-          if (!pdfUrl && desa.nama?.toLowerCase().includes('genengwaru') && storageUrl && pdfFilename) {
-            pdfUrl = `${storageUrl}${pdfFilename}`;
-          }
-          
-          if (pdfUrl) {
-            map[desa.id] = pdfUrl;
-          }
-        }
-        
-        setDesaKrawanganMap(map);
-      }
-    } catch (err: any) {
-      console.error("Error fetching desa krawangan URLs:", err.message);
-    }
-  };
-  
-  fetchDesaKrawangan();
-}, [storageUrl, pdfFilename]);
 
   // --- Fetch Data Persil ---
   useEffect(() => {
@@ -199,18 +125,71 @@ useEffect(() => {
     fetchPersils();
   }, [selectedDesaId]);
 
-  // --- Auto-load PDF when desa is selected ---
+  // --- Set PDF URL ketika desa dipilih ---
   useEffect(() => {
-    if (selectedDesaId && desaKrawanganMap[selectedDesaId]) {
-      setSelectedPdfUrl(desaKrawanganMap[selectedDesaId]);
-    } else if (selectedDesaId) {
-      setSelectedPdfUrl(null);
-    } else {
-      setSelectedPdfUrl(null);
-    }
+    const loadPdfUrl = async () => {
+      if (!selectedDesaId) {
+        setSelectedPdfUrl(null);
+        return;
+      }
+      
+      setPdfLoading(true);
+      
+      try {
+        // Untuk desa Genengwaru, gunakan URL dari env
+        if (selectedDesa?.nama?.toLowerCase().includes('genengwaru')) {
+          const pdfUrl = `${pdfBaseUrl}${pdfFilename}`;
+          console.log('Loading PDF from:', pdfUrl);
+          
+          // Test URL terlebih dahulu
+          try {
+            const response = await fetch(pdfUrl, { method: 'HEAD' });
+            if (response.ok) {
+              setSelectedPdfUrl(pdfUrl);
+            } else {
+              console.error('PDF not accessible, status:', response.status);
+              setError('File PDF tidak dapat diakses');
+              setSelectedPdfUrl(null);
+            }
+          } catch (err) {
+            console.error('Error testing PDF URL:', err);
+            setSelectedPdfUrl(pdfUrl); // Tetap set URL meskipun test gagal
+          }
+        } else {
+          // Untuk desa lain, ambil dari database
+          const { data, error } = await supabase
+            .from('desa')
+            .select('krawangan_url')
+            .eq('id', selectedDesaId)
+            .single();
+          
+          if (error) {
+            console.error('Error fetching desa PDF URL:', error);
+            setSelectedPdfUrl(null);
+          } else if (data?.krawangan_url) {
+            // Jika URL sudah lengkap
+            if (data.krawangan_url.startsWith('http')) {
+              setSelectedPdfUrl(data.krawangan_url);
+            } else {
+              // Jika hanya path, gabungkan dengan base URL
+              setSelectedPdfUrl(`${pdfBaseUrl}${data.krawangan_url}`);
+            }
+          } else {
+            setSelectedPdfUrl(null);
+          }
+        }
+      } catch (err) {
+        console.error('Error in loadPdfUrl:', err);
+        setSelectedPdfUrl(null);
+      } finally {
+        setPdfLoading(false);
+      }
+    };
+    
+    loadPdfUrl();
     setSelectedPageNumber(null);
     setPdfSearchKeyword(null);
-  }, [selectedDesaId, desaKrawanganMap]);
+  }, [selectedDesaId, selectedDesa, pdfBaseUrl, pdfFilename]);
 
   // --- Filter Logic ---
   const filteredKecamatans = kecamatans
@@ -240,14 +219,12 @@ useEffect(() => {
     
     if (searchTermTrimmed && filteredPersils.length === 1 && !filteredPersils[0].is_void) {
       const persil = filteredPersils[0];
-      // Set halaman dari database jika ada (fallback)
       if (persil.halaman_krawangan && persil.halaman_krawangan > 0) {
         setSelectedPageNumber(persil.halaman_krawangan);
       } else {
         setSelectedPageNumber(null);
       }
-      // Set keyword pencarian PDF dengan berbagai format yang mungkin ada di PDF
-      setPdfSearchKeyword(`${persil.nomor_persil}`);
+      setPdfSearchKeyword(persil.nomor_persil?.toString() || null);
     } else if (!searchTermTrimmed) {
       setSelectedPageNumber(null);
       setPdfSearchKeyword(null);
@@ -260,8 +237,6 @@ useEffect(() => {
     } else {
       setSelectedPageNumber(null);
     }
-    // Optional: juga lakukan pencarian saat klik
-    // setPdfSearchKeyword(`${persil.nomor_persil}`);
   };
 
   const handlePrintPDF = async () => {
@@ -719,11 +694,17 @@ useEffect(() => {
           {/* PDF Viewer Panel */}
           {isSplitView && (
             <div className="lg:w-1/2 bg-zinc-100 border-t lg:border-t-0 lg:border-l border-zinc-200">
-              <PDFViewer 
-                pdfUrl={selectedPdfUrl}
-                pageNumber={selectedPageNumber}
-                searchKeyword={pdfSearchKeyword}
-              />
+              {pdfLoading ? (
+                <div className="h-full flex items-center justify-center">
+                  <Loader2 className="animate-spin text-zinc-400" size={32} />
+                </div>
+              ) : (
+                <PDFViewer 
+                  pdfUrl={selectedPdfUrl}
+                  pageNumber={selectedPageNumber}
+                  searchKeyword={pdfSearchKeyword}
+                />
+              )}
             </div>
           )}
         </div>

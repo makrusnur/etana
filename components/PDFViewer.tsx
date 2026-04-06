@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
-import { Loader2, AlertCircle, Search as SearchIcon, FileWarning } from 'lucide-react';
+import { Loader2, AlertCircle, FileWarning, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Download, Maximize2, Minimize2 } from 'lucide-react';
 
 // Set worker src
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+const pdfjsWorkerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerSrc;
 
 interface PDFViewerProps {
   pdfUrl: string | null;
@@ -17,237 +18,219 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
   searchKeyword 
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
+  const renderTaskRef = useRef<any>(null);
+  const isMountedRef = useRef(true);
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [numPages, setNumPages] = useState<number>(0);
-  const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
-  const [searching, setSearching] = useState(false);
   const [searchResult, setSearchResult] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
+  const [searching, setSearching] = useState(false);
+  
+  // Zoom state
+  const [zoom, setZoom] = useState<number>(1);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Fungsi untuk memeriksa apakah file PDF dapat diakses
-  const checkPdfAccessibility = async (url: string): Promise<boolean> => {
-    try {
-      const response = await fetch(url, { method: 'HEAD' });
-      return response.ok;
-    } catch (err) {
-      return false;
-    }
-  };
+  // Cleanup
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (renderTaskRef.current) {
+        try { renderTaskRef.current.cancel(); } catch(e) {}
+      }
+    };
+  }, []);
 
-  // Load PDF document
+  // Load PDF
   useEffect(() => {
     if (!pdfUrl) {
-      setPdfDoc(null);
+      pdfDocRef.current = null;
       setNumPages(0);
       setCurrentPage(1);
       setError(null);
-      setSearchResult(null);
       return;
     }
 
     const loadPdf = async () => {
       setLoading(true);
       setError(null);
-      setSearchResult(null);
       
       try {
-        // Cek apakah file dapat diakses
-        const isAccessible = await checkPdfAccessibility(pdfUrl);
-        if (!isAccessible) {
-          throw new Error('File PDF tidak dapat diakses. Periksa URL atau permission bucket.');
+        if (renderTaskRef.current) {
+          try { renderTaskRef.current.cancel(); } catch(e) {}
         }
-
-        // Load PDF tanpa cache parameter untuk menghindari masalah
+        
         const loadingTask = pdfjsLib.getDocument({
           url: pdfUrl,
-          disableRange: true, // Matikan range request untuk menghindari CORS issues
-          disableStream: true,
-          isEvalSupported: false,
-        });
-        
-        const doc = await loadingTask.promise;
-        setPdfDoc(doc);
-        setNumPages(doc.numPages);
-        setCurrentPage(1);
-        setError(null);
-      } catch (err: any) {
-        console.error('Error loading PDF:', err);
-        
-        // Coba lagi dengan URL tanpa encoding jika error
-        if (retryCount === 0 && pdfUrl.includes('%')) {
-          setRetryCount(1);
-          const decodedUrl = decodeURIComponent(pdfUrl);
-          setPdfDoc(null); // Trigger reload dengan URL decoded
-          setTimeout(() => {
-            loadPdfWithUrl(decodedUrl);
-          }, 100);
-          return;
-        }
-        
-        let errorMessage = 'Gagal memuat PDF. ';
-        if (err.status === 400) {
-          errorMessage += 'File tidak ditemukan atau URL tidak valid. ';
-        } else if (err.status === 403) {
-          errorMessage += 'Akses ditolak. Pastikan bucket storage bersifat public. ';
-        } else if (err.status === 404) {
-          errorMessage += 'File tidak ditemukan. ';
-        } else {
-          errorMessage += err.message || 'Periksa koneksi dan URL PDF.';
-        }
-        setError(errorMessage);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    const loadPdfWithUrl = async (url: string) => {
-      setLoading(true);
-      try {
-        const loadingTask = pdfjsLib.getDocument({
-          url: url,
           disableRange: true,
           disableStream: true,
         });
+        
         const doc = await loadingTask.promise;
-        setPdfDoc(doc);
+        
+        if (!isMountedRef.current) {
+          doc.destroy();
+          return;
+        }
+        
+        pdfDocRef.current = doc;
         setNumPages(doc.numPages);
-        setCurrentPage(1);
-        setError(null);
-      } catch (err) {
-        setError('Gagal memuat PDF setelah percobaan ulang.');
+        setCurrentPage(pageNumber && pageNumber <= doc.numPages ? pageNumber : 1);
+      } catch (err: any) {
+        if (isMountedRef.current) {
+          setError(`Gagal memuat PDF: ${err.message || 'Periksa URL'}`);
+        }
       } finally {
-        setLoading(false);
+        if (isMountedRef.current) setLoading(false);
       }
     };
     
     loadPdf();
-  }, [pdfUrl, retryCount]);
+  }, [pdfUrl]);
 
-  // Render halaman tertentu
+  // Render halaman
   const renderPage = async (pageNum: number) => {
-    if (!pdfDoc || !canvasRef.current) return;
+    if (!pdfDocRef.current || !canvasRef.current || !isMountedRef.current) return;
+    
+    if (renderTaskRef.current) {
+      try { renderTaskRef.current.cancel(); } catch(e) {}
+    }
+    
     try {
-      const page = await pdfDoc.getPage(pageNum);
+      const page = await pdfDocRef.current.getPage(pageNum);
       const viewport = page.getViewport({ scale: 1.5 });
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
+      
+      if (!context) return;
 
-      const renderContext = {
-        canvasContext: context!,
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      canvas.style.width = '100%';
+      canvas.style.height = 'auto';
+
+      const renderTask = page.render({
+        canvasContext: context,
         viewport: viewport,
-      };
-      await page.render(renderContext).promise;
-    } catch (err) {
-      console.error('Render error:', err);
+      });
+      renderTaskRef.current = renderTask;
+      
+      await renderTask.promise;
+      renderTaskRef.current = null;
+    } catch (err: any) {
+      if (err.name !== 'RenderingCancelledException') {
+        console.error('Render error:', err);
+      }
     }
   };
 
   useEffect(() => {
-    if (pdfDoc && currentPage >= 1 && currentPage <= numPages) {
+    if (pdfDocRef.current && currentPage >= 1 && currentPage <= numPages) {
       renderPage(currentPage);
     }
-  }, [pdfDoc, currentPage, numPages]);
+  }, [currentPage, numPages]);
 
-  // Navigasi berdasarkan pageNumber prop (dari database)
+  // Navigasi dari props
   useEffect(() => {
-    if (pageNumber && pdfDoc && pageNumber >= 1 && pageNumber <= numPages) {
+    if (pageNumber && pdfDocRef.current && pageNumber >= 1 && pageNumber <= numPages) {
       setCurrentPage(pageNumber);
       setSearchResult(null);
     }
-  }, [pageNumber, pdfDoc, numPages]);
+  }, [pageNumber, numPages]);
 
-  // Pencarian teks ketika searchKeyword berubah
+  // ========== PENCARIAN SEDERHANA ==========
+  // Hanya menggunakan format: "persil no. {keyword}"
   useEffect(() => {
-    if (!pdfDoc || !searchKeyword || searchKeyword.trim() === '') {
+    if (!pdfDocRef.current || !searchKeyword || searchKeyword.trim() === '') {
       setSearchResult(null);
       return;
     }
 
     const performSearch = async () => {
+      if (!pdfDocRef.current) return;
+      
       setSearching(true);
       setSearchResult(null);
+      
       try {
-        const keyword = searchKeyword.trim().toLowerCase();
-        let foundPage = null;
+        const keyword = searchKeyword.trim();
+        // Hanya satu format pencarian
+        const searchText = `persil no. ${keyword}`.toLowerCase();
         
-        // Coba berbagai format pencarian
-        const searchPatterns = [
-          keyword,
-          `persil ${keyword}`,
-          `no. ${keyword}`,
-          `nomor ${keyword}`,
-          `persil no. ${keyword}`,
-          `persil nomor ${keyword}`,
-          ` ${keyword} `,
-        ];
+        console.log(`🔍 Mencari: "${searchText}"`);
         
-        // Iterasi semua halaman untuk mencari teks
-        for (let pageIdx = 1; pageIdx <= pdfDoc.numPages; pageIdx++) {
-          const page = await pdfDoc.getPage(pageIdx);
+        // Cari di semua halaman
+        for (let pageIdx = 1; pageIdx <= pdfDocRef.current.numPages; pageIdx++) {
+          const page = await pdfDocRef.current.getPage(pageIdx);
           const textContent = await page.getTextContent();
-          const pageText = textContent.items.map((item: any) => item.str).join(' ').toLowerCase();
+          const pageText = textContent.items
+            .map((item: any) => item.str)
+            .join(' ')
+            .toLowerCase();
           
-          // Cek apakah salah satu pattern ditemukan
-          const isFound = searchPatterns.some(pattern => pageText.includes(pattern));
-          
-          if (isFound) {
-            foundPage = pageIdx;
-            setSearchResult(`✓ Ditemukan di halaman ${pageIdx}`);
-            break;
+          if (pageText.includes(searchText)) {
+            setCurrentPage(pageIdx);
+            setSearchResult(`✓ Ditemukan "persil no. ${keyword}" di halaman ${pageIdx}`);
+            return;
           }
         }
         
-        if (foundPage) {
-          setCurrentPage(foundPage);
-        } else {
-          setSearchResult(`✗ "${searchKeyword}" tidak ditemukan`);
-        }
+        setSearchResult(`✗ "persil no. ${keyword}" tidak ditemukan`);
       } catch (err) {
         console.error('Search error:', err);
-        setSearchResult('Gagal melakukan pencarian');
+        setSearchResult('Gagal mencari');
       } finally {
         setSearching(false);
       }
     };
 
-    // Debounce search
-    const timeoutId = setTimeout(() => {
-      performSearch();
-    }, 500);
-
+    const timeoutId = setTimeout(performSearch, 500);
     return () => clearTimeout(timeoutId);
-  }, [pdfDoc, searchKeyword]);
+  }, [searchKeyword]);
 
-  // Handler navigasi manual
-  const goToPrevPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-      setSearchResult(null);
-    }
-  };
-  
-  const goToNextPage = () => {
-    if (currentPage < numPages) {
-      setCurrentPage(currentPage + 1);
-      setSearchResult(null);
-    }
+  // Zoom handlers
+  const zoomIn = () => setZoom(prev => Math.min(prev + 0.25, 3));
+  const zoomOut = () => setZoom(prev => Math.max(prev - 0.25, 0.5));
+  const resetZoom = () => setZoom(1);
+
+  // Download PDF
+  const downloadPDF = () => {
+    if (pdfUrl) window.open(pdfUrl, '_blank');
   };
 
-  const handleRetry = () => {
-    setRetryCount(prev => prev + 1);
-    setError(null);
+  // Fullscreen
+  const toggleFullscreen = () => {
+    if (!containerRef.current) return;
+    if (!isFullscreen) {
+      containerRef.current.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  // Page handlers
+  const goToPrevPage = () => currentPage > 1 && setCurrentPage(currentPage - 1);
+  const goToNextPage = () => currentPage < numPages && setCurrentPage(currentPage + 1);
+  const goToPage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const page = parseInt(e.target.value);
+    if (!isNaN(page) && page >= 1 && page <= numPages) setCurrentPage(page);
   };
 
   if (!pdfUrl) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-zinc-400 p-8 text-center">
+      <div className="h-full flex flex-col items-center justify-center text-zinc-400 p-8">
         <FileWarning size={48} strokeWidth={1} />
-        <p className="mt-4 text-sm font-medium">Tidak ada PDF untuk desa ini</p>
-        <p className="text-xs mt-1">Silakan pilih desa yang memiliki arsip krawangan</p>
+        <p className="mt-4 text-sm font-medium">Belum ada dokumen</p>
       </div>
     );
   }
@@ -255,7 +238,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <Loader2 className="animate-spin text-zinc-400" size={32} />
+        <Loader2 className="animate-spin text-blue-500" size={32} />
       </div>
     );
   }
@@ -263,58 +246,96 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
   if (error) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-red-500 p-8 text-center">
-        <AlertCircle size={48} />
-        <p className="mt-4 text-sm font-medium">{error}</p>
-        <button
-          onClick={handleRetry}
-          className="mt-4 px-4 py-2 bg-zinc-900 text-white text-sm rounded-lg hover:bg-zinc-800"
-        >
-          Coba Lagi
-        </button>
+        <AlertCircle size={40} />
+        <p className="mt-4 text-sm">{error}</p>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col bg-zinc-100">
-      {/* Toolbar navigasi */}
-      {numPages > 0 && (
-        <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-zinc-200">
+    <div ref={containerRef} className="h-full flex flex-col bg-zinc-100">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between gap-2 px-3 py-2 bg-white border-b border-zinc-200 shrink-0">
+        <div className="flex items-center gap-1">
           <button
             onClick={goToPrevPage}
             disabled={currentPage <= 1}
-            className="px-3 py-1 text-sm bg-zinc-100 rounded disabled:opacity-50 hover:bg-zinc-200 transition-all"
+            className="p-1.5 hover:bg-zinc-100 rounded disabled:opacity-30"
           >
-            ← Sebelumnya
+            <ChevronLeft size={18} />
           </button>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">
-              Halaman {currentPage} dari {numPages}
-            </span>
-            {(searching || searchKeyword) && (
-              <div className="flex items-center gap-1">
-                {searching ? (
-                  <Loader2 size={14} className="animate-spin text-blue-500" />
-                ) : searchResult && (
-                  <span className={`text-xs ${searchResult.includes('✓') ? 'text-green-600' : searchResult.includes('✗') ? 'text-amber-600' : 'text-blue-600'}`}>
-                    {searchResult}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
+          <input
+            type="number"
+            value={currentPage}
+            onChange={goToPage}
+            min={1}
+            max={numPages}
+            className="w-12 text-center text-sm border border-zinc-200 rounded py-1"
+          />
+          <span className="text-xs text-zinc-500">/ {numPages}</span>
           <button
             onClick={goToNextPage}
             disabled={currentPage >= numPages}
-            className="px-3 py-1 text-sm bg-zinc-100 rounded disabled:opacity-50 hover:bg-zinc-200 transition-all"
+            className="p-1.5 hover:bg-zinc-100 rounded disabled:opacity-30"
           >
-            Selanjutnya →
+            <ChevronRight size={18} />
           </button>
         </div>
-      )}
-      {/* Canvas PDF */}
-      <div className="flex-1 overflow-auto flex justify-center p-4">
-        <canvas ref={canvasRef} className="shadow-lg max-w-full h-auto" />
+
+        <div className="flex items-center gap-1">
+          <button onClick={zoomOut} className="p-1.5 hover:bg-zinc-100 rounded">
+            <ZoomOut size={16} />
+          </button>
+          <span className="text-xs font-medium min-w-[45px] text-center">
+            {Math.round(zoom * 100)}%
+          </span>
+          <button onClick={zoomIn} className="p-1.5 hover:bg-zinc-100 rounded">
+            <ZoomIn size={16} />
+          </button>
+          <button onClick={resetZoom} className="text-xs px-2 py-1 hover:bg-zinc-100 rounded">
+            Reset
+          </button>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <button onClick={downloadPDF} className="p-1.5 hover:bg-zinc-100 rounded">
+            <Download size={16} />
+          </button>
+          <button onClick={toggleFullscreen} className="p-1.5 hover:bg-zinc-100 rounded">
+            {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          </button>
+        </div>
+
+        {/* Status Pencarian */}
+        {searching && <Loader2 size={14} className="animate-spin text-blue-500" />}
+        {searchResult && (
+          <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+            searchResult.includes('✓') ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+          }`}>
+            {searchResult}
+          </span>
+        )}
+      </div>
+
+      {/* Canvas Container dengan CSS Zoom */}
+      <div className="flex-1 overflow-auto p-4" style={{ backgroundColor: '#e5e7eb' }}>
+        <div 
+          className="flex justify-center transition-transform duration-200"
+          style={{
+            transform: `scale(${zoom})`,
+            transformOrigin: 'center top',
+          }}
+        >
+          <canvas 
+            ref={canvasRef} 
+            className="shadow-lg bg-white"
+            style={{
+              display: 'block',
+              maxWidth: '100%',
+              height: 'auto',
+            }}
+          />
+        </div>
       </div>
     </div>
   );
