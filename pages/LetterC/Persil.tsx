@@ -69,47 +69,76 @@ export const Persil = () => {
   }, []);
 
   // --- Fetch URL Krawangan dari database ---
-  useEffect(() => {
-    const fetchDesaKrawangan = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('desa')
-          .select('id, krawangan_url');
+  // --- Fetch URL Krawangan dari database ---
+useEffect(() => {
+  const fetchDesaKrawangan = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('desa')
+        .select('id, nama, krawangan_url');
+      
+      if (error) throw error;
+      
+      if (data) {
+        const map: Record<string, string> = {};
         
-        if (error) throw error;
-        
-        if (data) {
-          const map: Record<string, string> = {};
+        for (const desa of data) {
+          let pdfUrl = null;
           
-          for (const desa of data) {
-            // Jika ada krawangan_url di database, gunakan itu
-            if (desa.krawangan_url) {
-              // Cek apakah URL sudah lengkap atau hanya path
-              if (desa.krawangan_url.startsWith('http')) {
-                map[desa.id] = desa.krawangan_url;
-              } else {
-                // Gunakan storage URL dari env
-                const fullUrl = `${storageUrl}${desa.krawangan_url}`;
-                map[desa.id] = fullUrl;
-              }
+          // Priority 1: Gunakan krawangan_url dari database jika ada
+          if (desa.krawangan_url) {
+            // Jika URL sudah lengkap
+            if (desa.krawangan_url.startsWith('http')) {
+              pdfUrl = desa.krawangan_url;
             } 
-            // Jika tidak ada di database, fallback ke env untuk desa tertentu
-            else if (desa.nama?.toLowerCase().includes('genengwaru') && storageUrl && pdfFilename) {
-              // Untuk desa Genengwaru, gunakan URL dari env
-              const defaultUrl = `${storageUrl}${pdfFilename}`;
-              map[desa.id] = defaultUrl;
+            // Jika hanya path/filename
+            else {
+              // Coba berbagai kemungkinan path
+              const possibleUrls = [
+                `${storageUrl}${desa.krawangan_url}`,
+                `${storageUrl}${encodeURIComponent(desa.krawangan_url)}`,
+                `https://xrtdbatsycdhbbkxcpjs.supabase.co/storage/v1/object/public/krawangan-desa-genengwaru/${desa.krawangan_url}`,
+              ];
+              
+              // Coba URL pertama yang valid
+              for (const url of possibleUrls) {
+                try {
+                  const response = await fetch(url, { method: 'HEAD' });
+                  if (response.ok) {
+                    pdfUrl = url;
+                    break;
+                  }
+                } catch (err) {
+                  console.log(`URL not accessible: ${url}`);
+                }
+              }
+              
+              // Jika tidak ada yang berhasil, gunakan URL default
+              if (!pdfUrl) {
+                pdfUrl = possibleUrls[0];
+              }
             }
           }
           
-          setDesaKrawanganMap(map);
+          // Priority 2: Fallback ke env untuk desa Genengwaru
+          if (!pdfUrl && desa.nama?.toLowerCase().includes('genengwaru') && storageUrl && pdfFilename) {
+            pdfUrl = `${storageUrl}${pdfFilename}`;
+          }
+          
+          if (pdfUrl) {
+            map[desa.id] = pdfUrl;
+          }
         }
-      } catch (err: any) {
-        console.error("Error fetching desa krawangan URLs:", err.message);
+        
+        setDesaKrawanganMap(map);
       }
-    };
-    
-    fetchDesaKrawangan();
-  }, [storageUrl, pdfFilename]);
+    } catch (err: any) {
+      console.error("Error fetching desa krawangan URLs:", err.message);
+    }
+  };
+  
+  fetchDesaKrawangan();
+}, [storageUrl, pdfFilename]);
 
   // --- Fetch Data Persil ---
   useEffect(() => {

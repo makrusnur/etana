@@ -551,17 +551,18 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
 
   // Fungsi untuk cek nomor kohir duplikat
   // Di dalam checkDuplicateNomorC
+  // 1. FUNGSI CEK KE DATABASE
   const checkDuplicateNomorC = async (nomorC: string, excludeId?: string) => {
-    // Tambahkan log untuk debugging
-    console.log("Mengecek Desa:", selectedDesaId, "Nomor:", nomorC);
-  
-    if (!nomorC || !selectedDesaId) return false; // Jangan cek jika data tidak lengkap
+    const cleanNomor = nomorC.trim();
+    
+    // Jangan lakukan query jika nomor kosong atau desa belum dipilih
+    if (!cleanNomor || !selectedDesaId) return false; 
     
     let query = supabase
       .from('letter_c')
       .select('id')
       .eq('desa_id', selectedDesaId)
-      .eq('nomor_c', nomorC.trim()); // HARUS .eq (equal)
+      .eq('nomor_c', cleanNomor); // Mencari kecocokan nilai yang sama persis
       
     if (excludeId) {
       query = query.neq('id', excludeId);
@@ -574,19 +575,27 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
       return false; 
     }
   
+    // Akan return true HANYA JIKA data ditemukan (panjang array > 0)
     return data && data.length > 0;
   };
 
-  // Validasi nomor kohir saat input berubah
+  // 2. FUNGSI SAAT INPUT BERUBAH
   const handleNomorCChange = async (value: string) => {
-    setForm({...form, nomor_c: value});
-    setNomorCError('');
+    // 1. Update state untuk UI agar ketikan user langsung muncul
+    setForm(prev => ({ ...prev, nomor_c: value }));
+    setNomorCError(''); // Reset error setiap ada ketikan baru
     
-    if (value && value.trim() !== '') {
-      const isDuplicate = await checkDuplicateNomorC(form.nomor_c.toString().trim(), editData?.id);
-      if (isDuplicate) {
-        setNomorCError(`Nomor Kohir C.${value} sudah terdaftar di desa ini!`);
-      }
+    const cleanValue = value.trim();
+
+    // 2. Jika input kosong setelah di-trim, hentikan proses (jangan tembak database)
+    if (!cleanValue) return;
+
+    // 3. PENTING: Gunakan 'cleanValue', BUKAN 'form.nomor_c'
+    const isDuplicate = await checkDuplicateNomorC(cleanValue, editData?.id);
+    
+    // 4. Set pesan error jika terbukti duplikat
+    if (isDuplicate) {
+      setNomorCError(`Nomor Kohir C.${cleanValue} sudah terdaftar di desa ini!`);
     }
   };
 

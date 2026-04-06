@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
-import { Loader2, AlertCircle, Search as SearchIcon } from 'lucide-react';
+import { Loader2, AlertCircle, Search as SearchIcon, FileWarning } from 'lucide-react';
 
 // Set worker src
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -24,6 +24,17 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
   const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchResult, setSearchResult] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  // Fungsi untuk memeriksa apakah file PDF dapat diakses
+  const checkPdfAccessibility = async (url: string): Promise<boolean> => {
+    try {
+      const response = await fetch(url, { method: 'HEAD' });
+      return response.ok;
+    } catch (err) {
+      return false;
+    }
+  };
 
   // Load PDF document
   useEffect(() => {
@@ -40,22 +51,79 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
       setLoading(true);
       setError(null);
       setSearchResult(null);
+      
       try {
-        // Tambahkan parameter untuk menghindari cache
-        const urlWithCache = `${pdfUrl}${pdfUrl.includes('?') ? '&' : '?'}_=${Date.now()}`;
-        const doc = await pdfjsLib.getDocument(urlWithCache).promise;
+        // Cek apakah file dapat diakses
+        const isAccessible = await checkPdfAccessibility(pdfUrl);
+        if (!isAccessible) {
+          throw new Error('File PDF tidak dapat diakses. Periksa URL atau permission bucket.');
+        }
+
+        // Load PDF tanpa cache parameter untuk menghindari masalah
+        const loadingTask = pdfjsLib.getDocument({
+          url: pdfUrl,
+          disableRange: true, // Matikan range request untuk menghindari CORS issues
+          disableStream: true,
+          isEvalSupported: false,
+        });
+        
+        const doc = await loadingTask.promise;
         setPdfDoc(doc);
         setNumPages(doc.numPages);
         setCurrentPage(1);
+        setError(null);
       } catch (err: any) {
         console.error('Error loading PDF:', err);
-        setError('Gagal memuat PDF. Periksa URL atau koneksi.');
+        
+        // Coba lagi dengan URL tanpa encoding jika error
+        if (retryCount === 0 && pdfUrl.includes('%')) {
+          setRetryCount(1);
+          const decodedUrl = decodeURIComponent(pdfUrl);
+          setPdfDoc(null); // Trigger reload dengan URL decoded
+          setTimeout(() => {
+            loadPdfWithUrl(decodedUrl);
+          }, 100);
+          return;
+        }
+        
+        let errorMessage = 'Gagal memuat PDF. ';
+        if (err.status === 400) {
+          errorMessage += 'File tidak ditemukan atau URL tidak valid. ';
+        } else if (err.status === 403) {
+          errorMessage += 'Akses ditolak. Pastikan bucket storage bersifat public. ';
+        } else if (err.status === 404) {
+          errorMessage += 'File tidak ditemukan. ';
+        } else {
+          errorMessage += err.message || 'Periksa koneksi dan URL PDF.';
+        }
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
     };
+    
+    const loadPdfWithUrl = async (url: string) => {
+      setLoading(true);
+      try {
+        const loadingTask = pdfjsLib.getDocument({
+          url: url,
+          disableRange: true,
+          disableStream: true,
+        });
+        const doc = await loadingTask.promise;
+        setPdfDoc(doc);
+        setNumPages(doc.numPages);
+        setCurrentPage(1);
+        setError(null);
+      } catch (err) {
+        setError('Gagal memuat PDF setelah percobaan ulang.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
     loadPdf();
-  }, [pdfUrl]);
+  }, [pdfUrl, retryCount]);
 
   // Render halaman tertentu
   const renderPage = async (pageNum: number) => {
@@ -114,6 +182,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
           `nomor ${keyword}`,
           `persil no. ${keyword}`,
           `persil nomor ${keyword}`,
+          ` ${keyword} `,
         ];
         
         // Iterasi semua halaman untuk mencari teks
@@ -127,7 +196,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
           
           if (isFound) {
             foundPage = pageIdx;
-            setSearchResult(`Ditemukan di halaman ${pageIdx}`);
+            setSearchResult(`✓ Ditemukan di halaman ${pageIdx}`);
             break;
           }
         }
@@ -135,7 +204,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
         if (foundPage) {
           setCurrentPage(foundPage);
         } else {
-          setSearchResult(`Tidak ditemukan: "${searchKeyword}"`);
+          setSearchResult(`✗ "${searchKeyword}" tidak ditemukan`);
         }
       } catch (err) {
         console.error('Search error:', err);
@@ -145,7 +214,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
       }
     };
 
-    // Debounce search untuk menghindari terlalu banyak request
+    // Debounce search
     const timeoutId = setTimeout(() => {
       performSearch();
     }, 500);
@@ -168,10 +237,15 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
     }
   };
 
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
+    setError(null);
+  };
+
   if (!pdfUrl) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-zinc-400 p-8 text-center">
-        <AlertCircle size={48} strokeWidth={1} />
+        <FileWarning size={48} strokeWidth={1} />
         <p className="mt-4 text-sm font-medium">Tidak ada PDF untuk desa ini</p>
         <p className="text-xs mt-1">Silakan pilih desa yang memiliki arsip krawangan</p>
       </div>
@@ -191,6 +265,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
       <div className="h-full flex flex-col items-center justify-center text-red-500 p-8 text-center">
         <AlertCircle size={48} />
         <p className="mt-4 text-sm font-medium">{error}</p>
+        <button
+          onClick={handleRetry}
+          className="mt-4 px-4 py-2 bg-zinc-900 text-white text-sm rounded-lg hover:bg-zinc-800"
+        >
+          Coba Lagi
+        </button>
       </div>
     );
   }
@@ -216,7 +296,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
                 {searching ? (
                   <Loader2 size={14} className="animate-spin text-blue-500" />
                 ) : searchResult && (
-                  <span className={`text-xs ${searchResult.includes('Tidak') ? 'text-amber-600' : 'text-green-600'}`}>
+                  <span className={`text-xs ${searchResult.includes('✓') ? 'text-green-600' : searchResult.includes('✗') ? 'text-amber-600' : 'text-blue-600'}`}>
                     {searchResult}
                   </span>
                 )}
