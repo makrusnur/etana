@@ -550,21 +550,30 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
   const [showCropper, setShowCropper] = useState(false);
 
   // Fungsi untuk cek nomor kohir duplikat
+  // Di dalam checkDuplicateNomorC
   const checkDuplicateNomorC = async (nomorC: string, excludeId?: string) => {
-    if (!nomorC || !selectedDesaId) return false;
+    // Tambahkan log untuk debugging
+    console.log("Mengecek Desa:", selectedDesaId, "Nomor:", nomorC);
+  
+    if (!nomorC || !selectedDesaId) return false; // Jangan cek jika data tidak lengkap
     
     let query = supabase
       .from('letter_c')
-      .select('id, nomor_c')
+      .select('id')
       .eq('desa_id', selectedDesaId)
-      .eq('nomor_c', nomorC);
-    
+      .eq('nomor_c', nomorC.trim()); // HARUS .eq (equal)
+      
     if (excludeId) {
       query = query.neq('id', excludeId);
     }
     
     const { data, error } = await query;
-    if (error) return false;
+    
+    if (error) {
+      console.error("Query Error:", error);
+      return false; 
+    }
+  
     return data && data.length > 0;
   };
 
@@ -574,7 +583,7 @@ const FormTambahC = ({ selectedDesaId, editData, onClose, onSuccess, existingKoh
     setNomorCError('');
     
     if (value && value.trim() !== '') {
-      const isDuplicate = await checkDuplicateNomorC(value.trim(), editData?.id);
+      const isDuplicate = await checkDuplicateNomorC(form.nomor_c.toString().trim(), editData?.id);
       if (isDuplicate) {
         setNomorCError(`Nomor Kohir C.${value} sudah terdaftar di desa ini!`);
       }

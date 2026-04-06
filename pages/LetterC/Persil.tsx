@@ -38,10 +38,15 @@ export const Persil = () => {
   // PDF States
   const [selectedPdfUrl, setSelectedPdfUrl] = useState<string | null>(null);
   const [selectedPageNumber, setSelectedPageNumber] = useState<number | null>(null);
+  const [pdfSearchKeyword, setPdfSearchKeyword] = useState<string | null>(null);
   const [isSplitView, setIsSplitView] = useState(true);
   
   // Map untuk menyimpan URL krawangan per desa
   const [desaKrawanganMap, setDesaKrawanganMap] = useState<Record<string, string>>({});
+
+  // Get storage URL from env
+  const storageUrl = import.meta.env.VITE_SUPABASE_STORAGE_URL;
+  const pdfFilename = import.meta.env.VITE_PDF_FILENAME;
 
   // selectedDesa dihitung dari state
   const selectedDesa = desas.find(d => d.id === selectedDesaId);
@@ -75,11 +80,27 @@ export const Persil = () => {
         
         if (data) {
           const map: Record<string, string> = {};
-          data.forEach((desa: any) => {
+          
+          for (const desa of data) {
+            // Jika ada krawangan_url di database, gunakan itu
             if (desa.krawangan_url) {
-              map[desa.id] = desa.krawangan_url;
+              // Cek apakah URL sudah lengkap atau hanya path
+              if (desa.krawangan_url.startsWith('http')) {
+                map[desa.id] = desa.krawangan_url;
+              } else {
+                // Gunakan storage URL dari env
+                const fullUrl = `${storageUrl}${desa.krawangan_url}`;
+                map[desa.id] = fullUrl;
+              }
+            } 
+            // Jika tidak ada di database, fallback ke env untuk desa tertentu
+            else if (desa.nama?.toLowerCase().includes('genengwaru') && storageUrl && pdfFilename) {
+              // Untuk desa Genengwaru, gunakan URL dari env
+              const defaultUrl = `${storageUrl}${pdfFilename}`;
+              map[desa.id] = defaultUrl;
             }
-          });
+          }
+          
           setDesaKrawanganMap(map);
         }
       } catch (err: any) {
@@ -88,7 +109,7 @@ export const Persil = () => {
     };
     
     fetchDesaKrawangan();
-  }, []);
+  }, [storageUrl, pdfFilename]);
 
   // --- Fetch Data Persil ---
   useEffect(() => {
@@ -159,6 +180,7 @@ export const Persil = () => {
       setSelectedPdfUrl(null);
     }
     setSelectedPageNumber(null);
+    setPdfSearchKeyword(null);
   }, [selectedDesaId, desaKrawanganMap]);
 
   // --- Filter Logic ---
@@ -183,19 +205,23 @@ export const Persil = () => {
     return matchesSearch && matchesFilter && matchesVoid;
   });
 
-  // --- Auto-select page when search matches exactly one persil ---
+  // --- Auto-select page & search keyword when search matches exactly one persil ---
   useEffect(() => {
     const searchTermTrimmed = searchTerm.trim();
     
     if (searchTermTrimmed && filteredPersils.length === 1 && !filteredPersils[0].is_void) {
       const persil = filteredPersils[0];
+      // Set halaman dari database jika ada (fallback)
       if (persil.halaman_krawangan && persil.halaman_krawangan > 0) {
         setSelectedPageNumber(persil.halaman_krawangan);
       } else {
         setSelectedPageNumber(null);
       }
+      // Set keyword pencarian PDF dengan berbagai format yang mungkin ada di PDF
+      setPdfSearchKeyword(`${persil.nomor_persil}`);
     } else if (!searchTermTrimmed) {
       setSelectedPageNumber(null);
+      setPdfSearchKeyword(null);
     }
   }, [searchTerm, filteredPersils]);
 
@@ -205,6 +231,8 @@ export const Persil = () => {
     } else {
       setSelectedPageNumber(null);
     }
+    // Optional: juga lakukan pencarian saat klik
+    // setPdfSearchKeyword(`${persil.nomor_persil}`);
   };
 
   const handlePrintPDF = async () => {
@@ -665,6 +693,7 @@ export const Persil = () => {
               <PDFViewer 
                 pdfUrl={selectedPdfUrl}
                 pageNumber={selectedPageNumber}
+                searchKeyword={pdfSearchKeyword}
               />
             </div>
           )}
